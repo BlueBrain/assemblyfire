@@ -1,0 +1,10 @@
+root_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/random_stream_20trials"
+
+root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures"
+
+preprocessing_protocol:
+    t_start: 1000
+    t_end: 62000
+    bin_size: 10
+
+clustering_method: "density_based"

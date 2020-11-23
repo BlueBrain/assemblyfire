@@ -1,0 +1,10 @@
+assemblyfire.egg-info/
+build/
+dist/
+doc/
+extra/
+tests/
+MANIFEST.in
+tox.ini
+assemblyfire/__pycache__
+*.pyc
