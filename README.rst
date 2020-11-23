@@ -24,4 +24,4 @@ Examples
 
 .. code-block::
 
-  assemblyfire find_assemblies -v /gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/100p_depol_simmat.yaml
+  assemblyfire find_assemblies -v configs/100p_depol_simmat.yaml
