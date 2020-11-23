@@ -14,7 +14,7 @@ Installation
   module load python
   python -m venv dev-assemblyfire
   source dev-assemblyfire/bin/activate
-  git pull
+  git pull https://github.com/andrisecker/assemblyfire.git
   cd assemblyfire/
   pip install -i https://bbpteam.epfl.ch/repository/devpi/simple -e .
 
