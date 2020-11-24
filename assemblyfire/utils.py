@@ -7,9 +7,11 @@ author: András Ecker, last update: 11.2020
 
 import os
 import json
+import h5py
 import numpy as np
 from bluepy.v2.enums import Cell, Synapse
 from bluepy.v2 import Circuit
+from assemblyfire.assemblies import AssemblyGroup, AssemblyProjectMetadata
 
 
 def ensure_dir(dirpath):
@@ -132,3 +134,13 @@ def read_spikes(f_name, t_start, t_end):
     idx = np.where((t_start < spike_times) & (spike_times < t_end))[0]
 
     return spike_times[idx], spiking_gids[idx]
+
+
+def load_assemblies_from_h5(h5f_name, prefix="assemblies"):
+    """Load assemblies over seeds from saved h5 file into dict of AssemblyGroups"""
+
+    with h5py.File(h5f_name, "r") as h5:
+        keys = list(h5[prefix].keys())
+    project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix=prefix)
+    return dict([(k, AssemblyGroup.from_h5(h5f_name, k, prefix=prefix))
+                 for k in keys]), project_metadata
