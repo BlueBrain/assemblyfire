@@ -14,9 +14,6 @@ from collections import namedtuple
 from cached_property import cached_property
 import numpy as np
 import multiprocessing as mp
-from bluepy.v2 import Simulation
-
-from assemblyfire.utils import get_seeds, get_patterns, get_E_gids, get_spikes
 
 
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "row_map", "t_bins", "t_idx"])
@@ -113,10 +110,12 @@ class SpikeMatrixGroup(object):
 
     @cached_property
     def seeds(self):
+        from assemblyfire.utils import get_seeds
         return get_seeds(self.root_path)
 
     @cached_property
     def patterns(self):
+        from assemblyfire.utils import get_patterns
         return get_patterns(self.root_path)
 
     def get_blueconfig_path(self, seed):
@@ -124,6 +123,8 @@ class SpikeMatrixGroup(object):
 
     def get_spike_matrices(self):
         """Bin spikes and threshold activity by population firing rate"""
+        from bluepy.v2 import Simulation
+        from assemblyfire.utils import get_E_gids, get_spikes
 
         spike_matrix_dict = {}; rate_dict = {}
         for seed in tqdm(self.seeds):
