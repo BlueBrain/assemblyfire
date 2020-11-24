@@ -9,6 +9,7 @@ Installation
 
 .. code-block::
 
+  # to install it on BB5 with bluepy:
   module purge
   module load unstable
   module load python
@@ -16,7 +17,12 @@ Installation
   source dev-assemblyfire/bin/activate
   git pull https://github.com/andrisecker/assemblyfire.git
   cd assemblyfire/
-  pip install -i https://bbpteam.epfl.ch/repository/devpi/simple -e .
+  pip install -i https://bbpteam.epfl.ch/repository/devpi/simple -e .[bluepy]
+
+  # to install it locally without having to install bluepy
+  git pull https://github.com/andrisecker/assemblyfire.git
+  cd assemblyfire/
+  pip install -e .
 
 
 Examples

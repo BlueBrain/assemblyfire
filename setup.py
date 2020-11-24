@@ -38,7 +38,7 @@ setup(
     entry_points={"console_scripts": ["assemblyfire=assemblyfire.cli:cli"]},
     extras_require={
         "docs": ["sphinx", "sphinx-bluebrain-theme"],
-        "bbp": ["bluepy>=0.14.15"]
+        "bluepy": ["bluepy>=0.14.15"]
     },
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

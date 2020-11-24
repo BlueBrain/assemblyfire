@@ -20,6 +20,19 @@ SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "row_map", 
 ThresholdedRate = namedtuple("ThresholdedRate", ["rate", "rate_th"])
 
 
+def _get_bluepy_simulation(blueconfig_path):
+    try:
+        from bluepy.v2 import Simulation
+    except ImportError as e:
+        msg = (
+            "Assemblyfire requirements are not installed.\n"
+            "Please pip install bluepy as follows:\n"
+            " pip install -i https://bbpteam.epfl.ch/repository/devpi/simple bluepy[all]"
+        )
+        raise ImportError(str(e) + "\n\n" + msg)
+    return Simulation(blueconfig_path)
+
+
 def spikes2mat(spike_times, spiking_gids, t_start, t_end, bin_size):
     """Bins time and builds spike matrix"""
 
@@ -123,12 +136,11 @@ class SpikeMatrixGroup(object):
 
     def get_spike_matrices(self):
         """Bin spikes and threshold activity by population firing rate"""
-        from bluepy.v2 import Simulation
         from assemblyfire.utils import get_E_gids, get_spikes
 
         spike_matrix_dict = {}; rate_dict = {}
         for seed in tqdm(self.seeds):
-            sim = Simulation(self.get_blueconfig_path(seed))
+            sim = _get_bluepy_simulation(self.get_blueconfig_path(seed))
             gids = get_E_gids(sim.circuit, sim.target)
             spike_times, spiking_gids = get_spikes(sim, gids, self.t_start, self.t_end)
             spike_matrix, row_map, t_bins = spikes2mat(spike_times, spiking_gids,
