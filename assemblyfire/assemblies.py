@@ -1,7 +1,7 @@
 import numpy
-from scipy.stats import hypergeom
-from scipy.stats import pearsonr
-from scipy.stats import binom
+from scipy.stats import binom, pearsonr, hypergeom
+
+from assemblyfire.clustering import cluster_assemblies
 
 
 __io_version__ = "1.0"
@@ -500,6 +500,46 @@ class AssemblyGroup(object):
             return numpy.diag(M)
         else:
             raise Exception("Unknown score function: {0}".format(score_function))
+
+
+
+def consensus_over_seeds_hamming(assembly_grp_dict, project_metadata, criterion="maxclust", threshold=None):
+    """Takes an assembly group dictionary gives a dictionary of assemblies grouped by seed.
+    Returns an assembly group dictionary of the same assemblies grouped by cluster.  The clusters are determined as follows:
+    1. Interpret each assembly as a binary vector in R^N where N = #(all_gids).
+    2. Compute matrix M of pariwise Hamming distances between all assemblies in all seeds.
+    3. Fill in block diagonals of M (corresponding to each seed block) with 10 times the largest value of M.  Such that the distance between different assemblies within each seed is "infinite".
+    4. Perform hierachical clustering on assemblies using M as a matrix distance.
+    5. Determine clusters.  Default is set so the total number of clusters is the maximum number of assemblies found across seeds.
+    """
+
+    assert criterion in ["distance", "maxclust"]
+
+    # Making one big assembly group of all assemblies
+    # seeds = list(assembly_grp_dict.keys())
+    gids = []
+    n_assemblies = []
+    assembly_lst = []
+    for _, assembly_grp in assembly_grp_dict.items():
+        gids.extend(assembly_grp.all.tolist())
+        n = len(assembly_grp.assemblies)
+        n_assemblies.append(n)
+        assembly_lst.extend([assembly_grp.assemblies[i] for i in range(n)])
+    all_assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=np.unique(gids),
+                                   label="all", metadata=project_metadata)
+
+    if criterion == "maxclust":
+        sim_matrix, clusters, plotting = cluster_assemblies(all_assemblies.as_bool().T, n_assemblies,
+                                                            criterion, np.max(n_assemblies))
+    elif criterion == "distance":
+        sim_matrix, clusters, plotting = cluster_assemblies(all_assemblies.as_bool().T, n_assemblies,
+                                                            criterion, threshold)
+
+
+
+
+
+
 
 
 class ConsensusAssembly(Assembly):

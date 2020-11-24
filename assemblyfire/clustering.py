@@ -30,7 +30,7 @@ from assemblyfire.plots import plot_sim_matrix, plot_dendogram_silhouettes, plot
 
 # hierarchical clustering (using scipy and sklearn)
 def cluster_sim_mat(spike_matrix):
-    """Hieararchical (Ward linkage) clustering of cosine similarity matrix"""
+    """Hieararchical (Ward linkage) clustering of cosine similarity matrix of significant time bins"""
 
     cond_dists = pdist(spike_matrix.T, metric="cosine")
     dists = squareform(cond_dists)
@@ -38,7 +38,7 @@ def cluster_sim_mat(spike_matrix):
 
     linkage = ward(cond_dists)
 
-    # determine number of clusters
+    # determine number of clusters using silhouette scores
     silhouette_scores = []
     for n in range(4, 21):
         clusters = fcluster(linkage, n, criterion="maxclust")
@@ -46,6 +46,48 @@ def cluster_sim_mat(spike_matrix):
     n_clust = np.argmax(silhouette_scores) + 4
 
     clusters = fcluster(linkage, int(n_clust), criterion="maxclust")
+    silhouettes = silhouette_samples(dists, clusters)
+    clusters = clusters - 1  # to start indexing at 0
+
+    plotting = [linkage, silhouettes]
+    return sim_matrix, clusters, plotting
+
+
+def _update_block_diagonal_dists(dists, n_assemblies):
+    """
+    Assemblies from the same seed tend to cluster together, but that's not what we want. - Daniela
+    Thus, this function fills block diagonals with "infinite" distance representing infinite distance
+    between different assemblies from the same seed and return scipy's condensed distance representation
+    which can be passed to hierarhichal clustering in the next step
+    """
+
+    inf_dist = np.max(dists) * 10
+    n_assemblies_cum = [0] + np.cumsum(n_assemblies).tolist()
+    for i, j in zip(n_assemblies_cum[:-1], n_assemblies_cum[1:]):
+        dists[i:j, i:j] = inf_dist
+    np.fill_diagonal(dists, 0)
+    return squareform(dists)
+
+
+def cluster_assemblies(assemblies, n_assemblies, criterion, criterion_arg):
+    """
+    Hieararchical (Ward linkage) clustering of hamming similarity matrix of assemblies from different seeds
+    :param assemblies: assemblies x gids boolean array representing all assemblies across seeds
+    :param n_assemblies: list with number of assemblies per seed
+    :param criterion: criterion for hierarchical clustering
+    :param criterion_arg: if criterion is maxclust the number of clusters to find
+                          if criterion is distance the threshold to cut the dendogram
+    """
+
+    cond_dists = pdist(assemblies, metric="hamming")
+    dists = squareform(cond_dists)
+    sim_matrix = 1 - dists
+
+    cond_dists = _update_block_diagonal_dists(dists, n_assemblies)
+
+    linkage = ward(cond_dists)
+
+    clusters = fcluster(linkage, criterion_arg, criterion=criterion)
     silhouettes = silhouette_samples(dists, clusters)
     clusters = clusters - 1  # to start indexing at 0
 
