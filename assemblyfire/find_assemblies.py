@@ -43,6 +43,7 @@ def run(config_path):
 
     h5f_name = get_out_fname(spikes.root_path, spikes.clustering_method)
     if os.path.isfile(h5f_name):
+        L.warning("Existing HDF5 file: %s will be removed" % h5f_name)
         os.remove(h5f_name)
     metadata = {"root_path": spikes.root_path, "seeds": spikes.seeds, "patterns": spikes.patterns}
     AssemblyProjectMetadata.to_h5(metadata, h5f_name, prefix="assemblies")

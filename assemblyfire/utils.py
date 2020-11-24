@@ -7,9 +7,23 @@ author: András Ecker, last update: 11.2020
 
 import os
 import json
+import h5py
 import numpy as np
-from bluepy.v2.enums import Cell, Synapse
-from bluepy.v2 import Circuit
+
+from assemblyfire.assemblies import AssemblyGroup, AssemblyProjectMetadata
+
+
+def _get_bluepy_circuit(circuitconfig_path):
+    try:
+        from bluepy.v2 import Circuit
+    except ImportError as e:
+        msg = (
+            "Assemblyfire requirements are not installed.\n"
+            "Please pip install bluepy as follows:\n"
+            " pip install -i https://bbpteam.epfl.ch/repository/devpi/simple bluepy[all]"
+        )
+        raise ImportError(str(e) + "\n\n" + msg)
+    return Circuit(circuitconfig_path)
 
 
 def ensure_dir(dirpath):
@@ -60,23 +74,26 @@ def _get_gids(c, target):
 
 
 def get_E_gids(c, target="mc2_Column"):
+    from bluepy.v2.enums import Cell
     return c.cells.ids({"$target": target, Cell.SYNAPSE_CLASS: "EXC"})
 
 
 def get_EI_gids(c, target="mc2_Column"):
+    from bluepy.v2.enums import Cell
     gidsE = get_E_gids(c, target)
     gidsI = c.cells.ids({"$target": target, Cell.SYNAPSE_CLASS: "INH"})
     return gidsE, gidsI
 
 
 def _get_layer_gids(c, layer, target):
+    from bluepy.v2.enums import Cell
     return c.cells.ids({"$target": target, Cell.LAYER: layer})
 
 
 def map_gids_to_depth(circuit_config, target="mc2_Column"):
     """Creates gid-depth map (for better figure asthetics)"""
 
-    c = Circuit(circuit_config)
+    c = _get_bluepy_circuit(circuit_config)
     gids = _get_gids(c, target)
     ys = c.cells.get(gids)["y"]
     # convert pd.Series to dictionary...
@@ -88,7 +105,7 @@ def map_gids_to_depth(circuit_config, target="mc2_Column"):
 def get_layer_boundaries(circuit_config, target="mc2_Column"):
     """Gets layer boundaries and cell numbers (used for raster plots)"""
 
-    c = Circuit(circuit_config)
+    c = _get_bluepy_circuit(circuit_config)
     yticks = []
     yticklables = []
     hlines = []
@@ -132,3 +149,13 @@ def read_spikes(f_name, t_start, t_end):
     idx = np.where((t_start < spike_times) & (spike_times < t_end))[0]
 
     return spike_times[idx], spiking_gids[idx]
+
+
+def load_assemblies_from_h5(h5f_name, prefix="assemblies"):
+    """Load assemblies over seeds from saved h5 file into dict of AssemblyGroups"""
+
+    with h5py.File(h5f_name, "r") as h5:
+        keys = list(h5[prefix].keys())
+    project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix=prefix)
+    return dict([(k, AssemblyGroup.from_h5(h5f_name, k, prefix=prefix))
+                 for k in keys]), project_metadata
