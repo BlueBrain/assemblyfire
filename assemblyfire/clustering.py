@@ -12,6 +12,7 @@ last modified: András Ecker 11.2020
 """
 
 import os
+import logging
 from copy import deepcopy
 from tqdm import tqdm
 import numpy as np
@@ -26,6 +27,8 @@ from sklearn.metrics import silhouette_score, silhouette_samples
 from assemblyfire.assemblies import Assembly, AssemblyGroup
 from assemblyfire.plots import plot_sim_matrix, plot_dendogram_silhouettes, plot_transformed,\
                                plot_components, plot_rhos_deltas, plot_cluster_seqs, plot_assemblies
+
+L = logging.getLogger("assemblyfire")
 
 
 # hierarchical clustering (using scipy and sklearn)
@@ -336,6 +339,9 @@ def cluster_assemblies(assemblies, n_assemblies, criterion, criterion_arg):
     clusters = fcluster(linkage, criterion_arg, criterion=criterion)
     silhouettes = silhouette_samples(dists, clusters)
     clusters = clusters - 1  # to start indexing at 0
+    cluster_idx, counts = np.unique(clusters, return_counts=True)
+    L.info("Total number of assemblies: %i, Number of clusters: %i" % (np.sum(counts), len(counts)))
+    L.info("Size of clusters: ", counts)
 
     plotting = [linkage, silhouettes]
     return sim_matrix, clusters, plotting
