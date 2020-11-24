@@ -18,10 +18,10 @@ __h5_strings__ = {"1.0": {
     "indices": "assembly_indices",
     "consensus": "consensus_assemblies",
     "instantiations_label": "instantiations",
-    "consensus_meta": "_consensus_metadata"
+    "consensus_magic_string": "_consensus"
     }
 }
-__RESERVED__ = [__h5_strings__["1.0"]["consensus_meta"]]
+__RESERVED__ = []
 
 
 def __to_h5_1p0__(data, h5, prefix=None):
@@ -54,17 +54,16 @@ def __consensus_to_h5_1p0__(data, h5, prefix=None, label=None):
         prefix = prefix + "/" + str(data.label)
     else:
         prefix = prefix + "/" + label
+    consensus_metadata = {
+        "label": str(data.label),
+        "index": data.idx,
+        "core_threshold": data._thresh,
+        "core_method": data._core_method,
+        strings["consensus_magic_string"]: True
+    }
     instantiations = AssemblyGroup(data.instantiations, data.union.gids,
                                    label=strings["instantiations_label"])
     __to_h5_1p0__(instantiations, h5, prefix=prefix)
-    consensus_metadata = {
-        strings["consensus_meta"]: {
-            "label": str(data.label),
-            "index": data.idx,
-            "core_threshold": data._thresh,
-            "core_method": data._core_method
-        }
-    }
     __meta_to_h5_1p0__(consensus_metadata, h5, prefix=prefix)
 
 
@@ -76,7 +75,8 @@ def __from_h5_1p0__(h5, group_name, prefix=None):
     prefix_grp = h5[prefix]
     assert group_name in prefix_grp.keys()
     all_neurons = numpy.unique(numpy.hstack([prefix_grp[k][strings["gids"]][:]
-                                             for k in prefix_grp.keys()]))
+                                             for k in prefix_grp.keys()
+                                             if k not in __RESERVED__]))
 
     R = prefix_grp[group_name][strings["gids"]][:]
     M = prefix_grp[group_name][strings["bool_index"]][:]
@@ -108,12 +108,14 @@ def __consensus_from_h5_1p0__(h5, group_name, prefix=None):
 
     prefix_grp = h5[prefix]
     assert group_name in prefix_grp.keys()
-    consensus_meta = __meta_from_h5_1p0__(prefix_grp, prefix=prefix, group_name=group_name)
-    assert strings["consensus_meta"] in consensus_meta, \
+    grp_meta = __meta_from_h5_1p0__(prefix_grp, prefix=group_name)
+    assert grp_meta.get(strings["consensus_magic_string"], False), \
         "Assembly {0} at {1} not a consensus assembly!".format(group_name, prefix)
+    grp_meta.pop(strings["consensus_magic_string"])
 
     instantiations = __from_h5_1p0__(prefix_grp, strings["instantiations_label"], prefix=group_name)
-    return ConsensusAssembly(instantiations, **consensus_meta[strings["consensus_meta"]])
+
+    return ConsensusAssembly(list(instantiations), **grp_meta)
 
 
 def __meta_from_h5_1p0__(h5, group_name=None, prefix=None):
