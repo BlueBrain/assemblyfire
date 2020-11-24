@@ -502,21 +502,18 @@ class AssemblyGroup(object):
             raise Exception("Unknown score function: {0}".format(score_function))
 
 
-
-def consensus_over_seeds_hamming(assembly_grp_dict, project_metadata, criterion="maxclust", threshold=None):
-    """Takes an assembly group dictionary gives a dictionary of assemblies grouped by seed.
-    Returns an assembly group dictionary of the same assemblies grouped by cluster.  The clusters are determined as follows:
-    1. Interpret each assembly as a binary vector in R^N where N = #(all_gids).
-    2. Compute matrix M of pariwise Hamming distances between all assemblies in all seeds.
-    3. Fill in block diagonals of M (corresponding to each seed block) with 10 times the largest value of M.  Such that the distance between different assemblies within each seed is "infinite".
-    4. Perform hierachical clustering on assemblies using M as a matrix distance.
-    5. Determine clusters.  Default is set so the total number of clusters is the maximum number of assemblies found across seeds.
+def consensus_over_seeds_hamming(assembly_grp_dict, criterion="maxclust", threshold=None):
+    """
+    Hierarhichal clustering (Ward linkage) of assemblies from different seeds based on Hamming distance
+    :param assembly_grp_dict: dict with seeds as keys and AssemblyGroup object as values
+    :param criterion: criterion for hierarchical clustering (see `clustering.py/cluster_assemblies()`)
+    :param threshold: threshold to cut dendogram if criterion is "distance" (see `clustering.py/cluster_assemblies()`)
+    :return: assembly_grp_clust: dict with cluster idx as keys and AssemblyGroup object as values
     """
 
     assert criterion in ["distance", "maxclust"]
 
-    # Making one big assembly group of all assemblies
-    # seeds = list(assembly_grp_dict.keys())
+    # concatenate assemblies over seed into 1 big AssemblyGroup
     gids = []
     n_assemblies = []
     assembly_lst = []
@@ -525,9 +522,10 @@ def consensus_over_seeds_hamming(assembly_grp_dict, project_metadata, criterion=
         n = len(assembly_grp.assemblies)
         n_assemblies.append(n)
         assembly_lst.extend([assembly_grp.assemblies[i] for i in range(n)])
-    all_assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=np.unique(gids),
-                                   label="all", metadata=project_metadata)
+    all_gids = np.unique(gids)
+    all_assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=all_gids, label="all")
 
+    # hierarhichal clustering
     if criterion == "maxclust":
         sim_matrix, clusters, plotting = cluster_assemblies(all_assemblies.as_bool().T, n_assemblies,
                                                             criterion, np.max(n_assemblies))
@@ -535,11 +533,15 @@ def consensus_over_seeds_hamming(assembly_grp_dict, project_metadata, criterion=
         sim_matrix, clusters, plotting = cluster_assemblies(all_assemblies.as_bool().T, n_assemblies,
                                                             criterion, threshold)
 
+    # making an assembly group of assemblies grouped by clustering
+    assembly_grp_clust = {}
+    for cluster in np.unique(clusters):
+        c_idx = np.where(clusters==cluster)[0]
+        assembly_lst = [assembly_group.assemblies[i] for i in c_idx]
+        assembly_grp_clust[cluster] = AssemblyGroup(assemblies=assembly_lst, all_gids=all_gids,
+                                                    label="cluster%i" % cluster)
 
-
-
-
-
+    return assembly_grp_clust
 
 
 class ConsensusAssembly(Assembly):

@@ -53,48 +53,6 @@ def cluster_sim_mat(spike_matrix):
     return sim_matrix, clusters, plotting
 
 
-def _update_block_diagonal_dists(dists, n_assemblies):
-    """
-    Assemblies from the same seed tend to cluster together, but that's not what we want. - Daniela
-    Thus, this function fills block diagonals with "infinite" distance representing infinite distance
-    between different assemblies from the same seed and return scipy's condensed distance representation
-    which can be passed to hierarhichal clustering in the next step
-    """
-
-    inf_dist = np.max(dists) * 10
-    n_assemblies_cum = [0] + np.cumsum(n_assemblies).tolist()
-    for i, j in zip(n_assemblies_cum[:-1], n_assemblies_cum[1:]):
-        dists[i:j, i:j] = inf_dist
-    np.fill_diagonal(dists, 0)
-    return squareform(dists)
-
-
-def cluster_assemblies(assemblies, n_assemblies, criterion, criterion_arg):
-    """
-    Hieararchical (Ward linkage) clustering of hamming similarity matrix of assemblies from different seeds
-    :param assemblies: assemblies x gids boolean array representing all assemblies across seeds
-    :param n_assemblies: list with number of assemblies per seed
-    :param criterion: criterion for hierarchical clustering
-    :param criterion_arg: if criterion is maxclust the number of clusters to find
-                          if criterion is distance the threshold to cut the dendogram
-    """
-
-    cond_dists = pdist(assemblies, metric="hamming")
-    dists = squareform(cond_dists)
-    sim_matrix = 1 - dists
-
-    cond_dists = _update_block_diagonal_dists(dists, n_assemblies)
-
-    linkage = ward(cond_dists)
-
-    clusters = fcluster(linkage, criterion_arg, criterion=criterion)
-    silhouettes = silhouette_samples(dists, clusters)
-    clusters = clusters - 1  # to start indexing at 0
-
-    plotting = [linkage, silhouettes]
-    return sim_matrix, clusters, plotting
-
-
 # density based clustering (built from core numpy and scipy functions)
 def PCA_ncomps(matrix, n_components):
     """PCA wrapper with fixed number of components"""
@@ -258,6 +216,22 @@ def within_cluster_correlations(spike_matrix, core_cell_idx):
     return assembly_idx
 
 
+def _update_block_diagonal_dists(dists, n_assemblies):
+    """
+    Assemblies from the same seed tend to cluster together, but that's not what we want. - Daniela
+    Thus, this function fills block diagonals with "infinite" distance representing infinite distance
+    between different assemblies from the same seed and return scipy's condensed distance representation
+    which can be passed to hierarhichal clustering in the next step
+    """
+
+    inf_dist = np.max(dists) * 10
+    n_assemblies_cum = [0] + np.cumsum(n_assemblies).tolist()
+    for i, j in zip(n_assemblies_cum[:-1], n_assemblies_cum[1:]):
+        dists[i:j, i:j] = inf_dist
+    np.fill_diagonal(dists, 0)
+    return squareform(dists)
+
+
 def cluster_spikes(spike_matrix_dict, method, FigureArgs):
     """
     Cluster spikes either via hierarchical clustering (Ward's linkage)
@@ -339,3 +313,29 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, FigureArgs):
         fig_name = os.path.join(FigureArgs.fig_dir, "assemblies_seed%i.png" % seed)
         plot_assemblies(core_cell_idx, assembly_idx, SpikeMatrixResult.row_map,
                         FigureArgs.ystuff, FigureArgs.depths, fig_name)
+
+
+def cluster_assemblies(assemblies, n_assemblies, criterion, criterion_arg):
+    """
+    Hieararchical (Ward linkage) clustering of hamming similarity matrix of assemblies from different seeds
+    :param assemblies: assemblies x gids boolean array representing all assemblies across seeds
+    :param n_assemblies: list with number of assemblies per seed
+    :param criterion: criterion for hierarchical clustering
+    :param criterion_arg: if criterion is maxclust the number of clusters to find
+                          if criterion is distance the threshold to cut the dendogram
+    """
+
+    cond_dists = pdist(assemblies, metric="hamming")
+    dists = squareform(cond_dists)
+    sim_matrix = 1 - dists
+
+    cond_dists = _update_block_diagonal_dists(dists, n_assemblies)
+
+    linkage = ward(cond_dists)
+
+    clusters = fcluster(linkage, criterion_arg, criterion=criterion)
+    silhouettes = silhouette_samples(dists, clusters)
+    clusters = clusters - 1  # to start indexing at 0
+
+    plotting = [linkage, silhouettes]
+    return sim_matrix, clusters, plotting
