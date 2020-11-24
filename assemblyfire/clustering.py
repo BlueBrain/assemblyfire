@@ -24,7 +24,6 @@ from scipy.cluster.hierarchy import ward, fcluster
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score, silhouette_samples
 
-from assemblyfire.assemblies import Assembly, AssemblyGroup
 from assemblyfire.plots import plot_sim_matrix, plot_dendogram_silhouettes, plot_transformed,\
                                plot_components, plot_rhos_deltas, plot_cluster_seqs, plot_assemblies
 
@@ -289,6 +288,8 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, FigureArgs):
     :param h5f_name: str - name of the HDF5 file (dumping the assemblies and their metadata)
     :param FigureArgs: plotting related arguments (see `cli.py`)
     """
+
+    from assemblyfire.assemblies import Assembly, AssemblyGroup
 
     for seed, SpikeMatrixResult in tqdm(spike_matrix_dict.items()):
         spike_matrix = SpikeMatrixResult.spike_matrix[:, SpikeMatrixResult.t_idx]

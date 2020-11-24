@@ -1,7 +1,12 @@
+# -*- coding: utf-8 -*-
+"""
+Classes and functions to deal with cell assemblies detected in the previous step of the pipeline
+authors: Michael Reimann, András Ecker, Daniela Egas Santander
+last modified: 11.2020
+"""
+
 import numpy
 from scipy.stats import binom, pearsonr, hypergeom
-
-from assemblyfire.clustering import cluster_assemblies
 
 
 __io_version__ = "1.0"
@@ -511,6 +516,7 @@ def consensus_over_seeds_hamming(assembly_grp_dict, criterion="maxclust", thresh
     :return: assembly_grp_clust: dict with cluster idx as keys and AssemblyGroup object as values
     """
 
+    from assemblyfire.clustering import cluster_assemblies
     assert criterion in ["distance", "maxclust"]
 
     # concatenate assemblies over seed into 1 big AssemblyGroup
