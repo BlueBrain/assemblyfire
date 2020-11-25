@@ -8,8 +8,8 @@ author: András Ecker, last update: 11.2020
 import os
 import json
 import h5py
-import numpy as np
 from collections import namedtuple
+import numpy as np
 
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
 
@@ -30,14 +30,6 @@ def _get_bluepy_circuit(circuitconfig_path):
 def ensure_dir(dirpath):
     if not os.path.exists(dirpath):
         os.makedirs(dirpath)
-
-
-def get_out_fname(root_path, clustering_method):
-    if clustering_method == "hierarchical":
-        tmp = "assemblies_simmat.h5"
-    elif clustering_method == "density_based":
-        tmp = "assemblies_spikes.h5"
-    return os.path.join(root_path, tmp)
 
 
 def get_seeds(root_path):
@@ -71,16 +63,22 @@ def get_patterns(root_path):
 
 
 def _get_gids(c, target):
-    return c.cells.ids({"$target":target})
+    import warnings
+    warnings.simplefilter(action="ignore", category=FutureWarning)
+    return c.cells.ids({"$target": target})
 
 
 def get_E_gids(c, target="mc2_Column"):
     from bluepy.v2.enums import Cell
+    import warnings
+    warnings.simplefilter(action="ignore", category=FutureWarning)
     return c.cells.ids({"$target": target, Cell.SYNAPSE_CLASS: "EXC"})
 
 
 def get_EI_gids(c, target="mc2_Column"):
     from bluepy.v2.enums import Cell
+    import warnings
+    warnings.simplefilter(action="ignore", category=FutureWarning)
     gidsE = get_E_gids(c, target)
     gidsI = c.cells.ids({"$target": target, Cell.SYNAPSE_CLASS: "INH"})
     return gidsE, gidsI
@@ -88,6 +86,8 @@ def get_EI_gids(c, target="mc2_Column"):
 
 def _get_layer_gids(c, layer, target):
     from bluepy.v2.enums import Cell
+    import warnings
+    warnings.simplefilter(action="ignore", category=FutureWarning)
     return c.cells.ids({"$target": target, Cell.LAYER: layer})
 
 
