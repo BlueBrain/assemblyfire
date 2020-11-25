@@ -1,28 +1,40 @@
 # -*- coding: utf-8 -*-
 """
-Legacy code which might be usefull to keep...
+Legacy code which might be useful to keep...
 """
 
 
-def load_assemblies_from_h5(fn, prefix=None):
-    import h5py
-    from assemblyfire import assemblies
-    if prefix is None:
-        prefix = "assemblies"
-    with h5py.File(fn, "r") as h5:
-        kk = list(h5[prefix].keys())
-    project_metadata = assemblies.AssemblyProjectMetadata.from_h5(fn, prefix=prefix)
-    return dict([(k, assemblies.AssemblyGroup.from_h5(fn, k, prefix=prefix))
-                 for k in kk]), project_metadata
+def consensus_properties(clusters, cores, origins):
+    import numpy
+
+    looseness = clusters.lengths() / cores.lengths() - 1
+    stability = []
+    num_labels = len(numpy.unique(numpy.hstack([list(zip(*x))[0] for x in origins])))
+    for origin_lst in origins:
+        origin_labels, origin_idx = zip(*origin_lst)
+        stability.append(len(numpy.unique(origin_labels)) / num_labels)
+    return looseness, stability
 
 
-def project_assemblies_to_h5(dict_groups, fn, metadata=None, prefix=None):
-    from assemblyfire import assemblies
-    if metadata is None:
-        metadata = {}
-    assemblies.AssemblyProjectMetadata.to_h5(metadata, fn, prefix=prefix)
-    for assembly_group in dict_groups.values():
-        assembly_group.to_h5(fn, prefix=prefix)
+def evaluate_alignment_over_seeds(assembly_grp_dict, reference, score_function="overlap", return_aligned=False):
+    assert score_function in ["correlation", "overlap"], "Unknown score function"
+    ref_assembly = assembly_grp_dict[reference]
+    other_assemblies = dict([(k, v) for k, v in assembly_grp_dict.items() if k != reference])
+    aligned = {}; out_idv_scores = {}
+    for k, v in other_assemblies.items():
+        a_result, a_scores = ref_assembly.align_with(v, return_scores=True)
+        aligned[k] = a_result
+        out_idv_scores[k] = a_scores.diagonal()
+
+    #  Relative overlap, normalized by expectation
+    out_overall_scores = {}
+    for group_label, group in aligned.items():
+        if score_function == "overlap":
+           out_idv_scores[group_label] = ref_assembly.evaluate_individual_alignments(group)
+        out_overall_scores[group_label] = ref_assembly.evaluate_overall_alignment(group)[0]
+    if return_aligned:
+        return aligned, out_idv_scores, out_overall_scores
+    return out_idv_scores, out_overall_scores
 
 
 def consensus_over_seeds(assembly_grp_dict, score_function="correlation", threshold=0.94):
