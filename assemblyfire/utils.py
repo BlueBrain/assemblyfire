@@ -10,8 +10,6 @@ import json
 import h5py
 import numpy as np
 
-from assemblyfire.assemblies import AssemblyGroup, AssemblyProjectMetadata
-
 
 def _get_bluepy_circuit(circuitconfig_path):
     try:
@@ -153,6 +151,7 @@ def read_spikes(f_name, t_start, t_end):
 
 def load_assemblies_from_h5(h5f_name, prefix="assemblies"):
     """Load assemblies over seeds from saved h5 file into dict of AssemblyGroups"""
+    from assemblyfire.assemblies import AssemblyGroup, AssemblyProjectMetadata
 
     with h5py.File(h5f_name, "r") as h5:
         keys = list(h5[prefix].keys())
