@@ -100,7 +100,7 @@ def spikes_to_h5(h5f_name, spike_matrix_dict, metadata, prefix):
 
 
 class SpikeMatrixGroup(object):
-    """Class to store metadata about simulations, binned raster and significant time bins"""
+    """Class to store config parameters about simulations, binned raster and significant time bins"""
 
     def __init__(self, config_path):
         """YAML config file based constructor"""
@@ -117,8 +117,24 @@ class SpikeMatrixGroup(object):
         return self.config["root_path"]
 
     @property
+    def h5f_name(self):
+        return self.config["h5_out"]["file_name"]
+
+    @property
+    def h5_prefix_spikes(self):
+        return self.config["h5_out"]["prefixes"]["spikes"]
+
+    @property
+    def h5_prefix_assemblies(self):
+        return self.config["h5_out"]["prefixes"]["assemblies"]
+
+    @property
     def root_fig_path(self):
         return self.config["root_fig_path"]
+
+    @cached_property
+    def fig_path(self):
+        return os.path.join(self.root_fig_path, self._config_path.split('/')[-1][:-5])
 
     @property
     def t_start(self):
@@ -134,8 +150,8 @@ class SpikeMatrixGroup(object):
 
     @property
     def clustering_method(self):
-        assert self.config["clustering_method"] in ["hierarchical", "density_based"]
-        return self.config["clustering_method"]
+        assert self.config["clustering_methods"]["spikes"] in ["hierarchical", "density_based"]
+        return self.config["clustering_methods"]["spikes"]
 
     @cached_property
     def seeds(self):
@@ -146,15 +162,6 @@ class SpikeMatrixGroup(object):
     def patterns(self):
         from assemblyfire.utils import get_patterns
         return get_patterns(self.root_path)
-
-    @cached_property
-    def fig_path(self):
-        return os.path.join(self.root_fig_path, self._config_path.split('/')[-1][:-5])
-
-    @cached_property
-    def h5f_name(self):
-        from assemblyfire.utils import get_out_fname
-        return get_out_fname(self.root_path, self.clustering_method)
 
     def get_blueconfig_path(self, seed):
         return os.path.join(self.root_path, "stimulusstim_a0", "seed%i" % seed, "BlueConfig")
@@ -190,6 +197,6 @@ class SpikeMatrixGroup(object):
 
         # save spikes to h5
         metadata = {"root_path": self.root_path, "seeds": self.seeds, "patterns": self.patterns}
-        spikes_to_h5(self.h5f_name, spike_matrix_dict, metadata, prefix="spikes")
+        spikes_to_h5(self.h5f_name, spike_matrix_dict, metadata, prefix=self.h5_prefix_spikes)
 
         return spike_matrix_dict

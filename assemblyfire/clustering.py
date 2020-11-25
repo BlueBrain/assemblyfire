@@ -276,7 +276,7 @@ def cluster_spikes(spike_matrix_dict, method, FigureArgs):
     return clusters_dict
 
 
-def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, FigureArgs):
+def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, h5_prefix, FigureArgs):
     """
     Finds "core cells" - cells which correlate with the activation of (clustered) time bins
     and then checks within group correlations against the mean correlation to decide
@@ -284,6 +284,7 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, FigureArgs):
     :param spike_matrix_dict: dict with seed as key and SpikeMatrixResult (see `spikes.py`) as value
     :param clusters_dict: dict with seed as key and clustered (significant) time bins as value (see `cluster_spikes()`)
     :param h5f_name: str - name of the HDF5 file (dumping the assemblies and their metadata)
+    :param h5_prefix: str - directory name of assemblies within the HDF5 file
     :param FigureArgs: plotting related arguments (see `cli.py`)
     """
     from assemblyfire.assemblies import Assembly, AssemblyGroup
@@ -309,7 +310,7 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, FigureArgs):
                                  for i in assembly_idx]
         assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=gids,
                                    label="seed%i" % seed, metadata=metadata)
-        assemblies.to_h5(h5f_name, prefix="assemblies")
+        assemblies.to_h5(h5f_name, prefix=h5_prefix)
 
         # plot (only depth profile at this point)
         fig_name = os.path.join(FigureArgs.fig_path, "assemblies_seed%i.png" % seed)
@@ -340,7 +341,6 @@ def cluster_assemblies(assemblies, n_assemblies, criterion, criterion_arg):
     clusters = clusters - 1  # to start indexing at 0
     cluster_idx, counts = np.unique(clusters, return_counts=True)
     L.info("Total number of assemblies: %i, Number of clusters: %i" % (np.sum(counts), len(counts)))
-    L.info("Size of clusters: ", counts)
 
     plotting = [linkage, silhouettes]
     return sim_matrix, clusters, plotting
