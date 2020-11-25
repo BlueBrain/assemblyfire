@@ -36,6 +36,6 @@ def find_assemblies(config_path):
 @cli.command()
 @click.argument("config_path", required=True)
 def consensus(config_path):
-    """CLI for `find_assemblies.py/run()`"""
+    """CLI for `find_consensus_assemblies.py/run()`"""
     from assemblyfire.find_consensus_assemblies import run
     run(config_path)
