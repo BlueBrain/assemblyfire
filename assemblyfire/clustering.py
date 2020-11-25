@@ -24,9 +24,6 @@ from scipy.cluster.hierarchy import ward, fcluster
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score, silhouette_samples
 
-from assemblyfire.plots import plot_sim_matrix, plot_dendogram_silhouettes, plot_transformed,\
-                               plot_components, plot_rhos_deltas, plot_cluster_seqs, plot_assemblies
-
 L = logging.getLogger("assemblyfire")
 
 
@@ -130,7 +127,7 @@ def db_clustering(matrix, ratio_to_keep=0.02):
 
     # find cluster centroids
     centroid_idx = np.where(gammas >= uCI)[0]
-    assert len(centroid_idx) <= 20
+    assert len(centroid_idx) <= 20, "len(centroid_idx)=%i > 20" % les(centroid_idx)
 
     plotting = [rhos, deltas, tmp_idx, sorted_gammas, fit, lCI, uCI, centroid_idx]
 
@@ -244,35 +241,36 @@ def cluster_spikes(spike_matrix_dict, method, FigureArgs):
     :param FigureArgs: plotting related arguments (see `cli.py`)
     :return: dict with seed as key and clustered (significant) time bins as value
     """
+    from assemblyfire.plots import plot_cluster_seqs
 
     clusters_dict = {}
     for seed, SpikeMatrixResult in tqdm(spike_matrix_dict.items()):
-        # keep only significant time bins
-        spike_matrix = SpikeMatrixResult.spike_matrix[:, SpikeMatrixResult.t_idx]
-        t_bins = SpikeMatrixResult.t_bins[SpikeMatrixResult.t_idx]
+        spike_matrix = SpikeMatrixResult.spike_matrix
+        t_bins = SpikeMatrixResult.t_bins
 
         if method == "hierarchical":
+            from assemblyfire.plots import plot_sim_matrix, plot_dendogram_silhouettes
             sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix)
 
-            fig_name = os.path.join(FigureArgs.fig_dir, "similarity_matrix_seed%i.png" % seed)
+            fig_name = os.path.join(FigureArgs.fig_path, "similarity_matrix_seed%i.png" % seed)
             plot_sim_matrix(sim_matrix, FigureArgs.patterns, t_bins, fig_name)
-            fig_name = os.path.join(FigureArgs.fig_dir, "Ward_clustering_seed%i.png" % seed)
+            fig_name = os.path.join(FigureArgs.fig_path, "Ward_clustering_seed%i.png" % seed)
             plot_dendogram_silhouettes(clusters, *plotting, fig_name)
 
         elif method == "density_based":
-
+            from assemblyfire.plots import plot_transformed, plot_components, plot_rhos_deltas
             pca_transformed, pca_components = PCA_ncomps(spike_matrix.T, 12)
             clusters, plotting = db_clustering(pca_transformed)
 
-            fig_name = os.path.join(FigureArgs.fig_dir, "PCA_transformed_seed%i.png" % seed)
+            fig_name = os.path.join(FigureArgs.fig_path, "PCA_transformed_seed%i.png" % seed)
             plot_transformed(pca_transformed, FigureArgs.patterns, t_bins, fig_name)
-            fig_name = os.path.join(FigureArgs.fig_dir, "PCA_components_seed%i.png" % seed)
-            plot_components(pca_components, SpikeMatrixResult.row_map, FigureArgs.depths, fig_name)
-            fig_name = os.path.join(FigureArgs.fig_dir, "rho_delta_seed%i.png" % seed)
+            fig_name = os.path.join(FigureArgs.fig_path, "PCA_components_seed%i.png" % seed)
+            plot_components(pca_components, SpikeMatrixResult.gids, FigureArgs.depths, fig_name)
+            fig_name = os.path.join(FigureArgs.fig_path, "rho_delta_seed%i.png" % seed)
             plot_rhos_deltas(*plotting, fig_name)
 
         clusters_dict[seed] = clusters
-        fig_name = os.path.join(FigureArgs.fig_dir, "clusters_seed%i.png" % seed)
+        fig_name = os.path.join(FigureArgs.fig_path, "clusters_seed%i.png" % seed)
         plot_cluster_seqs(clusters, FigureArgs.patterns, t_bins, fig_name)
 
     return clusters_dict
@@ -288,12 +286,12 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, FigureArgs):
     :param h5f_name: str - name of the HDF5 file (dumping the assemblies and their metadata)
     :param FigureArgs: plotting related arguments (see `cli.py`)
     """
-
     from assemblyfire.assemblies import Assembly, AssemblyGroup
+    from assemblyfire.plots import plot_assemblies
 
     for seed, SpikeMatrixResult in tqdm(spike_matrix_dict.items()):
-        spike_matrix = SpikeMatrixResult.spike_matrix[:, SpikeMatrixResult.t_idx]
-        t_bins = SpikeMatrixResult.t_bins[SpikeMatrixResult.t_idx]
+        spike_matrix = SpikeMatrixResult.spike_matrix
+        gids = SpikeMatrixResult.gids
         clusters = clusters_dict[seed]
 
         # core cells
@@ -306,16 +304,16 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, FigureArgs):
         assembly_idx = within_cluster_correlations(spike_matrix, core_cell_idx)
 
         # save to h5
-        metadata = {"t_bins": t_bins, "clusters": clusters}
-        assembly_lst = [Assembly(SpikeMatrixResult.row_map[core_cell_idx[:, i] == 1], i)
-                        for i in assembly_idx]
-        assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=SpikeMatrixResult.row_map,
+        metadata = {"clusters": clusters}
+        assembly_lst = [Assembly(gids[core_cell_idx[:, i] == 1], i)
+                                 for i in assembly_idx]
+        assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=gids,
                                    label="seed%i" % seed, metadata=metadata)
         assemblies.to_h5(h5f_name, prefix="assemblies")
 
         # plot (only depth profile at this point)
-        fig_name = os.path.join(FigureArgs.fig_dir, "assemblies_seed%i.png" % seed)
-        plot_assemblies(core_cell_idx, assembly_idx, SpikeMatrixResult.row_map,
+        fig_name = os.path.join(FigureArgs.fig_path, "assemblies_seed%i.png" % seed)
+        plot_assemblies(core_cell_idx, assembly_idx, gids,
                         FigureArgs.ystuff, FigureArgs.depths, fig_name)
 
 
