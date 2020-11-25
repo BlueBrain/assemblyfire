@@ -632,6 +632,25 @@ class ConsensusAssembly(Assembly):
             return -np.log10(p_values)
         raise ValueError("Need to specify 'expected_n' or 'expected_distribution'!")
 
+    def to_h5(self, filename, prefix=None, version=None):
+        """
+        :param filename: Filename to write this assembly group to
+        :param prefix: Default: None, a prefix within the file to put the data behind
+        :param version: default: latest
+        :return: str: the prefix used
+        """
+        import h5py
+        write_func = self.__class__.h5_write_func[__initialize_h5__(filename, version=version)]
+        with h5py.File(filename, "r+") as h5:
+            return write_func(self, h5, prefix)
+
+    @classmethod
+    def from_h5(cls, fn, group_name, prefix=None):
+        import h5py
+        read_func = cls.h5_read_func[__initialize_h5__(fn, assert_exists=True)]
+        with h5py.File(fn, "r") as h5:
+            return read_func(h5, group_name, prefix=prefix)
+
     def __union_of_instantiations__(self):
         """
         :return: The assembly representing the union of all stochastic instantiations of the consensus assembly
