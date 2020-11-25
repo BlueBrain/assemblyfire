@@ -33,13 +33,18 @@ def _get_bluepy_simulation(blueconfig_path):
     return Simulation(blueconfig_path)
 
 
-def spikes2mat(spike_times, spiking_gids, t_start, t_end, bin_size):
+def spikes2mat(spike_times, spiking_gids, t_start, t_end, bin_size, return_time_in_bin=False):
     """Bins time and builds spike matrix"""
 
     gids = np.unique(spiking_gids)
     gid_bins = np.hstack([sorted(gids), np.max(gids) + 1])
     t_bins = np.arange(t_start, t_end + bin_size, bin_size)
     spike_matrix = np.histogram2d(spiking_gids, spike_times, bins=(gid_bins, t_bins))[0]
+    if return_time_in_bin:
+        t_idx = np.digitize(spike_times, bins=t_bins) - 1
+        in_t_win = (t_idx >= 0) & (t_idx < (len(t_bins) - 1))
+        time_in_bin = spike_times[in_t_win] - t_bins[t_idx[in_t_win]]
+        return spike_matrix, gid_bins[:-1], t_bins, time_in_bin
     return spike_matrix, gid_bins[:-1], t_bins
 
 
