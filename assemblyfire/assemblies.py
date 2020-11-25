@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Classes and functions to deal with cell assemblies detected in the previous step of the pipeline
+Classes to handle cell assemblies detected in the previous step of the pipeline
 authors: Michael Reimann, András Ecker, Daniela Egas Santander
 last modified: 11.2020
 """
@@ -95,6 +95,7 @@ __meta_writers__ = {
 
 
 class AssemblyProjectMetadata(object):
+    #TODO decide how to structure metadata and write a proper Class
     @staticmethod
     def from_h5(fn, group_name=None, prefix=None):
         import h5py
@@ -109,44 +110,6 @@ class AssemblyProjectMetadata(object):
         write_func = __meta_writers__[AssemblyGroup.__initialize_h5__(fn, version=version)]
         with h5py.File(fn, "r+") as h5:
             return write_func(metadata, h5, prefix=prefix)
-
-
-def correlation_func(A, B):
-    """
-    Normalized correlations between values in A and B
-    rows: samples / observations
-    columns: variables
-    :param A: A numpy.array of shape N x A
-    :param B: A numpy.array of shape N x B, i.e. the same first dimension as A
-    :return: numpy.array of shape A x B
-    """
-    A = A - A.mean(axis=0, keepdims=True)
-    B = B - B.mean(axis=0, keepdims=True)
-    M = numpy.dot(A.transpose(), B) / A.shape[0]
-    M = M / numpy.sqrt(numpy.dot(A.var(axis=0, keepdims=True).transpose(),  # N x 1
-                                 B.var(axis=0, keepdims=True)))  # M x 1
-    return M
-
-
-def greedy_alignment(score_matrix):
-    """
-    :param score_matrix: A numpy.array where entry at i, j denotes the quality of an alignment of item i of one group
-    with item j of another group
-    :return: A kind-of optimal alignment, i.e. a permutation of the items in the second group that leads to a kind-of
-    optimal alignment
-    """
-
-    idx1 = list(range(score_matrix.shape[0]))
-    idx2 = list(range(score_matrix.shape[1]))
-    alignment = -numpy.ones(len(idx1), dtype=int)
-    while len(idx1) > 0 and len(idx2) > 0:
-        active_submat = score_matrix[numpy.ix_(idx1, idx2)]
-        i, j = numpy.nonzero(active_submat == active_submat.max())
-        alignment[idx1[i[0]]] = idx2[j[0]]
-        idx1.remove(idx1[i[0]])
-        idx2.remove(idx2[j[0]])
-        # TODO: Deal with: idx2 is empty but idx1 not yet
-    return alignment
 
 
 class Assembly(object):
@@ -443,6 +406,23 @@ class AssemblyGroup(object):
         return numpy.array([hypergeom(len(self.all), len(a), len(b)).stats(moment)
                             for a, b in zip(self, other)])
 
+    @staticmethod
+    def correlation_func(A, B):
+        """
+        Normalized correlations between values in A and B
+        rows: samples / observations
+        columns: variables
+        :param A: A numpy.array of shape N x A
+        :param B: A numpy.array of shape N x B, i.e. the same first dimension as A
+        :return: numpy.array of shape A x B
+        """
+        A = A - A.mean(axis=0, keepdims=True)
+        B = B - B.mean(axis=0, keepdims=True)
+        M = numpy.dot(A.transpose(), B) / A.shape[0]
+        M = M / numpy.sqrt(numpy.dot(A.var(axis=0, keepdims=True).transpose(),  # N x 1
+                                     B.var(axis=0, keepdims=True)))  # M x 1
+        return M
+
     def intersection_pattern_correlation(self, other=None, normalized=True):
         """
         :param other: Another AssemblyGroup object. If none provided, this object is used
@@ -459,7 +439,28 @@ class AssemblyGroup(object):
         else:
             I = self.intersection_sizes()
             O = self.intersection_sizes(other=other)
-        return correlation_func(I, O)
+        return self.correlation_func(I, O)
+
+    @staticmethod
+    def greedy_alignment(score_matrix):
+        """
+        :param score_matrix: A numpy.array where entry at i, j denotes the quality of an alignment
+        of item i of one group with item j of another group
+        :return: A kind-of optimal alignment, i.e. a permutation of the items in the second group
+        that leads to a kind-of optimal alignment
+        """
+
+        idx1 = list(range(score_matrix.shape[0]))
+        idx2 = list(range(score_matrix.shape[1]))
+        alignment = -numpy.ones(len(idx1), dtype=int)
+        while len(idx1) > 0 and len(idx2) > 0:
+            active_submat = score_matrix[numpy.ix_(idx1, idx2)]
+            i, j = numpy.nonzero(active_submat == active_submat.max())
+            alignment[idx1[i[0]]] = idx2[j[0]]
+            idx1.remove(idx1[i[0]])
+            idx2.remove(idx2[j[0]])
+            # TODO: Deal with: idx2 is empty but idx1 not yet
+        return alignment
 
     def align_with(self, other, return_scores=False):
         """
@@ -470,7 +471,7 @@ class AssemblyGroup(object):
         """
         new_all = numpy.union1d(self.all, other.all)
         M = self.intersection_pattern_correlation(other)
-        alignment = greedy_alignment(M)
+        alignment = self.greedy_alignment(M)
         M = M[:, alignment]
         out_grp = AssemblyGroup([other.assemblies[i] for i in alignment],
                                 new_all, label=other.label, metadata=other.metadata)
@@ -507,6 +508,7 @@ class AssemblyGroup(object):
             raise Exception("Unknown score function: {0}".format(score_function))
 
 
+#TODO: move this to a separate file (together with parts of legacy.py)
 def consensus_over_seeds_hamming(assembly_grp_dict, criterion="maxclust", threshold=None):
     """
     Hierarhichal clustering (Ward linkage) of assemblies from different seeds based on Hamming distance
