@@ -9,6 +9,9 @@ import os
 import json
 import h5py
 import numpy as np
+from collections import namedtuple
+
+SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
 
 
 def _get_bluepy_circuit(circuitconfig_path):
@@ -153,8 +156,25 @@ def load_assemblies_from_h5(h5f_name, prefix="assemblies"):
     """Load assemblies over seeds from saved h5 file into dict of AssemblyGroups"""
     from assemblyfire.assemblies import AssemblyGroup, AssemblyProjectMetadata
 
-    with h5py.File(h5f_name, "r") as h5:
-        keys = list(h5[prefix].keys())
-    project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix=prefix)
+    with h5py.File(h5f_name, "r") as h5f:
+        keys = list(h5f[prefix].keys())
+    project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix="spikes")
     return dict([(k, AssemblyGroup.from_h5(h5f_name, k, prefix=prefix))
                  for k in keys]), project_metadata
+
+
+def load_spikes_from_h5(h5f_name, prefix="spikes"):
+    """Load spike matrices over seeds from saved h5 file"""
+    from assemblyfire.assemblies import AssemblyProjectMetadata
+
+    h5f = h5py.File(h5f_name, "r")
+    seeds = list(h5f[prefix].keys())
+    prefix_grp = h5f[prefix]
+    spike_matrix_dict = {}
+    for seed in seeds:
+        spike_matrix_dict[seed] = SpikeMatrixResult(prefix_grp[seed]["spike_matrix"][:],
+                                                    prefix_grp[seed]["gids"][:],
+                                                    prefix_grp[seed]["t_bins"][:])
+    h5f.close()
+    project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix=prefix)
+    return spike_matrix_dict, project_metadata
