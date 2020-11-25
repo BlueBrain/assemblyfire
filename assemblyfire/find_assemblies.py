@@ -30,7 +30,7 @@ def run(config_path):
     ystuff = get_layer_boundaries(spikes.get_blueconfig_path(spikes.seeds[0]))
 
     L.info(" Preprocessed spikes and assemblies will be saved to: %s" % spikes.h5f_name)
-    spike_matrix_dict = spikes.get_spike_matrices()
+    spike_matrix_dict = spikes.get_sign_spike_matrices()
     L.info(" Cluster time bins via %s clustering..." % spikes.clustering_method)
     clusters_dict = cluster_spikes(spike_matrix_dict, method=spikes.clustering_method,
                                    FigureArgs=FigureArgs(spikes.patterns, depths, None, spikes.fig_path))
