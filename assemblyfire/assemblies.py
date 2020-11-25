@@ -15,7 +15,10 @@ __h5_strings__ = {"1.0": {
     "assembly_group": "assemblies",
     "gids": "all_gids",
     "bool_index": "assembly_gids",
-    "indices": "assembly_indices"
+    "indices": "assembly_indices",
+    "consensus": "consensus_assemblies",
+    "instantiations_label": "instantiations",
+    "consensus_magic_string": "_consensus"
     }
 }
 __RESERVED__ = []
@@ -33,9 +36,35 @@ def __to_h5_1p0__(data, h5, prefix=None):
     grp_out.create_dataset(strings["bool_index"], data=data.as_bool())
     for k, v in data.metadata.items():
         grp_out.attrs[k] = v
+
+    for i, assembly in enumerate(data):
+        if isinstance(assembly, ConsensusAssembly):
+            __consensus_to_h5_1p0__(assembly, grp_out, prefix=strings["consensus"], label=str(i))
+
     grp_out.attrs[strings["indices"]] = [assembly.idx if assembly.idx is not None else -1
                                          for assembly in data]
     return prefix
+
+
+def __consensus_to_h5_1p0__(data, h5, prefix=None, label=None):
+    strings = __h5_strings__["1.0"]
+    if prefix is None:
+        prefix = strings["consensus"]
+    if label is None:
+        prefix = prefix + "/" + str(data.label)
+    else:
+        prefix = prefix + "/" + label
+    consensus_metadata = {
+        "label": str(data.label),
+        "index": data.idx,
+        "core_threshold": data._thresh,
+        "core_method": data._core_method,
+        strings["consensus_magic_string"]: True
+    }
+    instantiations = AssemblyGroup(data.instantiations, data.union.gids,
+                                   label=strings["instantiations_label"])
+    __to_h5_1p0__(instantiations, h5, prefix=prefix)
+    __meta_to_h5_1p0__(consensus_metadata, h5, prefix=prefix)
 
 
 def __from_h5_1p0__(h5, group_name, prefix=None):
@@ -46,15 +75,47 @@ def __from_h5_1p0__(h5, group_name, prefix=None):
     prefix_grp = h5[prefix]
     assert group_name in prefix_grp.keys()
     all_neurons = numpy.unique(numpy.hstack([prefix_grp[k][strings["gids"]][:]
-                                             for k in prefix_grp.keys()]))
+                                             for k in prefix_grp.keys()
+                                             if k not in __RESERVED__]))
 
     R = prefix_grp[group_name][strings["gids"]][:]
     M = prefix_grp[group_name][strings["bool_index"]][:]
     metadata = dict(prefix_grp[group_name].attrs)
     orig_indices = metadata.get(strings["indices"], list(range(M.shape[1])))
-    assemblies = [Assembly(R[M[:, i].astype(bool)], index=idx)
-                  for i, idx in enumerate(orig_indices)]
-    return AssemblyGroup(assemblies, all_neurons, label=group_name, metadata=metadata)
+
+    consensus_groups = []
+    if strings["consensus"] in prefix_grp[group_name]:
+        consensus_groups = list(prefix_grp[group_name][strings["consensus"]].keys())
+
+    final_assemblies = []
+    for i, idx in enumerate(orig_indices):
+        assembly = Assembly(R[M[:, i].astype(bool)], index=idx)
+        if str(i) in consensus_groups:
+            cons_assembly = __consensus_from_h5_1p0__(prefix_grp[group_name], str(i), prefix=strings["consensus"])
+            assert cons_assembly.idx == assembly.idx, "Consistency check"
+            assert len(cons_assembly.gids) == len(assembly.gids), "Consistency check"
+            final_assemblies.append(cons_assembly)
+        else:
+            final_assemblies.append(assembly)
+
+    return AssemblyGroup(final_assemblies, all_neurons, label=group_name, metadata=metadata)
+
+
+def __consensus_from_h5_1p0__(h5, group_name, prefix=None):
+    strings = __h5_strings__["1.0"]
+    if prefix is None:
+        prefix = strings["consensus"]
+
+    prefix_grp = h5[prefix]
+    assert group_name in prefix_grp.keys()
+    grp_meta = __meta_from_h5_1p0__(prefix_grp, prefix=group_name)
+    assert grp_meta.get(strings["consensus_magic_string"], False), \
+        "Assembly {0} at {1} not a consensus assembly!".format(group_name, prefix)
+    grp_meta.pop(strings["consensus_magic_string"])
+
+    instantiations = __from_h5_1p0__(prefix_grp, strings["instantiations_label"], prefix=group_name)
+
+    return ConsensusAssembly(list(instantiations), **grp_meta)
 
 
 def __meta_from_h5_1p0__(h5, group_name=None, prefix=None):
@@ -91,6 +152,12 @@ __meta_readers__ = {
 }
 __meta_writers__ = {
     "1.0": __meta_to_h5_1p0__
+}
+__cons_writers__ = {
+    "1.0": __consensus_to_h5_1p0__
+}
+__cons_readers__ = {
+    "1.0": __consensus_from_h5_1p0__
 }
 
 
@@ -560,7 +627,7 @@ class ConsensusAssembly(Assembly):
     a neuron to be part of this assembly, if its "coreness" property is above a user-specified threshold
     """
 
-    def __init__(self, lst_assemblies, index=None, core_threshold=4.0, core_method="p-value"):
+    def __init__(self, lst_assemblies, index=None, label=None, core_threshold=4.0, core_method="p-value"):
         """
         :param lst_assemblies: A list of assemblies that are thought to represent the same "true" assembly.
         We call them the "instantiations" of the true assembly.
@@ -576,6 +643,7 @@ class ConsensusAssembly(Assembly):
         self.union = self.__union_of_instantiations__()
         self._core_method = core_method
         self._thresh = core_threshold
+        self.label = label
         if core_method == "number":
             self.coreness = self.calculate_coreness(self.__number_of_times_contained__(),
                                                     expected_n=self.__expected_number_of_instantiations__())
@@ -593,6 +661,26 @@ class ConsensusAssembly(Assembly):
         """
         return ConsensusAssembly(self.instantiations, index=self.idx,
                                  core_method=self._core_method, core_threshold=new_thresh)
+
+    def to_h5(self, filename, prefix=None, version=None):
+        """
+        :param filename: Filename to write this assembly group to
+        :param prefix: Default: None, a prefix within the file to put the data behind
+        :param version: default: latest
+        :return: str: the prefix used
+        """
+        import h5py
+        write_func = __cons_writers__[AssemblyGroup.__initialize_h5__(filename, version=version)]
+        with h5py.File(filename, "r+") as h5:
+            return write_func(self, h5, prefix)
+
+    @staticmethod
+    def from_h5(fn, group_name, prefix=None):
+        import h5py
+        read_func = __cons_readers__[AssemblyGroup.__initialize_h5__(fn, assert_exists=True)]
+        with h5py.File(fn, "r") as h5:
+            return read_func(h5, group_name, prefix=prefix)
+
 
     @staticmethod
     def calculate_coreness(vec_num_contained, expected_n=None, expected_distribution=None, epsilon=1E-5):
