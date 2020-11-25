@@ -104,6 +104,14 @@ def spikes_to_h5(h5f_name, spike_matrix_dict, metadata, prefix):
             grp_out.create_dataset("t_bins", data=SpikeMatrixResult.t_bins)
 
 
+def spike_train_convolution(spike_matrix, std):
+    """Convolve spike matrix (row-by-row) with Gaussian kernel"""
+    from scipy.signal import convolve2d
+    x = np.linspace(0, 10*std, 11)  # 11 is hard coded... feel free to find a better number
+    kernel = np.exp(-np.power(x-5*std, 2)/(2*std**2)).reshape(1, 11)
+    return convolve2d(spike_matrix, kernel, mode="same")
+
+
 class SpikeMatrixGroup(object):
     """Class to store config parameters about simulations, binned raster and significant time bins"""
 
@@ -171,18 +179,23 @@ class SpikeMatrixGroup(object):
     def get_blueconfig_path(self, seed):
         return os.path.join(self.root_path, "stimulusstim_a0", "seed%i" % seed, "BlueConfig")
 
-    def get_spike_matrices(self):
-        """Bin spikes and threshold activity by population firing rate"""
+    def load_spikes(self, seed):
+        """Loads in spikes from simulations using bluepy"""
         from assemblyfire.utils import get_E_gids, get_spikes
+        sim = _get_bluepy_simulation(self.get_blueconfig_path(seed))
+        gids = get_E_gids(sim.circuit, sim.target)
+        spike_times, spiking_gids = get_spikes(sim, gids, self.t_start, self.t_end)
+        return spike_times, spiking_gids
+
+    def get_sign_spike_matrices(self):
+        """Bin spikes and threshold activity by population firing rate to get significant time bins"""
         from assemblyfire.plots import plot_rate
 
         spike_matrix_dict = {}
         for seed in tqdm(self.seeds):
-            sim = _get_bluepy_simulation(self.get_blueconfig_path(seed))
-            gids = get_E_gids(sim.circuit, sim.target)
-            spike_times, spiking_gids = get_spikes(sim, gids, self.t_start, self.t_end)
+            spike_times, spiking_gids = self.load_spikes(seed)
             spike_matrix, gids, t_bins = spikes2mat(spike_times, spiking_gids,
-                                                       self.t_start, self.t_end, self.bin_size)
+                                                    self.t_start, self.t_end, self.bin_size)
             assert (spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1)))
 
             # threshold rate: this could be a separate function...
@@ -205,3 +218,37 @@ class SpikeMatrixGroup(object):
         spikes_to_h5(self.h5f_name, spike_matrix_dict, metadata, prefix=self.h5_prefix_spikes)
 
         return spike_matrix_dict
+
+    def convolve_spike_matrix(self, seed):
+        """Bins spikes and convolves it with a 1D Gaussian kernel row-by-row"""
+        spike_times, spiking_gids = self.load_spikes(seed)
+        # bin size = 1 ms and kernel's std = 0.5 ms from Nolte et al. 2019
+        spike_matrix, gids, _ = spikes2mat(spike_times, spiking_gids,
+                                           self.t_start, self.t_end, bin_size=1)
+        assert (spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1)))
+        return spike_train_convolution(spike_matrix, std=0.5), gids
+
+    def get_spike_time_reliability(self):
+        """Convolution based spike time reliability (`r_spike`) measure from Schreiber et al. 2003"""
+        from scipy.spatial.distance import pdist
+
+        # one can't simply np.dstack() them because it's not guaranteed that all gids spike in all trials
+        gid_dict = {}
+        convolved_spike_matrix_dict = {}
+        for seed in self.seeds:
+            convolved_spike_matrix, gids = self.convolve_spike_matrix(seed)
+            gid_dict[seed] = gids
+            convolved_spike_matrix_dict[seed] = convolved_spike_matrix
+
+        # build #gids matrices from trials and calculate pairwise correlation between rows
+        all_gids = np.unique(np.stack(gid_dict.values()))
+        r_spikes = []
+        for gid in all_gids:
+            gid_trials_convolved = np.stack(convolved_spike_matrix_dict[seed][np.where(gids == gid)[0], :]
+                                            for seed, gids in gid_dict.items())  # 2D array with <= len(seeds) rows
+            n_trials = gid_trials_convolved.shape[0]
+            r_spike = np.sum(pdist(gid_trials_convolved,
+                                   lambda u, v: np.dot(u, v)/(np.linalg.norm(u)*np.linalg.norm(v))))
+            r_spikes.append(r_spike * 2/(n_trials*(n_trials-1)))
+
+        return all_gids, np.asarray(r_spikes)
