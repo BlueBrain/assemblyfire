@@ -5,6 +5,7 @@ authors: Michael Reimann, András Ecker, Daniela Egas Santander
 last modified: 11.2020
 """
 
+import os
 import numpy as np
 from scipy.stats import binom, pearsonr, hypergeom
 
@@ -698,7 +699,7 @@ class ConsensusAssembly(Assembly):
         plt.polar(angles, r, **kwargs)
 
 
-def consensus_over_seeds_hamming(assembly_grp_dict, criterion="maxclust", threshold=None):
+def consensus_over_seeds_hamming(assembly_grp_dict, h5f_name, h5_prefix, fig_path, criterion="maxclust", threshold=None):
     """
     Hierarhichal clustering (Ward linkage) of assemblies from different seeds based on Hamming distance
     :param assembly_grp_dict: dict with seeds as keys and AssemblyGroup object as values
@@ -707,6 +708,7 @@ def consensus_over_seeds_hamming(assembly_grp_dict, criterion="maxclust", thresh
     :return: assembly_grp_clust: dict with cluster idx as keys and AssemblyGroup object as values
     """
     from assemblyfire.clustering import cluster_assemblies
+    from assemblyfire.plots import plot_assembly_sim_matrix, plot_dendogram_silhouettes
     assert criterion in ["distance", "maxclust"]
 
     # concatenate assemblies over seed into 1 big AssemblyGroup
@@ -728,16 +730,18 @@ def consensus_over_seeds_hamming(assembly_grp_dict, criterion="maxclust", thresh
     elif criterion == "distance":
         sim_matrix, clusters, plotting = cluster_assemblies(all_assemblies.as_bool().T, n_assemblies,
                                                             criterion, threshold)
+    # plotting clustering results
+    fig_name = os.path.join(fig_path, "simmat_assemblies_hamming.png")
+    plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name)
+    fig_name = os.path.join(fig_path, "Ward_clustering_assemblies.png")
+    plot_dendogram_silhouettes(clusters, *plotting, fig_name)
 
-    # making an assembly group of assemblies grouped by clustering
-    assembly_grp_clust = {}
+    # making consensus assemblies from assemblies grouped by clustering
     for cluster in np.unique(clusters):
         c_idx = np.where(clusters==cluster)[0]
         assembly_lst = [all_assemblies.assemblies[i] for i in c_idx]
-        assembly_grp_clust[cluster] = AssemblyGroup(assemblies=assembly_lst, all_gids=all_gids,
-                                                    label="cluster%i" % cluster)
-
-    return assembly_grp_clust
+        cons_assembly = ConsensusAssembly(assembly_lst, index=cluster, label="cluster%i" % cluster)
+        cons_assembly.to_h5(h5f_name, prefix=h5_prefix)
 
 
 def evaluate_alignment_over_seeds(assembly_grp_dict, reference, score_function="overlap", return_aligned=False):

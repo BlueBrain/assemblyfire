@@ -2,7 +2,7 @@
 """
 CLI to detect and analyse cell assemblies
  * `assemblyfire find-assemblies` config_path: detect assemblies in spiking data
- * `assemblyfire analyse-assemblies`: TODO
+ * `assemblyfire consensus config_path`: create consensus assemblies from assemblies across seeds
 last modified: Thomas Delemontex, András Ecker 11.2020
 """
 
@@ -30,4 +30,12 @@ def cli(verbose):
 def find_assemblies(config_path):
     """CLI for `find_assemblies.py/run()`"""
     from assemblyfire.find_assemblies import run
+    run(config_path)
+    
+
+@cli.command()
+@click.argument("config_path", required=True)
+def consensus(config_path):
+    """CLI for `find_consensus_assemblies.py/run()`"""
+    from assemblyfire.find_consensus_assemblies import run
     run(config_path)

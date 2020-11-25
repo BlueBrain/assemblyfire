@@ -3,17 +3,16 @@
 Main run function for finding cell assemblies in spiking data
 """
 
-import os
 import logging
 from collections import namedtuple
 
-from assemblyfire.utils import ensure_dir, get_out_fname, map_gids_to_depth, get_layer_boundaries
+from assemblyfire.utils import ensure_dir, map_gids_to_depth, get_layer_boundaries
 from assemblyfire.spikes import SpikeMatrixGroup
 from assemblyfire.clustering import cluster_spikes, detect_assemblies
 
-
 L = logging.getLogger("assemblyfire")
 FigureArgs = namedtuple("FigureArgs", ["patterns", "depths", "ystuff", "fig_path"])
+
 
 def run(config_path):
     """
@@ -36,5 +35,5 @@ def run(config_path):
     clusters_dict = cluster_spikes(spike_matrix_dict, method=spikes.clustering_method,
                                    FigureArgs=FigureArgs(spikes.patterns, depths, None, spikes.fig_path))
     L.info(" Detecting assemblies within clustered time bins and saving them to file...")
-    detect_assemblies(spike_matrix_dict, clusters_dict, spikes.h5f_name,
+    detect_assemblies(spike_matrix_dict, clusters_dict, spikes.h5f_name, spikes.h5_prefix_assemblies,
                       FigureArgs=FigureArgs(None, depths, ystuff, spikes.fig_path))

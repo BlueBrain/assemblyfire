@@ -341,3 +341,21 @@ def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_na
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
+
+
+def plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name):
+    """Plots similarity matrix of assemblies"""
+
+    sim_mat = deepcopy(sim_matrix)
+    np.fill_diagonal(sim_mat, np.nan)
+    n_assemblies_cum = [0] + np.cumsum(n_assemblies).tolist()
+
+    fig = plt.figure(figsize=(10, 9))
+    ax = fig.add_subplot(1, 1, 1)
+    i = ax.imshow(sim_mat, cmap="coolwarm",
+                  aspect="auto", interpolation="none")
+    fig.colorbar(i)
+    ax.set_xticks(n_assemblies_cum)
+    ax.set_yticks(n_assemblies_cum)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)

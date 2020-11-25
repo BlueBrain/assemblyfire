@@ -1,5 +1,12 @@
 root_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/random_stream_20trials"
 
+h5_out:
+    file_name: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/random_stream_20trials/assemblies_simmat.h5"
+    prefixes:
+        spikes: "spikes"
+        assemblies: "assemblies"
+        consensus_assemblies: "consensus"
+
 root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures"
 
 preprocessing_protocol:
@@ -7,4 +14,6 @@ preprocessing_protocol:
     t_end: 62000
     bin_size: 10
 
-clustering_method: "hierarchical"
+clustering_methods:
+    spikes: "hierarchical"
+    assemblies: "hamming"
