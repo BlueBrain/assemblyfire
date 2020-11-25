@@ -31,3 +31,4 @@ Examples
 .. code-block::
 
   assemblyfire find_assemblies -v configs/100p_depol_simmat.yaml
+  assemblyfire consenus -v configs/100p_depol_simmat.yaml

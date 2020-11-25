@@ -2,7 +2,7 @@
 """
 CLI to detect and analyse cell assemblies
  * `assemblyfire find-assemblies` config_path: detect assemblies in spiking data
- * `assemblyfire analyse-assemblies`: TODO
+ * `assemblyfire consensus config_path`: create consensus assemblies from assemblies across seeds
 last modified: Thomas Delemontex, András Ecker 11.2020
 """
 
