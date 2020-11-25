@@ -8,6 +8,7 @@ last modified: Thomas Delemontex, András Ecker 11.2020
 
 import os
 import yaml
+import h5py
 from tqdm import tqdm
 from copy import deepcopy
 from collections import namedtuple
@@ -16,8 +17,7 @@ import numpy as np
 import multiprocessing as mp
 
 
-SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "row_map", "t_bins", "t_idx"])
-ThresholdedRate = namedtuple("ThresholdedRate", ["rate", "rate_th"])
+SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
 
 
 def _get_bluepy_simulation(blueconfig_path):
@@ -84,12 +84,28 @@ def sign_rate_std(spike_times, spiking_gids, t_start, t_end, bin_size, N=100):
     return np.percentile(tbin_stds, 95)
 
 
+def spikes_to_h5(h5f_name, spike_matrix_dict, metadata, prefix):
+    """Saves spike matrices to HDF5 file"""
+
+    with h5py.File(h5f_name, "a") as h5f:
+        grp = h5f.require_group(prefix)
+        for k, v in metadata.items():
+            grp.attrs[k] = v
+
+        for seed, SpikeMatrixResult in spike_matrix_dict.items():
+            grp_out = grp.create_group("seed%i" % seed)
+            grp_out.create_dataset("spike_matrix", data=SpikeMatrixResult.spike_matrix)
+            grp_out.create_dataset("gids", data=SpikeMatrixResult.gids)
+            grp_out.create_dataset("t_bins", data=SpikeMatrixResult.t_bins)
+
+
 class SpikeMatrixGroup(object):
     """Class to store metadata about simulations, binned raster and significant time bins"""
 
-    def __init__(self, config):
+    def __init__(self, config_path):
         """YAML config file based constructor"""
-        with open(config, "r") as f:
+        self._config_path = config_path
+        with open(config_path, "r") as f:
             self._config = yaml.load(f, Loader=yaml.SafeLoader)
 
     @property
@@ -131,19 +147,29 @@ class SpikeMatrixGroup(object):
         from assemblyfire.utils import get_patterns
         return get_patterns(self.root_path)
 
+    @cached_property
+    def fig_path(self):
+        return os.path.join(self.root_fig_path, self._config_path.split('/')[-1][:-5])
+
+    @cached_property
+    def h5f_name(self):
+        from assemblyfire.utils import get_out_fname
+        return get_out_fname(self.root_path, self.clustering_method)
+
     def get_blueconfig_path(self, seed):
         return os.path.join(self.root_path, "stimulusstim_a0", "seed%i" % seed, "BlueConfig")
 
     def get_spike_matrices(self):
         """Bin spikes and threshold activity by population firing rate"""
         from assemblyfire.utils import get_E_gids, get_spikes
+        from assemblyfire.plots import plot_rate
 
-        spike_matrix_dict = {}; rate_dict = {}
+        spike_matrix_dict = {}
         for seed in tqdm(self.seeds):
             sim = _get_bluepy_simulation(self.get_blueconfig_path(seed))
             gids = get_E_gids(sim.circuit, sim.target)
             spike_times, spiking_gids = get_spikes(sim, gids, self.t_start, self.t_end)
-            spike_matrix, row_map, t_bins = spikes2mat(spike_times, spiking_gids,
+            spike_matrix, gids, t_bins = spikes2mat(spike_times, spiking_gids,
                                                        self.t_start, self.t_end, self.bin_size)
             assert (spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1)))
 
@@ -153,10 +179,17 @@ class SpikeMatrixGroup(object):
             # get sign threshold (compare to Monte-Carlo shuffles)
             rate_th = sign_rate_std(spike_times, spiking_gids,
                                     self.t_start, self.t_end, self.bin_size)
+            # plotting rate
             rate_norm = get_rate_norm(len(np.unique(spiking_gids)), self.bin_size)
+            fig_name = os.path.join(self.fig_path, "rate_seed%i.png" % seed)
+            plot_rate(rate/rate_norm, rate_th/rate_norm, self.t_start, self.t_end, fig_name)
+
             # get ids of significant (above threshold) time bins
             t_idx = np.where(rate > np.mean(rate) + rate_th)[0]
-            spike_matrix_dict[seed] = SpikeMatrixResult(spike_matrix, row_map, t_bins, t_idx)
-            rate_dict[seed] = ThresholdedRate(rate/rate_norm, rate_th/rate_norm)
+            spike_matrix_dict[seed] = SpikeMatrixResult(spike_matrix[:, t_idx], gids, t_bins[t_idx])
 
-        return spike_matrix_dict, rate_dict
+        # save spikes to h5
+        metadata = {"root_path": self.root_path, "seeds": self.seeds, "patterns": self.patterns}
+        spikes_to_h5(self.h5f_name, spike_matrix_dict, metadata, prefix="spikes")
+
+        return spike_matrix_dict
