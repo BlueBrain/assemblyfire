@@ -24,6 +24,26 @@ __h5_strings__ = {"1.0": {
 __RESERVED__ = []
 
 
+def __initialize_h5__(filename, version=None, assert_exists=False):
+    import h5py
+    import os
+    if version is None:
+        version = __io_version__
+    existed = os.path.exists(filename)
+    assert existed or not assert_exists, "File {0} does not exist!".format(filename)
+    if not existed:
+        assert version in __h5_writers__, "Unknown version: {0}".format(version)
+    with h5py.File(filename, "a") as h5:
+        if existed:
+            # assert __str_io_version__ in h5.attrs, "Invalid file" TODO: Put that back in
+            version = h5.attrs.get(__str_io_version__, __io_version__)
+            assert version in __h5_writers__, "Unknown version: {0}".format(version)
+        else:
+            h5.attrs[__str_io_version__] = version
+
+    return version
+
+
 def __to_h5_1p0__(data, h5, prefix=None):
     strings = __h5_strings__["1.0"]
     if prefix is None:
@@ -165,7 +185,7 @@ class AssemblyProjectMetadata(object):
     @staticmethod
     def from_h5(fn, group_name=None, prefix=None):
         import h5py
-        read_func = __meta_readers__[AssemblyGroup.__initialize_h5__(fn, assert_exists=True)]
+        read_func = __meta_readers__[__initialize_h5__(fn, assert_exists=True)]
         with h5py.File(fn, "r") as h5:
             meta_dict = read_func(h5, group_name=group_name, prefix=prefix)
         return meta_dict
@@ -173,7 +193,7 @@ class AssemblyProjectMetadata(object):
     @staticmethod
     def to_h5(metadata, fn, prefix=None, version=None):
         import h5py
-        write_func = __meta_writers__[AssemblyGroup.__initialize_h5__(fn, version=version)]
+        write_func = __meta_writers__[__initialize_h5__(fn, version=version)]
         with h5py.File(fn, "r+") as h5:
             return write_func(metadata, h5, prefix=prefix)
 
@@ -269,6 +289,9 @@ class Assembly(object):
 
 
 class AssemblyGroup(object):
+    h5_read_func = __h5_readers__
+    h5_write_func = __h5_writers__
+
     def __init__(self, assemblies, all_gids, label=None, metadata=None):
         all_gids = numpy.array(all_gids)
         assert label not in __RESERVED__, "{0} is a reserved name".format(label)
@@ -389,26 +412,6 @@ class AssemblyGroup(object):
             "metadata": self.metadata
         }
 
-    @staticmethod
-    def __initialize_h5__(filename, version=None, assert_exists=False):
-        import h5py
-        import os
-        if version is None:
-            version = __io_version__
-        existed = os.path.exists(filename)
-        assert existed or not assert_exists, "File {0} does not exist!".format(filename)
-        if not existed:
-            assert version in __h5_writers__, "Unknown version: {0}".format(version)
-        with h5py.File(filename, "a") as h5:
-            if existed:
-                # assert __str_io_version__ in h5.attrs, "Invalid file" TODO: Put that back in
-                version = h5.attrs.get(__str_io_version__, __io_version__)
-                assert version in __h5_writers__, "Unknown version: {0}".format(version)
-            else:
-                h5.attrs[__str_io_version__] = version
-
-        return version
-
     def to_h5(self, filename, prefix=None, version=None):
         """
         :param filename: Filename to write this assembly group to
@@ -417,14 +420,14 @@ class AssemblyGroup(object):
         :return: str: the prefix used
         """
         import h5py
-        write_func = __h5_writers__[self.__initialize_h5__(filename, version=version)]
+        write_func = self.__class__.h5_write_func[__initialize_h5__(filename, version=version)]
         with h5py.File(filename, "r+") as h5:
             return write_func(self, h5, prefix)
 
-    @staticmethod
-    def from_h5(fn, group_name, prefix=None):
+    @classmethod
+    def from_h5(cls, fn, group_name, prefix=None):
         import h5py
-        read_func = __h5_readers__[AssemblyGroup.__initialize_h5__(fn, assert_exists=True)]
+        read_func = cls.h5_read_func[__initialize_h5__(fn, assert_exists=True)]
         with h5py.File(fn, "r") as h5:
             return read_func(h5, group_name, prefix=prefix)
 
@@ -624,6 +627,8 @@ class ConsensusAssembly(Assembly):
     the number of stochastic runs it shows up in, and based on that calculates a "coreness" property. We consider
     a neuron to be part of this assembly, if its "coreness" property is above a user-specified threshold
     """
+    h5_read_func = __cons_readers__
+    h5_write_func = __cons_writers__
 
     def __init__(self, lst_assemblies, index=None, label=None, core_threshold=4.0, core_method="p-value"):
         """
@@ -659,26 +664,6 @@ class ConsensusAssembly(Assembly):
         """
         return ConsensusAssembly(self.instantiations, index=self.idx,
                                  core_method=self._core_method, core_threshold=new_thresh)
-
-    def to_h5(self, filename, prefix=None, version=None):
-        """
-        :param filename: Filename to write this assembly group to
-        :param prefix: Default: None, a prefix within the file to put the data behind
-        :param version: default: latest
-        :return: str: the prefix used
-        """
-        import h5py
-        write_func = __cons_writers__[AssemblyGroup.__initialize_h5__(filename, version=version)]
-        with h5py.File(filename, "r+") as h5:
-            return write_func(self, h5, prefix)
-
-    @staticmethod
-    def from_h5(fn, group_name, prefix=None):
-        import h5py
-        read_func = __cons_readers__[AssemblyGroup.__initialize_h5__(fn, assert_exists=True)]
-        with h5py.File(fn, "r") as h5:
-            return read_func(h5, group_name, prefix=prefix)
-
 
     @staticmethod
     def calculate_coreness(vec_num_contained, expected_n=None, expected_distribution=None, epsilon=1E-5):
