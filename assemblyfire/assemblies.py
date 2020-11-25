@@ -714,7 +714,7 @@ def consensus_over_seeds_hamming(assembly_grp_dict, criterion="maxclust", thresh
     assembly_grp_clust = {}
     for cluster in np.unique(clusters):
         c_idx = np.where(clusters==cluster)[0]
-        assembly_lst = [assembly_group.assemblies[i] for i in c_idx]
+        assembly_lst = [all_assemblies.assemblies[i] for i in c_idx]
         assembly_grp_clust[cluster] = AssemblyGroup(assemblies=assembly_lst, all_gids=all_gids,
                                                     label="cluster%i" % cluster)
 
