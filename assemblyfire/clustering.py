@@ -8,6 +8,7 @@ density based clustering a la Rodriguez and Laio 2014
 of spike matrix projected to PCA space a la Herzog et al. 2020.
 Then "core-cells" and cell assemblies are detected with correlation
 based methods from (Montijn et al. 2016 and) Herzog et al. 2020
+Assemblies are clustered into consensus assemblies via hierarchical clustering
 last modified: András Ecker 11.2020
 """
 
