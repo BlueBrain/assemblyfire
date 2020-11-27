@@ -2,6 +2,7 @@
 """
 Correlate consensus assembly membership and single cell features
 (spike time reliability and mean+/-std of spike times within time bins)
+last modified: András Ecker 11.2020
 """
 
 import os
