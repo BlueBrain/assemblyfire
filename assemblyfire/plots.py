@@ -127,9 +127,8 @@ def plot_transformed(transformed, patterns, t_bins, fig_name):
     transformed_T = transformed.T
 
     fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(2, 1, height_ratios=[1, 3])
     ax = fig.add_subplot(1, 1, 1)
-    i = ax.imshow(transformed_T, cmap="coolwarm", aspect="auto")
+    ax.imshow(transformed_T, cmap="coolwarm", aspect="auto")
     ax.set_xlabel("time bins")
     ax.set_xticks(t_idx); ax.set_xticklabels(patterns)
     ax.xaxis.tick_top()
@@ -357,5 +356,144 @@ def plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name):
     fig.colorbar(i)
     ax.set_xticks(n_assemblies_cum)
     ax.set_yticks(n_assemblies_cum)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_single_cell_features(gids, r_spikes, mean_ts, std_ts, ystuff, depths, fig_name):
+    """Plots spike time reliability and mean+/-std(spike time) in bin"""
+
+    yrange = [ystuff["hlines"][-1], ystuff["hlines"][1]]
+    gid_depths = _gids_to_depth(gids, depths)
+    r_spikes[r_spikes == 0] = np.nan
+
+    fig = plt.figure(figsize=(9, 8))
+    ax = fig.add_subplot(1, 2, 1)
+    sns.despine(ax=ax, offset=5)
+    ax.scatter(r_spikes, gid_depths,
+               color="black", alpha=0.5, marker='.', s=5, edgecolor="none")
+    for i in range(2, 6):
+        ax.axhline(ystuff["hlines"][i], color="gray", ls="--")
+    ax.set_xlabel("r_spike")
+    ax.set_xlim([0, np.nanmax(r_spikes)])
+    ax.set_yticks(ystuff["yticks"][1:])
+    ax.set_ylim(yrange)
+    ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"][1:]])
+    ax2 = fig.add_subplot(1, 2, 2)
+    sns.despine(ax=ax2, left=True, offset=5)
+    ax2.errorbar(mean_ts, gid_depths, xerr=std_ts, color="black",
+                 fmt="none", alpha=0.5, lw=0.1, errorevery=10)
+    ax2.scatter(mean_ts, gid_depths,
+               color="black", alpha=0.5, marker='.', s=5, edgecolor="none")
+    for i in range(2, 6):
+        ax2.axhline(ystuff["hlines"][i], color="gray", ls="--")
+    ax2.set_xlabel("Spike time in bin (ms)")
+    ax2.set_xlim([0, 10])
+    ax2.set_ylim(yrange)
+    ax2.set_yticks([])
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_consensus_r_spike(consenus_r_spikes, r_spikes, fig_name):
+    """Plots spike time reliability for consensus assemblies
+    :param consenus_r_spikes: list of spike time reliabilities for all core cells in the consensus assemblies
+    :param r_spikes: array of spikes time reliability (r_spike) for all cells"""
+
+    n = len(consenus_r_spikes)
+    cmap = plt.cm.get_cmap("tab20", n)
+    max_len = np.max([assembly.shape[0] for assembly in consenus_r_spikes])
+    widths = [assembly.shape[0]/max_len for assembly in consenus_r_spikes]
+
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(1, 2, width_ratios=[7, 1])
+    ax = fig.add_subplot(gs[0])
+    parts = ax.violinplot(consenus_r_spikes, showextrema=False, widths=widths)
+    for i, pc in enumerate(parts["bodies"]):
+        pc.set_facecolor(colors.to_hex(cmap(i)))
+        pc.set_edgecolor("black")
+        pc.set_alpha(1)
+    idx = np.arange(1, n+1)
+    for i, consenus_rs in zip(idx, consenus_r_spikes):
+        quartile1, median, quartile3 = np.percentile(consenus_rs, [25, 50, 75])
+        ax.vlines(i, quartile1, quartile3, color='k', linestyle='-', lw=5)
+        ax.scatter(i, median, marker='o', color='white', s=30, edgecolor="none", zorder=3)
+    ax.set_ylabel("r_spike")
+    ax.set_xticks(idx)
+    ax.set_xticklabels(["cons%s\n(n=%i)" % (i, consenus_r_spikes[i].shape[0])
+                        for i in range(0, n)])
+    ax.set_ylim([0, np.nanmax(r_spikes)])
+    sns.despine(ax=ax, bottom=True, offset=5, trim=True)
+
+    n_all = r_spikes.shape[0]
+    r_spikes = r_spikes[~np.isnan(r_spikes)]
+    ax2 = fig.add_subplot(gs[1])
+    sns.despine(ax=ax2, left=True, bottom=True)
+    parts = ax2.violinplot(r_spikes, showextrema=False, widths=[1])
+    parts["bodies"][0].set_facecolor("gray")
+    parts["bodies"][0].set_edgecolor("black")
+    parts["bodies"][0].set_alpha(0.8)
+    quartile1, median, quartile3 = np.percentile(r_spikes, [25, 50, 75])
+    ax2.vlines(1, quartile1, quartile3, color='k', linestyle='-', lw=5)
+    ax2.scatter(1, median, marker='o', color='white', s=30, edgecolor="none", zorder=3)
+    ax2.set_xticks([1])
+    ax2.set_xticklabels(["all_gids\n(n=%i)" % n_all])
+    ax2.set_ylim([0, np.nanmax(consenus_r_spikes[-1])])
+    ax2.set_yticks([])
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_consensus_t_in_bin(consensus_gids, all_gids, consenus_mean_ts, consenus_std_ts,
+                            mean_ts, std_ts, ystuff, depths, fig_name):
+    """Plots time in bin for consensus assemblies"""
+
+    n = len(consenus_mean_ts)
+    cmap = plt.cm.get_cmap("tab20", n)
+    yrange = [ystuff["hlines"][-1], ystuff["hlines"][1]]
+
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(1, n+1)
+    for i in range(n):
+        ax = fig.add_subplot(gs[i])
+        gid_depths = _gids_to_depth(consensus_gids[i], depths)
+        color = colors.to_hex(cmap(i))
+        errorevery = 10 if consensus_gids[i].shape[0] > 2000 else 1
+        ax.errorbar(consenus_mean_ts[i], gid_depths, xerr=consenus_std_ts[i], color=color,
+                    fmt="none", alpha=0.5, lw=0.1, errorevery=errorevery)
+        ax.scatter(consenus_mean_ts[i], gid_depths,
+                   color=color, alpha=0.5, marker='.', s=5, edgecolor="none")
+        for j in range(2, 6):
+            ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
+        ax.set_xlim([0, 10])
+        ax.set_title("cons%s\n(n=%i)" % (i + 1, consensus_gids[i].shape[0]))
+        ax.set_ylim(yrange)
+        if i == 0:
+            ax.set_yticks(ystuff["yticks"][1:])
+            ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"][1:]])
+            sns.despine(ax=ax, offset=5)
+        else:
+            ax.set_yticks([])
+            sns.despine(ax=ax, left=True, offset=5)
+
+    ax = fig.add_subplot(gs[-1])
+    gid_depths = _gids_to_depth(all_gids, depths)
+    ax.errorbar(mean_ts, gid_depths, xerr=std_ts, color="black",
+                fmt="none", alpha=0.5, lw=0.1, errorevery=10)
+    ax.scatter(mean_ts, gid_depths,
+               color="black", alpha=0.5, marker='.', s=5, edgecolor="none")
+    for j in range(2, 6):
+        ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
+    ax.set_xlim([0, 10])
+    ax.set_title("all_gids\n(n=%i)" % all_gids.shape[0])
+    ax.set_ylim(yrange)
+    ax.set_yticks([])
+    sns.despine(ax=ax, left=True, offset=5)
+    fig.add_subplot(1, 1, 1, frameon=False)
+    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    plt.xlabel("Spike time in bin (ms)")
+    fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
