@@ -26,14 +26,12 @@ def consensus_vs_single_cell_features(config_path):
     all_gids = single_cell_features.gids
     consensus_gids = [assembly.gids for _, assembly in consensus_assemblies.items()]
 
-    """
     # consensus assembly membership vs. spike time reliability
     r_spikes = single_cell_features.r_spikes
     r_spikes[r_spikes == 0] = np.nan
     consenus_r_spikes = [r_spikes[np.searchsorted(all_gids, gids)] for gids in consensus_gids]
     fig_name = os.path.join(spikes.fig_path, "consensus_r_spikes.png")
     plot_consensus_r_spike(consenus_r_spikes, r_spikes, fig_name)
-    """
 
     # consensus assembly membership vs. spike time in bin
     mean_ts = single_cell_features.mean_ts
