@@ -92,6 +92,10 @@ def _get_layer_gids(c, layer, target):
     return c.cells.ids({"$target": target, Cell.LAYER: layer})
 
 
+def get_mtypes(c, gids):
+    return c.cells.get(gids)["mtype"]
+
+
 def map_gids_to_depth(circuit_config, target="mc2_Column"):
     """Creates gid-depth map (for better figure asthetics)"""
 

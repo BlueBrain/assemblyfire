@@ -20,7 +20,7 @@ import multiprocessing as mp
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
 
 
-def _get_bluepy_simulation(blueconfig_path):
+def get_bluepy_simulation(blueconfig_path):
     try:
         from bluepy.v2 import Simulation
     except ImportError as e:
@@ -193,7 +193,7 @@ class SpikeMatrixGroup(object):
     def load_spikes(self, seed):
         """Loads in spikes from simulations using bluepy"""
         from assemblyfire.utils import get_E_gids, get_spikes
-        sim = _get_bluepy_simulation(self.get_blueconfig_path(seed))
+        sim = get_bluepy_simulation(self.get_blueconfig_path(seed))
         gids = get_E_gids(sim.circuit, sim.target)
         spike_times, spiking_gids = get_spikes(sim, gids, self.t_start, self.t_end)
         return spike_times, spiking_gids

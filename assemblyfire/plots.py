@@ -396,10 +396,80 @@ def plot_single_cell_features(gids, r_spikes, mean_ts, std_ts, ystuff, depths, f
     plt.close(fig)
 
 
+def plot_consensus_mtypes(consensus_gids, gids, consensus_mtypes, mtypes, ystuff, depths, fig_name):
+    """Plots depth profile and mtypes for consensus assemblies"""
+
+    n = len(consensus_gids)
+    mtypes_lst = np.unique(mtypes)[::-1]
+    mtypes_ypos = np.arange(len(mtypes_lst))
+    mtype_hlines = np.array([4.5, 8.5, 11.5])  # this is totally hard coded based on mtypes by layer
+    cmap = plt.cm.get_cmap("tab20", n)
+    yrange = [ystuff["hlines"][-1], ystuff["hlines"][1]]
+
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(2, n+1)
+    for i in range(n):
+        ax = fig.add_subplot(gs[0, i])
+        gid_depths = _gids_to_depth(consensus_gids[i], depths)
+        color = colors.to_hex(cmap(i))
+        ax.hist(gid_depths, bins=50, range=yrange, orientation="horizontal",
+                color=color, edgecolor=color)
+        for j in range(2, 6):
+            ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
+        ax.set_title("cons%s\n(n=%i)" % (i + 1, consensus_gids[i].shape[0]))
+        ax.set_xlim(left=5)  # for purely viz. purposes
+        ax2 = fig.add_subplot(gs[1, i])
+        mtypes_plot = [np.where(consensus_mtypes[i] == mtype)[0].shape[0] for mtype in mtypes_lst]
+        ax2.barh(mtypes_ypos, mtypes_plot, color=color, edgecolor=color)
+        ax2.set_xlim(left=5)
+        for hl in mtype_hlines:
+            ax2.axhline(hl, color="gray", ls="--")
+
+        if i == 0:
+            ax.set_xticks([])
+            ax.set_yticks(ystuff["yticks"][1:])
+            ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"][1:]])
+            ax2.set_xticks([])
+            ax2.set_yticks(mtypes_ypos)
+            ax2.set_yticklabels(mtypes_lst)
+            sns.despine(ax=ax, bottom=True, offset=5)
+            sns.despine(ax=ax2, bottom=True, offset=5)
+        else:
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax2.set_xticks([])
+            ax2.set_yticks([])
+            sns.despine(ax=ax, left=True, bottom=True)
+            sns.despine(ax=ax2, left=True, bottom=True)
+
+    ax = fig.add_subplot(gs[0, -1])
+    gid_depths = _gids_to_depth(gids, depths)
+    ax.hist(gid_depths, bins=50, range=yrange, orientation="horizontal",
+            color="gray", edgecolor="gray")
+    for j in range(2, 6):
+        ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
+    ax.set_title("all_gids\n(n=%i)" % gids.shape[0])
+    ax.set_xlim(left=5)
+    ax.set_xticks([])
+    ax.set_ylim(yrange)
+    ax.set_yticks([])
+    ax2 = fig.add_subplot(gs[1, -1])
+    mtypes_plot = [np.where(mtypes == mtype)[0].shape[0] for mtype in mtypes_lst]
+    ax2.barh(mtypes_ypos, mtypes_plot, color="gray", edgecolor="gray")
+    for hl in mtype_hlines:
+        ax2.axhline(hl, color="gray", ls="--")
+    ax2.set_xlim(left=5)
+    ax2.set_xticks([])
+    ax2.set_yticks([])
+    sns.despine(ax=ax, left=True, bottom=True)
+    sns.despine(ax=ax2, left=True, bottom=True)
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_consensus_r_spike(consenus_r_spikes, r_spikes, fig_name):
-    """Plots spike time reliability for consensus assemblies
-    :param consenus_r_spikes: list of spike time reliabilities for all core cells in the consensus assemblies
-    :param r_spikes: array of spikes time reliability (r_spike) for all cells"""
+    """Plots spike time reliability for consensus assemblies"""
 
     n = len(consenus_r_spikes)
     cmap = plt.cm.get_cmap("tab20", n)
