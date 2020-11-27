@@ -2,6 +2,3 @@
 """
 Legacy code which might be useful to keep...
 """
-
-
-
