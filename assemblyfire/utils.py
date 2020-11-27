@@ -12,6 +12,7 @@ from collections import namedtuple
 import numpy as np
 
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
+SingleCellFeatures = namedtuple("SingleCellFeatures", ["gids", "r_spikes", "mean_ts", "std_ts"])
 
 
 def _get_bluepy_circuit(circuitconfig_path):
@@ -163,6 +164,18 @@ def load_assemblies_from_h5(h5f_name, prefix="assemblies"):
                  for k in keys]), project_metadata
 
 
+def load_consensus_assemblies_from_h5(h5f_name, prefix="consensus"):
+    """Load consensus (clustered and thresholded )assemblies
+    from saved h5 file into dict of ConsensusAssembly objects"""
+    from assemblyfire.assemblies import ConsensusAssembly, AssemblyProjectMetadata
+
+    with h5py.File(h5f_name, "r") as h5f:
+        keys = list(h5f[prefix].keys())
+    project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix="spikes")
+    return dict([(k, ConsensusAssembly.from_h5(h5f_name, k, prefix=prefix))
+                 for k in keys]), project_metadata
+
+
 def load_spikes_from_h5(h5f_name, prefix="spikes"):
     """Load spike matrices over seeds from saved h5 file"""
     from assemblyfire.assemblies import AssemblyProjectMetadata
@@ -178,3 +191,16 @@ def load_spikes_from_h5(h5f_name, prefix="spikes"):
     h5f.close()
     project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix=prefix)
     return spike_matrix_dict, project_metadata
+
+
+def load_single_cell_features_from_h5(h5f_name, prefix="spikes"):
+    """Load spike matrices over seeds from saved h5 file"""
+    from assemblyfire.assemblies import AssemblyProjectMetadata
+
+    h5f = h5py.File(h5f_name, "r")
+    prefix_grp = h5f[prefix]
+    single_cell_features = SingleCellFeatures(prefix_grp["gids"][:], prefix_grp["r_spikes"][:],
+                                              prefix_grp["mean_ts_in_bin"][:], prefix_grp["std_ts_in_bin"][:])
+    h5f.close()
+    project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix=prefix)
+    return single_cell_features, project_metadata

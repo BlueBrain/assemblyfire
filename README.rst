@@ -32,3 +32,4 @@ Examples
 
   assemblyfire find_assemblies -v configs/100p_depol_simmat.yaml
   assemblyfire consenus -v configs/100p_depol_simmat.yaml
+  assemblyfire single-cell -v configs/100p_depol_simmat.yaml
