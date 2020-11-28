@@ -111,7 +111,11 @@ class ConnectivityMatrix(object):
         p = np.zeros_like(self._gids, dtype=np.float)
         for i in idx[1:-1]:
             p[depths_bins == i] = p_ref[i-1]/counts[i]
-        assert(np.sum(p) == 1.0)
+        if np.sum(p) != 1.0:  # this is a bit hacky but it solves small numerical errors
+            # p /= np.sum(p)  # this doesn't work...
+            idx = np.where(p != 0.)[0]
+            p[idx[0]] += 1 - np.sum(p)
+        assert(np.sum(p) == 1.0), "Probability for random sampling != 1.0"
 
         sample_gids = np.random.choice(self._gids, len(ref_gids), replace=False, p=p)
         idx = self._lookup[sample_gids]
@@ -148,7 +152,11 @@ class ConnectivityMatrix(object):
         for i, mtype in enumerate(mtypes_lst):
             idx = np.where(mtypes == mtype)[0]
             p[idx] = p_ref[i]/idx.shape[0]
-        assert (np.sum(p) == 1.0)
+        if np.sum(p) != 1.0:  # this is a bit hacky but it solves small numerical errors
+            # p /= np.sum(p)  # this doesn't work...
+            idx = np.where(p != 0.)[0]
+            p[idx[0]] += 1 - np.sum(p)
+        assert (np.sum(p) == 1.0), "Probability for random sampling != 1.0"
 
         sample_gids = np.random.choice(self._gids, len(ref_gids), replace=False, p=p)
         idx = self._lookup[sample_gids]
