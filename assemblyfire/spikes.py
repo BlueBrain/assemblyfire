@@ -203,7 +203,7 @@ class SpikeMatrixGroup(object):
         from assemblyfire.plots import plot_rate
 
         spike_matrix_dict = {}
-        for seed in tqdm(self.seeds):
+        for seed in tqdm(self.seeds, desc="Loading in simulation results"):
             spike_times, spiking_gids = self.load_spikes(seed)
             spike_matrix, gids, t_bins = spikes2mat(spike_times, spiking_gids,
                                                     self.t_start, self.t_end, self.bin_size)
@@ -234,7 +234,7 @@ class SpikeMatrixGroup(object):
         # load in spikes and get times in bin per seed
         indiv_gids = []
         ts_in_bin = {}
-        for seed in tqdm(self.seeds):
+        for seed in tqdm(self.seeds, desc="Loading in simulation results"):
             spike_times, spiking_gids = self.load_spikes(seed)
             indiv_gids.extend(np.unique(spiking_gids).tolist())
             ts_in_bin[seed] = get_ts_in_bin(spike_times, spiking_gids, self.bin_size)
@@ -243,7 +243,7 @@ class SpikeMatrixGroup(object):
         mean_ts = []
         std_ts = []
         all_gids = np.unique(indiv_gids)
-        for gid in tqdm(all_gids, miniters=len(all_gids) / 100):
+        for gid in tqdm(all_gids, desc="Concatenating results for all gids", miniters=len(all_gids) / 100):
             ts_in_bin_gid = []
             for _, ts_in_bin_seed in ts_in_bin.items():
                 if gid in ts_in_bin_seed:
@@ -268,7 +268,7 @@ class SpikeMatrixGroup(object):
         # one can't simply np.dstack() them because it's not guaranteed that all gids spike in all trials
         gid_dict = {}
         convolved_spike_matrix_dict = {}
-        for seed in tqdm(self.seeds):
+        for seed in tqdm(self.seeds, desc="Loading in simulation results"):
             convolved_spike_matrix, gids = self.convolve_spike_matrix(seed)
             gid_dict[seed] = gids
             convolved_spike_matrix_dict[seed] = convolved_spike_matrix
@@ -278,7 +278,7 @@ class SpikeMatrixGroup(object):
             indiv_gids.extend(gids)
         all_gids = np.unique(indiv_gids)
         r_spikes = []
-        for gid in tqdm(all_gids, miniters=len(all_gids) / 100):
+        for gid in tqdm(all_gids, desc="Concatenating results for all gids", miniters=len(all_gids) / 100):
             # array of single neuron across trials with <=len(seed) rows
             gid_trials_convolved = np.stack(convolved_spike_matrix_dict[seed][(gids == gid), :][0]
                                             for seed, gids in gid_dict.items()

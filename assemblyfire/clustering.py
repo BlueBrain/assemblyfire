@@ -245,7 +245,7 @@ def cluster_spikes(spike_matrix_dict, method, FigureArgs):
     from assemblyfire.plots import plot_cluster_seqs
 
     clusters_dict = {}
-    for seed, SpikeMatrixResult in tqdm(spike_matrix_dict.items()):
+    for seed, SpikeMatrixResult in tqdm(spike_matrix_dict.items(), desc="Clustering"):
         spike_matrix = SpikeMatrixResult.spike_matrix
         t_bins = SpikeMatrixResult.t_bins
 
@@ -291,7 +291,7 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, h5_prefix, Fig
     from assemblyfire.assemblies import Assembly, AssemblyGroup
     from assemblyfire.plots import plot_assemblies
 
-    for seed, SpikeMatrixResult in tqdm(spike_matrix_dict.items()):
+    for seed, SpikeMatrixResult in tqdm(spike_matrix_dict.items(), desc="Detecting assemblies"):
         spike_matrix = SpikeMatrixResult.spike_matrix
         gids = SpikeMatrixResult.gids
         clusters = clusters_dict[seed]
