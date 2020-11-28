@@ -686,6 +686,7 @@ class ConsensusAssembly(Assembly):
             res.append(np.in1d(self.union.gids, assembly.gids))
         return np.vstack(res).sum(axis=0)
 
+    '''
     def plot(self, angles=None, **kwargs):
         from matplotlib import pyplot as plt
         if angles is None:
@@ -697,6 +698,7 @@ class ConsensusAssembly(Assembly):
         else:
             raise Exception()
         plt.polar(angles, r, **kwargs)
+    '''
 
 
 def consensus_over_seeds_hamming(assembly_grp_dict, h5f_name, h5_prefix, fig_path, criterion="maxclust", threshold=None):
