@@ -96,11 +96,11 @@ def get_mtypes(c, gids):
     return c.cells.get(gids)["mtype"]
 
 
-def map_gids_to_depth(circuit_config, gids=None, target="mc2_Column"):
+def map_gids_to_depth(circuit_config, gids=[], target="mc2_Column"):
     """Creates gid-depth map (for better figure asthetics)"""
 
     c = _get_bluepy_circuit(circuit_config)
-    if gids == None:
+    if not len(gids):
         gids = _get_gids(c, target)
     ys = c.cells.get(gids)["y"]
     # convert pd.Series to dictionary...
