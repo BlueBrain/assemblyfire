@@ -36,7 +36,7 @@ def consensus_botany(config_path):
     consensus_mtypes = [mtypes[np.searchsorted(all_gids, gids)] for gids in consensus_gids]
     union_mtypes = [mtypes[np.searchsorted(all_gids, gids)] for gids in union_gids]
 
-    depths = map_gids_to_depth(spikes.get_blueconfig_path(spikes.seeds[0]))
+    depths = map_gids_to_depth(spikes.get_blueconfig_path(spikes.seeds[0]), all_gids)
     ystuff = get_layer_boundaries(spikes.get_blueconfig_path(spikes.seeds[0]))
     fig_name = os.path.join(spikes.fig_path, "consensus_mtypes.png")
     plot_consensus_mtypes(union_gids, union_mtypes, consensus_gids, all_gids, consensus_mtypes, mtypes,

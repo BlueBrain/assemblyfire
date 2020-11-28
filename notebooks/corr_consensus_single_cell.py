@@ -47,7 +47,7 @@ def consensus_vs_single_cell_features(config_path):
     consenus_mean_ts = [mean_ts[np.searchsorted(all_gids, gids)] for gids in consensus_gids]
     std_ts = single_cell_features.std_ts
     consenus_std_ts = [std_ts[np.searchsorted(all_gids, gids)] for gids in consensus_gids]
-    depths = map_gids_to_depth(spikes.get_blueconfig_path(spikes.seeds[0]))
+    depths = map_gids_to_depth(spikes.get_blueconfig_path(spikes.seeds[0]), all_gids)
     ystuff = get_layer_boundaries(spikes.get_blueconfig_path(spikes.seeds[0]))
     fig_name = os.path.join(spikes.fig_path, "consensus_t_in_bin.png")
     plot_consensus_t_in_bin(consensus_gids, all_gids, consenus_mean_ts, consenus_std_ts,
