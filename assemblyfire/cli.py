@@ -3,6 +3,7 @@
 CLI to detect and analyse cell assemblies
  * `assemblyfire find-assemblies` config_path: detect assemblies in spiking data
  * `assemblyfire consensus config_path`: create consensus assemblies from assemblies across seeds
+ * `assemblyfire conn-mat`: loads in connectivity matrix
  * `assemblyfire single-cell config_path`: gets single cell features from simulations
 last modified: Thomas Delemontex, András Ecker 11.2020
 """
@@ -44,7 +45,15 @@ def consensus(config_path):
 
 @cli.command()
 @click.argument("config_path", required=True)
+def conn_mat(config_path):
+    """CLI for `get_connectivity_matrix.py/run()`"""
+    from assemblyfire.get_connectivity_matrix import run
+    run(config_path)
+
+
+@cli.command()
+@click.argument("config_path", required=True)
 def single_cell(config_path):
-    """CLI for `find_consensus_assemblies.py/run()`"""
+    """CLI for `get_single_cell_features.py/run()`"""
     from assemblyfire.get_single_cell_features import run
     run(config_path)
