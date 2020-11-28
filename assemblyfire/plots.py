@@ -396,7 +396,8 @@ def plot_single_cell_features(gids, r_spikes, mean_ts, std_ts, ystuff, depths, f
     plt.close(fig)
 
 
-def plot_consensus_mtypes(consensus_gids, gids, consensus_mtypes, mtypes, ystuff, depths, fig_name):
+def plot_consensus_mtypes(union_gids, union_mtypes, consensus_gids, gids, consensus_mtypes, mtypes,
+                          ystuff, depths, fig_name):
     """Plots depth profile and mtypes for consensus assemblies"""
 
     n = len(consensus_gids)
@@ -413,7 +414,10 @@ def plot_consensus_mtypes(consensus_gids, gids, consensus_mtypes, mtypes, ystuff
         gid_depths = _gids_to_depth(consensus_gids[i], depths)
         color = colors.to_hex(cmap(i))
         ax.hist(gid_depths, bins=50, range=yrange, orientation="horizontal",
-                color=color, edgecolor=color)
+                color=color, edgecolor=color, label="core")
+        union_depths = _gids_to_depth(union_gids[i], depths)
+        ax.hist(union_depths, bins=50, range=yrange, orientation="horizontal",
+                color="black", histtype="step", label="union")
         for j in range(2, 6):
             ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
         ax.set_title("cons%s\n(n=%i)" % (i + 1, consensus_gids[i].shape[0]))
@@ -421,6 +425,8 @@ def plot_consensus_mtypes(consensus_gids, gids, consensus_mtypes, mtypes, ystuff
         ax2 = fig.add_subplot(gs[1, i])
         mtypes_plot = [np.where(consensus_mtypes[i] == mtype)[0].shape[0] for mtype in mtypes_lst]
         ax2.barh(mtypes_ypos, mtypes_plot, color=color, edgecolor=color)
+        mtypes_plot = [np.where(union_mtypes[i] == mtype)[0].shape[0] for mtype in mtypes_lst]
+        ax2.barh(mtypes_ypos, mtypes_plot, color="none", edgecolor="black")
         ax2.set_xlim(left=5)
         for hl in mtype_hlines:
             ax2.axhline(hl, color="gray", ls="--")
@@ -429,6 +435,7 @@ def plot_consensus_mtypes(consensus_gids, gids, consensus_mtypes, mtypes, ystuff
             ax.set_xticks([])
             ax.set_yticks(ystuff["yticks"][1:])
             ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"][1:]])
+            ax.legend(frameon=False)
             ax2.set_xticks([])
             ax2.set_yticks(mtypes_ypos)
             ax2.set_yticklabels(mtypes_lst)
@@ -564,6 +571,58 @@ def plot_consensus_t_in_bin(consensus_gids, all_gids, consenus_mean_ts, consenus
     fig.add_subplot(1, 1, 1, frameon=False)
     plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
     plt.xlabel("Spike time in bin (ms)")
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_coreness_r_spike(r_spikes, coreness, fig_name):
+    """Plots corenss vs. spike time reliability"""
+
+    n = len(coreness)
+    cmap = plt.cm.get_cmap("tab20", n)
+    max_r = np.max([np.nanmax(r_spikes_) for r_spikes_ in r_spikes])
+
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(np.floor_divide(n, 5)+1, 5)
+    for i in range(n):
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)-5])
+        ax.scatter(coreness[i], r_spikes[i], color=cmap(i), marker='.', s=10, edgecolor="none")
+        ax.set_title("union%i\n(n=%i)" % (i+1, coreness[i].shape[0]))
+        ax.axvline(4., color="gray", ls="--")
+        ax.set_xticks([0, 4, 5])
+        ax.set_xlim([0, 5.1])
+        ax.set_yticks([0, 0.3, 0.6])
+        ax.set_ylim([0, max_r])
+        sns.despine(ax=ax, offset=True, trim=True)
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_coreness_t_in_bin(mean_ts, std_ts, coreness, fig_name):
+    """Plots corenss vs. spike time in bin"""
+
+    n = len(coreness)
+    cmap = plt.cm.get_cmap("tab20", n)
+
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(np.floor_divide(n, 5) + 1, 5)
+    for i in range(n):
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        color = colors.to_hex(cmap(i))
+        errorevery = 10 if coreness[i].shape[0] > 2000 else 1
+        ax.errorbar(coreness[i], mean_ts[i], yerr=std_ts[i], color=color,
+                    fmt="none", alpha=0.5, lw=0.1, errorevery=errorevery)
+        ax.scatter(coreness[i], mean_ts[i],
+                   color=color, alpha=0.5, marker='.', s=5, edgecolor="none")
+        ax.set_title("union%i\n(n=%i)" % (i + 1, coreness[i].shape[0]))
+        ax.axvline(4., color="gray", ls="--")
+        ax.set_xticks([0, 4, 5])
+        ax.set_xlim([0, 5.1])
+        ax.set_yticks([0, 5, 10])
+        ax.set_ylim([0, 10])
+        sns.despine(ax=ax, offset=True, trim=True)
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)

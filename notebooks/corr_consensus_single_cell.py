@@ -11,7 +11,8 @@ import numpy as np
 from assemblyfire.spikes import SpikeMatrixGroup
 from assemblyfire.utils import map_gids_to_depth, get_layer_boundaries,\
                                load_single_cell_features_from_h5, load_consensus_assemblies_from_h5
-from assemblyfire.plots import plot_consensus_r_spike, plot_consensus_t_in_bin
+from assemblyfire.plots import plot_consensus_r_spike, plot_consensus_t_in_bin,\
+                               plot_coreness_r_spike, plot_coreness_t_in_bin
 
 
 def consensus_vs_single_cell_features(config_path):
@@ -26,6 +27,7 @@ def consensus_vs_single_cell_features(config_path):
     consensus_assemblies, _ = load_consensus_assemblies_from_h5(spikes.h5f_name, prefix="consensus")
     all_gids = single_cell_features.gids
     consensus_gids = [assembly.gids for _, assembly in consensus_assemblies.items()]
+    union_gids = [assembly.union.gids for _, assembly in consensus_assemblies.items()]
 
     # consensus assembly membership vs. spike time reliability
     r_spikes = single_cell_features.r_spikes
@@ -33,6 +35,12 @@ def consensus_vs_single_cell_features(config_path):
     consenus_r_spikes = [r_spikes[np.searchsorted(all_gids, gids)] for gids in consensus_gids]
     fig_name = os.path.join(spikes.fig_path, "consensus_r_spikes.png")
     plot_consensus_r_spike(consenus_r_spikes, r_spikes, fig_name)
+
+    # coreness vs. spike time reliability
+    coreness = [assembly.coreness for _, assembly in consensus_assemblies.items()]
+    union_r_spikes = [r_spikes[np.searchsorted(all_gids, gids)] for gids in union_gids]
+    fig_name = os.path.join(spikes.fig_path, "coreness_r_spikes.png")
+    plot_coreness_r_spike(union_r_spikes, coreness, fig_name)
 
     # consensus assembly membership vs. spike time in bin
     mean_ts = single_cell_features.mean_ts
@@ -44,6 +52,12 @@ def consensus_vs_single_cell_features(config_path):
     fig_name = os.path.join(spikes.fig_path, "consensus_t_in_bin.png")
     plot_consensus_t_in_bin(consensus_gids, all_gids, consenus_mean_ts, consenus_std_ts,
                             mean_ts, std_ts, ystuff, depths, fig_name)
+
+    # coreness vs. spike time in bin
+    union_mean_ts = [mean_ts[np.searchsorted(all_gids, gids)] for gids in union_gids]
+    union_std_ts = [std_ts[np.searchsorted(all_gids, gids)] for gids in union_gids]
+    fig_name = os.path.join(spikes.fig_path, "coreness_t_in_bin.png")
+    plot_coreness_t_in_bin(union_mean_ts, union_std_ts, coreness, fig_name)
 
 
 if __name__ == "__main__":
