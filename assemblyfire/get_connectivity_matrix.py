@@ -25,5 +25,5 @@ def run(config_path):
 
     L.info("Loading in connectivity matrix and saving it to: %s" % h5f_name)
     connectivity_matrix = ConnectivityMatrix.from_bluepy(spikes.get_blueconfig_path(spikes.seeds[0]))
-    connectivity_matrix.to_h5(h5f_name, prefix=prefix)
+    connectivity_matrix.to_h5(h5f_name, group_name="full_matrix", prefix=prefix)
 
