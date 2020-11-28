@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Main run function for finding consensus cell assemblies
+last modified: András Ecker 11.2020
 """
 
 import os
