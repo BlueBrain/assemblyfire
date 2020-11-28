@@ -6,7 +6,8 @@ class NetworkAssemblyGroup(AssemblyGroup):
     A class derived from AssemblyGroup with additional information on the connectivity within the assembly
     """
     # TODO: Does it make sense to derive this from AssemblyGroup?
-    #  Maybe just make this a stand-alone thing that simply applies topological functions on Assemblies
+    #  Maybe just make this a stand-alone thing that simply applies topological functions on Assemblies - Michael
+    #  Why noy derive it from ConnectivityMatrix? - András
     # TODO: Implement actual topological functionality?
     def __init__(self, assemblies, all_gids, connectivity_obj, label=None, metadata=None):
         self._connectivity = connectivity_obj
