@@ -54,10 +54,9 @@ def consensus_botany(config_path):
     # TODO move this part to topology, once it has a proper structure
     connectivity_matrix = ConnectivityMatrix.from_h5(spikes.h5f_name, group_name="full_matrix", prefix="connectivity")
     consensus_in_degrees = [get_indegrees(connectivity_matrix.subarray(gids)) for gids in consensus_gids]
-    blueconfig_path = spikes.get_blueconfig_path(spikes.seeds[0])
-    control_in_degrees_depth = [get_indegrees(connectivity_matrix.sample_depth_profile(blueconfig_path, gids))
+    control_in_degrees_depth = [get_indegrees(connectivity_matrix.sample_depth_profile(gids))
                                 for gids in consensus_gids]
-    control_in_degrees_mtypes = [get_indegrees(connectivity_matrix.sample_mtype_composition(blueconfig_path, gids))
+    control_in_degrees_mtypes = [get_indegrees(connectivity_matrix.sample_mtype_composition(gids))
                                  for gids in consensus_gids]
     fig_name = os.path.join(spikes.fig_path, "consensus_in_degrees.png")
     plot_consensus_in_degree(consensus_in_degrees, control_in_degrees_depth, control_in_degrees_mtypes, fig_name)

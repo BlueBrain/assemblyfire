@@ -96,6 +96,10 @@ def get_mtypes(c, gids):
     return c.cells.get(gids)["mtype"]
 
 
+def get_depths(c, gids):
+    return c.cells.get(gids)["y"]
+
+
 def map_gids_to_depth(circuit_config, gids=[], target="mc2_Column"):
     """Creates gid-depth map (for better figure asthetics)"""
 
