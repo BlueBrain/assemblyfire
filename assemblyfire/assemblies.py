@@ -606,7 +606,6 @@ class ConsensusAssembly(Assembly):
         self._core_method = core_method
         self._thresh = core_threshold
         self.label = label
-        assert core_method in ["raw", "number", "p-value"], "Core method %s not defined!" % core_method
         if core_method == "raw":
             self.coreness = self.calculate_coreness(self.__number_of_times_contained__())
         elif core_method == "number":
@@ -616,7 +615,7 @@ class ConsensusAssembly(Assembly):
             self.coreness = self.calculate_coreness(self.__number_of_times_contained__(),
                                                     expected_distribution=self.__expected_distribution_of_instantiations__())
         else:
-            raise ValueError("Need to specify one of 'number' or 'p-value' for core_method")
+            raise ValueError("Need to specify one of 'raw', 'number' or 'p-value' for core_method")
         super(ConsensusAssembly, self).__init__(self.union.gids[self.coreness > self._thresh], index=index)
 
     def at_threshold(self, new_thresh):
