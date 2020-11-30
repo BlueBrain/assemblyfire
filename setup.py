@@ -29,6 +29,7 @@ setup(
                       "cached-property>=1.5.2",
                       "numpy>=1.19.4",
                       "scipy>=1.5.4",
+                      "pandas>=1.1.4",
                       "scikit-learn>=0.23.2",
                       "networkx>=2.5",
                       "pyflagser>=0.4.2",
