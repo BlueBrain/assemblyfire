@@ -7,3 +7,5 @@ from assemblyfire.connectivity import ConnectivityMatrix
 from assemblyfire.clustering import cluster_spikes, detect_assemblies, cluster_assemblies
 from assemblyfire import utils
 from assemblyfire import plots
+from assemblyfire.topology import NetworkAssembly
+

@@ -1,15 +1,33 @@
-from ..assemblies import AssemblyGroup
+from assemblyfire.connectivity import ConnectivityMatrix
 
 
-class NetworkAssemblyGroup(AssemblyGroup):
+class NetworkAssembly(ConnectivityMatrix):
     """
-    A class derived from AssemblyGroup with additional information on the connectivity within the assembly
+    A class derived from ConnectivityMatrix with additional information on networks metrics of the subgraph associated to an assembly within the connectivity matrix of the circuit.
     """
-    # TODO: Does it make sense to derive this from AssemblyGroup?
-    #  Maybe just make this a stand-alone thing that simply applies topological functions on Assemblies - Michael
-    #  Why noy derive it from ConnectivityMatrix? - András
-    # TODO: Implement actual topological functionality?
-    def __init__(self, assemblies, all_gids, connectivity_obj, label=None, metadata=None):
+    
+    
+    def simplex_counts(self):
+        """Return a the simplex counts of submatrix specified by `sub_gids`"""
+        import pyflagser
+        sub_mat= submatrix(self,sub_gids)
+        return pyflagser.flagser_count_unweighted(sub_mat, directed=True)
+        
+
+    def betti_counts(self):
+        """Return a the betti counts of submatrix specified by `sub_gids`"""
+        import pyflagser
+        sub_mat= submatrix(self,sub_gids)
+        return pyflagser.flagser_unweighted(sub_mat, directed=True)
+    
+    
+    #TODO: Simplex counts associated to a dictionary of assembly groups e.g. consensus assembly
+    #TODO: Simplex counts of core vs. random controls
+    #TODO: Filtered simplex counts with different weights on vertices (coreness, intersection) or on edges (strength of connection).
+    #TODO: Other graph metrics.  Centrality, communicability, connected components
+    
+    #Old code from Michael.  I think we don't need this anymore, because we inherit from ConnectivityMatrix, but I keep it here for now. --Daniela
+    """def __init__(self, assemblies, all_gids, connectivity_obj, label=None, metadata=None):
         self._connectivity = connectivity_obj
         super(NetworkAssemblyGroup, self).__init__(assemblies, all_gids, label=label, metadata=metadata)
 
@@ -19,10 +37,9 @@ class NetworkAssemblyGroup(AssemblyGroup):
                    label=base_group.label, metadata=base_group.metadata)
 
     def mat_of(self, idx):
-        """
-        Returns the connection matrix of a contained assembly
+        #Returns the connection matrix of a contained assembly
         :return:
-        """
+        
         return self._connectivity.submat(self.iloc(idx))
 
     def __mul__(self, other):
@@ -35,4 +52,4 @@ class NetworkAssemblyGroup(AssemblyGroup):
 
     def to_h5(self, filename, prefix=None, version=None):
         # TODO: Save the connectivity matrix somewhere in the metadata at 'prefix'
-        super(NetworkAssemblyGroup, self).to_h5(filename, prefix=prefix, version=version)
+        super(NetworkAssemblyGroup, self).to_h5(filename, prefix=prefix, version=version)"""
