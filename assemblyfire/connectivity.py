@@ -85,6 +85,26 @@ class ConnectivityMatrix(object):
     def subarray(self, sub_gids, sub_gids_post=None):
         return np.array(self.dense_submatrix(sub_gids, sub_gids_post=sub_gids_post))
 
+    def sample_matrix_n_neurons(self, ref_gids):
+        """
+        Return a submatrix with the same number of neurons as `ref_gids`
+        :param ref_gids: Subpopulation to use as reference for sampling.
+                 Can be either a list of gids, or an Assembly object
+        """
+
+        ref_gids = self.__extract_gids__(ref_gids)
+        assert np.isin(ref_gids, self._gids).all(), "Reference gids are not part of the connectivity matrix"
+
+        sample_gids = np.random.choice(self._gids, len(ref_gids), replace=False)
+        idx = self._lookup[sample_gids]
+        return self._m[np.ix_(idx, idx)]
+
+    def dense_sample_n_neurons(self, ref_gids):
+        return self.sample_matrix_n_neurons(ref_gids).todense()
+
+    def sample_n_neurons(self, ref_gids):
+        return np.array(self.dense_sample_n_neurons(ref_gids))
+
     def sample_matrix_depth_profile(self, blueconfig_path, ref_gids):
         """
         Return a submatrix with the same (in propability) depth profile as `ref_gids`
