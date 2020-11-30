@@ -31,16 +31,16 @@ setup(
                       "scipy>=1.5.4",
                       "scikit-learn>=0.23.2",
                       "networkx>=2.5",
+                      "pyflagser>=0.4.2",
                       "matplotlib>=3.1.3",
                       "seaborn>=0.11.0",
-                      "pyyaml"
                      ],
     packages=find_packages(),
     python_requires=">=3.6",
     entry_points={"console_scripts": ["assemblyfire=assemblyfire.cli:cli"]},
     extras_require={
         "docs": ["sphinx", "sphinx-bluebrain-theme"],
-        "bluepy": ["bluepy>=0.14.15"]
+        "bluepy": ["bluepy[all]>=0.14.15"]
     },
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
