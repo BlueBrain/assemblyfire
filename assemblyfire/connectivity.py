@@ -197,14 +197,3 @@ class ConnectivityMatrix(object):
             data_grp.create_dataset("indices", data=self._m.indices)
             data_grp.create_dataset("indptr", data=self._m.indptr)
             data_grp.create_dataset("gids", data=self._gids)
-
-
-""" sample code for setup
-import numpy as np
-from assemblyfire.spikes import SpikeMatrixGroup, get_bluepy_simulation
-from assemblyfire.connectivity import ConnectivityMatrix
-from assemblyfire.utils import map_gids_to_depth, get_mtypes
-spikes = SpikeMatrixGroup("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/100p_depol_simmat.yaml")
-conn_mat = ConnectivityMatrix.from_h5(spikes.h5f_name, group_name="full_matrix", prefix="connectivity")
-blueconfig_path = spikes.get_blueconfig_path(spikes.seeds[0])
-"""
