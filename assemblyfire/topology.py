@@ -1,6 +1,6 @@
 from assemblyfire.connectivity import ConnectivityMatrix
 
-
+#Currently not working because ConnectivityMatrix has changed!
 class NetworkAssembly(ConnectivityMatrix):
     """
     A class derived from ConnectivityMatrix with additional information on networks metrics of the subgraph associated to an assembly within the connectivity matrix of the circuit.
@@ -43,6 +43,14 @@ class NetworkAssembly(ConnectivityMatrix):
         from scipy.sparse.csgraph import connected_components
         pass
 
+    def core_number(self,sub_gids):
+        """Returns k core of directed graph, where degree of a vertex is the sum of in degree and out degree"""
+        #TODO: Implement directed (k,l) core and k-core of underlying undirected graph (very similar to this)
+        import networkx
+        G = networkx.from_numpy_matrix(self)
+        return networkx.algorithms.core.core_number(G) #Very inefficient (returns a dictionary!).  Look for different implementation
+        
+    
     #TODO: Simplex counts associated to a dictionary of assembly groups e.g. consensus assembly
     #TODO: Simplex counts of core vs. random controls
     #TODO: Filtered simplex counts with different weights on vertices (coreness, intersection) or on edges (strength of connection).
