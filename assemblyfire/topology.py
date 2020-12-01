@@ -106,7 +106,7 @@ class NetworkAssembly(ConnectivityMatrix):
         
 
 
-    def closeness_connected_components(matrix,directed=False):
+def closeness_connected_components(matrix,directed=False):
     """ compute the closeness of each  connected component of more than 1 vertex
     matrix: shape (n,n)
     directed: if True compute using strong component and directed closeness
