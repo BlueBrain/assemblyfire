@@ -103,27 +103,34 @@ class ConnectivityMatrix(object):
     def subarray(self, sub_gids, sub_gids_post=None):
         return np.array(self.dense_submatrix(sub_gids, sub_gids_post=sub_gids_post))
 
-    def sample_matrix_n_neurons(self, ref_gids):
+    def sample_matrix_n_neurons(self, ref_gids, sub_gids=None):
         """
         Return a submatrix with the same number of neurons as `ref_gids`
         :param ref_gids: Subpopulation to use as reference for sampling.
                  Can be either a list of gids, or an Assembly object
+        :param sub_gids: (optional) if specified, subpopulation to sample from
+                         (e.g. union of a ConsensusAssembly vs. the core as ref_gids)
         """
 
         ref_gids = self.__extract_gids__(ref_gids)
-        assert np.isin(ref_gids, self.gids).all(), "Reference gids are not part of the connectivity matrix"
+        if sub_gids is not None:
+            assert np.isin(sub_gids, self.gids).all(), "Sub gids are not part of the connectivity matrix"
+            assert np.isin(ref_gids, sub_gids).all(), "Reference gids are not part of sub gids"
+        else:
+            sub_gids = self.gids
+            assert np.isin(ref_gids, sub_gids).all(), "Reference gids are not part of the connectivity matrix"
 
-        sample_gids = np.random.choice(self.gids, len(ref_gids), replace=False)
+        sample_gids = np.random.choice(sub_gids, len(ref_gids), replace=False)
         idx = self._lookup[sample_gids]
         return self.matrix[np.ix_(idx, idx)]
 
-    def dense_sample_n_neurons(self, ref_gids):
+    def dense_sample_n_neurons(self, ref_gids, sub_gids):
         return self.sample_matrix_n_neurons(ref_gids).todense()
 
-    def sample_n_neurons(self, ref_gids):
+    def sample_n_neurons(self, ref_gids, sub_gids):
         return np.array(self.dense_sample_n_neurons(ref_gids))
 
-    def sample_gids_depth_profile(self, ref_gids, n_bins):
+    def sample_gids_depth_profile(self, ref_gids, sub_gids, n_bins=50):
         """
         Return gids with the same (binned) depth profile as `ref_gids`
         :param ref_gids: Subpopulation to use as reference for sampling.
@@ -151,7 +158,7 @@ class ConnectivityMatrix(object):
     def dense_sample_depth_profile(self, ref_gids, n_bins):
         return self.sample_matrix_depth_profile(ref_gids, n_bins).todense()
 
-    def sample_depth_profile(self, ref_gids, n_bins=50):
+    def sample_depth_profile(self, ref_gids, n_bins):
         return np.array(self.dense_sample_depth_profile(ref_gids, n_bins))
 
     def sample_gids_mtype_composition(self, ref_gids):
