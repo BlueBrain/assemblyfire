@@ -160,7 +160,7 @@ def simplex_counts_consensus(consensus_assemblies_dict, circuit):
         simplex_count_dict[c]=[circuit.simplex_counts(x.gids) for x in consensus_assemblies_dict[c].instantiations]
         #Comparison with random control of average size of the instantions
         mean_size=int(np.mean(np.array([len(x.gids) for  x in consensus_assemblies_dict[c].instantiations])))
-        sample_gids=np.random.choice(all_gids, mean_size, replace=False)
+        sample_gids=np.random.choice(circuit.gids, mean_size, replace=False)
         simplex_count_control_dict[c]=[circuit.simplex_counts(sample_gids)]
     return simplex_count_dict, simplex_count_control_dict
     
