@@ -103,9 +103,10 @@ class ConnectivityMatrix(object):
     def subarray(self, sub_gids, sub_gids_post=None):
         return np.array(self.dense_submatrix(sub_gids, sub_gids_post=sub_gids_post))
 
-    def sample_matrix_n_neurons(self, ref_gids):
+        
+    def sample_gids_n_neurons(self, ref_gids):
         """
-        Return a submatrix with the same number of neurons as `ref_gids`
+        Return n gids sampled at random where n is the number of neurons in `ref_gids`
         :param ref_gids: Subpopulation to use as reference for sampling.
                  Can be either a list of gids, or an Assembly object
         """
@@ -113,8 +114,17 @@ class ConnectivityMatrix(object):
         ref_gids = self.__extract_gids__(ref_gids)
         assert np.isin(ref_gids, self.gids).all(), "Reference gids are not part of the connectivity matrix"
 
-        sample_gids = np.random.choice(self.gids, len(ref_gids), replace=False)
-        idx = self._lookup[sample_gids]
+        return np.random.choice(self.gids, len(ref_gids), replace=False)
+
+        
+    def sample_matrix_n_neurons(self, ref_gids):
+        """
+        Return a submatrix with the same number of neurons as `ref_gids`
+        :param ref_gids: Subpopulation to use as reference for sampling.
+                 Can be either a list of gids, or an Assembly object
+        """
+
+        idx = self._lookup[self.sample_gids_n_neurons(ref_gids)]
         return self.matrix[np.ix_(idx, idx)]
 
     def dense_sample_n_neurons(self, ref_gids):
