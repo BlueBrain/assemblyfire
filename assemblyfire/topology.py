@@ -170,11 +170,27 @@ def simplex_counts_union(consensus_assemblies_dict, circuit):
         :return simplex_count_union: A dictionary with the same keys as consensus_assemblies_dict with values simplex counts for for the union of the consensus assembly in each key
         :return simplex_count_union_control: A dictionary with the same keys and values a simplex counts of random controls of the same size of its corresponding union
     """
-    simplex_count_union={}
-    simplex_count_union_control={}
+    simplex_count={}
+    simplex_count_control={}
     for c in consensus_assemblies_dict.keys():
         union=consensus_assemblies_dict[c].union
-        simplex_count_union[c]=[circuit.simplex_counts(union)]
-        simplex_count_union_control[c]=[circuit.simplex_counts(circuit.sample_gids_n_neurons(union,None))]
+        simplex_count[c]=[circuit.simplex_counts(union)]
+        simplex_count_control[c]=[circuit.simplex_counts(circuit.sample_gids_n_neurons(union,None))]
     #TODO: Add controls also for mtype and depth
-    return simplex_count_union, simplex_count_union_control
+    return simplex_count, simplex_count_control
+    
+def simplex_counts_core(consensus_assemblies_dict, circuit):
+    """Computes the simplex counts of the core of the consensus assemblies across consensus_assemblies_dict
+        :param consensus_assemblies_dict: A dictionary with consensus assemblies.
+        :param circuit: A NetworkAssembly object for the circuit where the assemblies belong to.
+        :return simplex_count_union: A dictionary with the same keys as consensus_assemblies_dict with values simplex counts for for the core of the consensus assembly in each key
+        :return simplex_count_union_control: A dictionary with the same keys and values a simplex counts of random controls of the same size of its corresponding core
+    """
+    simplex_count={}
+    simplex_count_control={}
+    for c in consensus_assemblies_dict.keys():
+        simplex_count[c]=[circuit.simplex_counts(consensus_assemblies_dict[c])]
+        simplex_count_control[c]=[circuit.simplex_counts(circuit.sample_gids_n_neurons(consensus_assemblies_dict[c],consensus_assemblies_dict[c].union.gids))]
+    #TODO: Add controls also for mtype and depth
+    #TODO: There is a bug in sample_gids, when sub_gids is an assembly instead of a list it is bugging.  Change the above once the bug is fixed
+    return simplex_count, simplex_count_control
