@@ -123,14 +123,13 @@ class ConnectivityMatrix(object):
     def sample_n_neurons(self, ref_gids):
         return np.array(self.dense_sample_n_neurons(ref_gids))
 
-    def sample_matrix_depth_profile(self, ref_gids, n_bins):
+    def sample_gids_depth_profile(self, ref_gids, n_bins):
         """
-        Return a submatrix with the same (in propability) depth profile as `ref_gids`
+        Return gids with the same (binned) depth profile as `ref_gids`
         :param ref_gids: Subpopulation to use as reference for sampling.
                          Can be either a list of gids, or an Assembly object
         :param n_bins: number of bins to be used to bin depth values
         """
-
         ref_gids = self.__extract_gids__(ref_gids)
         assert np.isin(ref_gids, self.gids).all(), "Reference gids are not part of the connectivity matrix"
 
@@ -143,8 +142,10 @@ class ConnectivityMatrix(object):
             idx = np.where(depths_bins == i+1)[0]
             assert idx.shape[0] >= hist[i], "Not enough neurons at this depths to sample from"
             sample_gids.extend(np.random.choice(self.gids[idx], hist[i], replace=False).tolist())
+        return sample_gids
 
-        idx = self._lookup[sample_gids]
+    def sample_matrix_depth_profile(self, ref_gids, n_bins):
+        idx = self._lookup[self.sample_gids_depth_profile(ref_gids, n_bins)]
         return self.matrix[np.ix_(idx, idx)]
 
     def dense_sample_depth_profile(self, ref_gids, n_bins):
@@ -153,13 +154,12 @@ class ConnectivityMatrix(object):
     def sample_depth_profile(self, ref_gids, n_bins=50):
         return np.array(self.dense_sample_depth_profile(ref_gids, n_bins))
 
-    def sample_matrix_mtype_composition(self, ref_gids):
+    def sample_gids_mtype_composition(self, ref_gids):
         """
-        Return a submatrix with the same (in propability) mtype composition as `ref_gids`
+        Return gids with the same mtype composition as `ref_gids`
         :param ref_gids: Subpopulation to use as reference for sampling.
                          Can be either a list of gids, or an Assembly object
         """
-
         ref_gids = self.__extract_gids__(ref_gids)
         assert np.isin(ref_gids, self.gids).all(), "Reference gids are not part of the connectivity matrix"
 
@@ -170,8 +170,10 @@ class ConnectivityMatrix(object):
             idx = np.where(self.mtypes == mtype)[0]
             assert idx.shape[0] >= counts[i], "Not enough %s to sample from" % mtype
             sample_gids.extend(np.random.choice(self.gids[idx], counts[i], replace=False).tolist())
+        return sample_gids
 
-        idx = self._lookup[sample_gids]
+    def sample_matrix_mtype_composition(self, ref_gids):
+        idx = self._lookup[self.sample_gids_mtype_composition(ref_gids)]
         return self.matrix[np.ix_(idx, idx)]
 
     def dense_sample_mtype_composition(self, ref_gids):
