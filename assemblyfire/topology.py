@@ -35,9 +35,31 @@ class NetworkAssembly(ConnectivityMatrix):
         """Return the convex hull of the sub gids in the 3D space. Require to know x,y,z position for gids"""
         pass
 
-    def centrality(self, sub_gids, kind="betweeness"):
+    def centrality(self, sub_gids, kind="closeness"):
         """Compute a centrality for the sub graph defined by sub_gids. `kind` can be 'betweeness' or 'closeness'"""
-        pass
+        if kind =="closenes":
+            from sknetwork.ranking import Closeness
+            closeness=Closeness()
+    def closeness(self,sub_gids=None,directed=False):
+        """ compute closeness centrality using sknetwork on all connected components or strongly connected
+        component (if directed==True)
+
+        output
+        """
+        from scipy.sparse.csgraph import connected_components
+        from sknetwork.ranking import Closeness
+        if sub_gids is None:
+            mat=self.dense_matrix
+        else:
+            #not sure if dense needed but easier(?) to make symetric
+            mat=self.subarray()
+        if directed:
+            n_comp,comp=connected_components(mat,directed=directed)
+            for i in range(n_comp):
+                idx_comp=np.where(comp==i)
+                comp_mat=mat
+        else:
+
 
     def degree(self, sub_gids=None, kind="in"):
         """Return in/out degrees of the subgraph, if None compute on the whole graph """
