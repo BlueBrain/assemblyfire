@@ -76,12 +76,15 @@ class NetworkAssembly(ConnectivityMatrix):
         if sub_gids==None:
             matrix=np.array(self.dense_matrix)
         else:
+            sub_gids = self.__extract_gids__(sub_gids)
             matrix=self.subarray(sub_gids)
         matrix_und=np.where((matrix+matrix.T) >=1, 1, 0)
+        
+        #Change the code from below to scipy implementation.
         G = nx.from_numpy_matrix(matrix_und)
         return [len(c) for c in sorted(nx.connected_components(G), key=len, reverse=True)]
         #TODO:  Possibly change this to list of gids for each connecte component for this use the line below
-        #return sorted(nx.connected_components(G) #Is this coming out in a usable way or should we transform to gids? 
+        #return sorted(nx.connected_components(G) #Is this coming out in a usable way or should we transform to gids?
 
 
         #OLD CODE.  I keep it here for now in case it's faster to implement it with scipy --Daniela
