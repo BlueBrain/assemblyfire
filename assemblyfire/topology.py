@@ -59,6 +59,7 @@ class NetworkAssembly(ConnectivityMatrix):
         """Returns k core of directed graph, where degree of a vertex is the sum of in degree and out degree"""
         #TODO: Implement directed (k,l) core and k-core of underlying undirected graph (very similar to this)
         import networkx
+        sub_gids = self.__extract_gids__(sub_gids)
         G = networkx.from_numpy_matrix(self.submatrix(sub_gids))
         return networkx.algorithms.core.core_number(G) # Very inefficient (returns a dictionary!). Look for different implementation
         
