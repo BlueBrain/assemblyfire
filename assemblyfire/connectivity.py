@@ -186,7 +186,7 @@ class ConnectivityMatrix(object):
         if prefix is None:
             prefix = "connectivity"
         if group_name is None:
-            prefix = "full_matrix"
+            group_name = "full_matrix"
         with h5py.File(fn, 'r') as h5:
             prefix_grp = h5[prefix]
             data_grp = prefix_grp[group_name]
