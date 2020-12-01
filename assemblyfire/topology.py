@@ -81,7 +81,7 @@ class NetworkAssembly(ConnectivityMatrix):
             sub_mat = self.submatrix(sub_gids)
         else:
             sub_mat = self.matrix"""
-=
+
     def core_number(self, sub_gids):
         """Returns k core of directed graph, where degree of a vertex is the sum of in degree and out degree"""
         #TODO: Implement directed (k,l) core and k-core of underlying undirected graph (very similar to this)
