@@ -47,7 +47,7 @@ class NetworkAssembly(ConnectivityMatrix):
         if sub_gids is None:
             m=self.matrix
         else:
-            sub_gids=self.__extract_gids__()
+            sub_gids=self.__extract_gids__(sub_gids)
             m=self.subarray(sub_gids)
         if kind == "in":
             degree = np.sum(m,axis=0)
