@@ -194,3 +194,22 @@ def simplex_counts_core(consensus_assemblies_dict, circuit):
     #TODO: Add controls also for mtype and depth
     #TODO: There is a bug in sample_gids, when sub_gids is an assembly instead of a list it is bugging.  Change the above once the bug is fixed
     return simplex_count, simplex_count_control
+
+def simplex_counts_intersection(consensus_assemblies_dict, circuit):
+    """Computes the simplex counts of the core of the consensus assemblies across consensus_assemblies_dict
+        :param consensus_assemblies_dict: A dictionary with consensus assemblies.
+        :param circuit: A NetworkAssembly object for the circuit where the assemblies belong to.
+        :return simplex_count_union: A dictionary with the same keys as consensus_assemblies_dict with values simplex counts for for the core of the consensus assembly in each key
+        :return simplex_count_union_control: A dictionary with the same keys and values a simplex counts of random controls of the same size of its corresponding core
+    """
+    simplex_count={}
+    simplex_count_control={}
+    for c in consensus_assemblies_dict.keys():
+        max_filtration=np.max(consensus_assemblies_dict[c].coreness)
+        gids_intersection=consensus_assemblies_dict[c].union.gids[np.where(consensus_assemblies_dict[c].coreness==max_filtration)]
+        #TODO: Implement the above in a weighted assembly class where you can choose thresholds
+        simplex_count[c]=[circuit.simplex_counts(gids_intersection)]
+        simplex_count_control[c]=[circuit.simplex_counts(circuit.sample_gids_n_neurons(gids_intersection,consensus_assemblies_dict[c].union.gids))]
+    #TODO: Add controls also for mtype and depth
+    #TODO: There is a bug in sample_gids, when sub_gids is an assembly instead of a list it is bugging.  Change the above once the bug is fixed
+    return simplex_count, simplex_count_control
