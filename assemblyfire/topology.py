@@ -46,19 +46,11 @@ class NetworkAssembly(ConnectivityMatrix):
 
         output
         """
-        from scipy.sparse.csgraph import connected_components
-        from sknetwork.ranking import Closeness
-        if sub_gids is None:
-            mat=self.dense_matrix
+        if sub_gids is not None:
+            m = self.submatrix(self.__extract_gids__(sub_gids))
         else:
-            #not sure if dense needed but easier(?) to make symetric
-            mat=self.subarray()
-        if directed:
-            n_comp,comp=connected_components(mat,directed=directed)
-            for i in range(n_comp):
-                idx_comp=np.where(comp==i)
-                comp_mat=mat
-        else:
+            m = self.matrix
+        return closeness_connected_components(m,directed=directed)
 
 
     def degree(self, sub_gids=None, kind="in"):
@@ -100,7 +92,7 @@ class NetworkAssembly(ConnectivityMatrix):
             sub_mat = self.submatrix(sub_gids)
         else:
             sub_mat = self.matrix"""
-=
+
     def core_number(self, sub_gids):
         """Returns k core of directed graph, where degree of a vertex is the sum of in degree and out degree"""
         #TODO: Implement directed (k,l) core and k-core of underlying undirected graph (very similar to this)
@@ -109,7 +101,35 @@ class NetworkAssembly(ConnectivityMatrix):
         G = networkx.from_numpy_matrix(self.submatrix(sub_gids))
         return networkx.algorithms.core.core_number(G) # Very inefficient (returns a dictionary!). Look for different implementation
         
-    
+
+
+    def closeness_connected_components(matrix,directed=False):
+    """ compute the closeness of each  connected component of more than 1 vertex
+    matrix: shape (n,n)
+    directed: if True compute using strong component and directed closeness
+    return a list of array of shape n, containting closeness of vertex in this component
+    or 0 if vertex is not in the component, in any case closeness cant be zero otherwise
+
+    """
+    from sknetwork.ranking import Closeness
+    from scipy.sparse.csgraph import connected_components
+    if directed:
+        n_comp,comp=connected_components(matrix,directed=True,connection="strong")
+    else:
+        n_comp,comp=connected_components(matrix,directed=False)
+        # we need to make the matrix symetric
+        matrix=matrix+matrix.T
+    closeness=Closeness() #if matrix is not symetric automatically use directed
+    n=matrix.shape[0]
+    all_c=[]
+    for i in range(n_comp):
+        c=np.zeros(n)
+        idx=comp==i
+        sub_mat=matrix[np.ix_(idx,idx)].tocsr()
+        if sub_mat.getnnz()>0:
+            c[idx]=closeness.fit_transform(sub_mat)
+            all_c.append(c)
+    return all_c
     #TODO: Simplex counts associated to a dictionary of assembly groups e.g. consensus assembly
     #TODO: Simplex counts of core vs. random controls
     #TODO: Filtered simplex counts with different weights on vertices (coreness, intersection) or on edges (strength of connection).
