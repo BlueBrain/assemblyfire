@@ -53,17 +53,32 @@ class NetworkAssembly(ConnectivityMatrix):
         else:
             ValueError("Need to specify 'in' or 'out' degree!")
 
+
     def connected_components(self, sub_gids=None):
-        """Compute connected_components of the subgraph, if None compute on the whole graph"""
-        from scipy.sparse.csgraph import connected_components
+        """Returns a list of the size of the connected components of the underlying undirected graph on sub_gids.
+            If sub_gids == None, returns it uses the whole graph"""
+                
+        import networkx as nx
+        if sub_gids==None:
+            matrix=np.array(self.dense_matrix)
+        else:
+            matrix=self.subarray(sub_gids)
+        matrix_und=np.where((matrix+matrix.T) >=1, 1, 0)
+        G = nx.from_numpy_matrix(matrix_und)
+        return [len(c) for c in sorted(nx.connected_components(G), key=len, reverse=True)]
+        #TODO:  Possibly change this to list of gids for each connecte component for this use the line below
+        #return sorted(nx.connected_components(G) #Is this coming out in a usable way or should we transform to gids? 
+
+
+        #OLD CODE.  I keep it here for now in case it's faster to implement it with scipy --Daniela
+        """from scipy.sparse.csgraph import connected_components
 
         if sub_gids is not None:
             sub_gids = self.__extract_gids__(sub_gids)
             sub_mat = self.submatrix(sub_gids)
         else:
-            sub_mat = self.matrix
-        pass
-
+            sub_mat = self.matrix"""
+=
     def core_number(self, sub_gids):
         """Returns k core of directed graph, where degree of a vertex is the sum of in degree and out degree"""
         #TODO: Implement directed (k,l) core and k-core of underlying undirected graph (very similar to this)
