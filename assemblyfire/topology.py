@@ -5,6 +5,8 @@ authors: Daniela Egas Santander, Nicolas Ninin
 last modified: 12.2020
 """
 
+import numpy as np
+
 from assemblyfire.connectivity import ConnectivityMatrix
 
 class NetworkAssembly(ConnectivityMatrix):
@@ -26,40 +28,36 @@ class NetworkAssembly(ConnectivityMatrix):
         import pyflagser
 
         sub_gids = self.__extract_gids__(sub_gids)
-        sub_mat= self.submatrix(sub_gids)
+        sub_mat = self.submatrix(sub_gids)
         return pyflagser.flagser_unweighted(sub_mat, directed=True)
 
     def convex_hull(self, sub_gids):
-        """
-        Return the convex hull of the sub gids in the 3D space.
-        Require to know x,y,z position for gids
-        """
+        """Return the convex hull of the sub gids in the 3D space. Require to know x,y,z position for gids"""
         pass
 
     def centrality(self, sub_gids, kind="betweeness"):
-        """
-        compute a centrality for the sub graph defined by sub_gids
-        kind can be betweeness, closeness
-        """
+        """Compute a centrality for the sub graph defined by sub_gids. `kind` can be 'betweeness' or 'closeness'"""
         pass
 
-    def degree(self, sub_gids=None,kind="in"):
-        if sub_gids is None:
-            m=self.matrix
+    def degree(self, sub_gids=None, kind="in"):
+        """Return in/out degrees of the subgraph, if None compute on the whole graph """
+        if sub_gids is not None:
+            m = self.subarray(self.__extract_gids__(sub_gids))
         else:
-            sub_gids=self.__extract_gids__(sub_gids)
-            m=self.subarray(sub_gids)
+            m = self.array
+
         if kind == "in":
-            degree = np.sum(m,axis=0)
+            return np.sum(m, axis=0)
+        elif kind == "out":
+            return np.sum(m, axis=1)
         else:
-            degree = np.sum(m,axis=1)
-        return degree
+            ValueError("Need to specify 'in' or 'out' degree!")
+
     def connected_components(self, sub_gids=None):
-        """
-        compute connected_components of the subgraph, if None compute on the whole graph
-        """
+        """Compute connected_components of the subgraph, if None compute on the whole graph"""
         from scipy.sparse.csgraph import connected_components
-        if sub_gids != None:
+
+        if sub_gids is not None:
             sub_gids = self.__extract_gids__(sub_gids)
             sub_mat = self.submatrix(sub_gids)
         else:
