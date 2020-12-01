@@ -43,6 +43,17 @@ class NetworkAssembly(ConnectivityMatrix):
         """
         pass
 
+    def degree(self, sub_gids=None,kind="in"):
+        if sub_gids is None:
+            m=self.matrix
+        else:
+            sub_gids=self.__extract_gids__()
+            m=self.subarray(sub_gids)
+        if kind == "in":
+            degree = np.sum(m,axis=0)
+        else:
+            degree = np.sum(m,axis=1)
+        return degree
     def connected_components(self, sub_gids=None):
         """
         compute connected_components of the subgraph, if None compute on the whole graph
