@@ -139,3 +139,29 @@ def closeness_connected_components(matrix,directed=False):
     #TODO: Filtered simplex counts with different weights on vertices (coreness, intersection) or on edges (strength of connection).
     #TODO: Other graph metrics.  Centrality, communicability, connected components
 
+
+#Functions to compute things across seeds.  Maybe these should be methods of a class? --Daniela
+
+def simplex_counts_consensus(consensus_assemblies_dict, circuit):
+    """Computes the simplices of consensus assemblies and a random control of the size of the average of each instantion
+        :param consensus_assemblies_dict: A dictionary with the different consensus assemblies accross seeds
+        :param circuit: A NetworkAssembly object for the circuit where the assemblies belong to
+        :return simplex_count_dict: A dictionary with the same keys as consensus_assemblies_dict
+                                    with values lists of simplex counts for all the instantions of the consensus assembly in each key
+        :return simplex_count_control_dict: A dictionary with the same keys and values a simplex counts of random controls of
+                                            size the average size of the instantions of each conensus assembly
+    """
+    #Compute simplex counts for assemblies within clusters
+    simplex_count_dict={}
+    simplex_count_control_dict={}
+
+    for c in consensus_assemblies_dict.keys():
+        #Simplex count of instantions in c
+        simplex_count_dict[c]=[circuit.simplex_counts(x.gids) for x in consensus_assemblies_dict[c].instantiations]
+        #Comparison with random control of average size of the instantions
+        mean_size=int(np.mean(np.array([len(x.gids) for  x in consensus_assemblies_dict[c].instantiations])))
+        sample_gids=np.random.choice(all_gids, mean_size, replace=False)
+        simplex_count_control_dict[c]=[circuit.simplex_counts(sample_gids)]
+    return simplex_count_dict, simplex_count_control_dict
+    
+
