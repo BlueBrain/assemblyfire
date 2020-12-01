@@ -607,7 +607,7 @@ class ConsensusAssembly(Assembly):
         self._thresh = core_threshold
         self.label = label
         if core_method == "raw":
-            self.coreness = self.calculate_coreness(self.__number_of_times_contained__())
+            self.coreness = self.__number_of_times_contained__()
         elif core_method == "number":
             self.coreness = self.calculate_coreness(self.__number_of_times_contained__(),
                                                     expected_n=self.__expected_number_of_instantiations__())
@@ -633,7 +633,7 @@ class ConsensusAssembly(Assembly):
         if expected_distribution is not None:
             p_values = 1.0 + epsilon - expected_distribution.cdf(vec_num_contained)
             return -np.log10(p_values)
-        return vec_num_contained
+        raise ValueError("Need to specify 'expected_n' or 'expected_distribution'!")
 
     def to_h5(self, filename, prefix=None, version=None):
         """
