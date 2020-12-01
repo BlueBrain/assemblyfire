@@ -102,16 +102,15 @@ class ConnectivityMatrix(object):
 
     def subarray(self, sub_gids, sub_gids_post=None):
         return np.array(self.dense_submatrix(sub_gids, sub_gids_post=sub_gids_post))
-
-    def sample_matrix_n_neurons(self, ref_gids, sub_gids=None):
+        
+    def sample_gids_n_neurons(self, ref_gids, sub_gids):
         """
-        Return a submatrix with the same number of neurons as `ref_gids`
+        Return n gids sampled at random where n is the number of neurons in `ref_gids`
         :param ref_gids: Subpopulation to use as reference for sampling.
                  Can be either a list of gids, or an Assembly object
         :param sub_gids: (optional) if specified, subpopulation to sample from
                          (e.g. union of a ConsensusAssembly vs. the core as ref_gids)
         """
-
         ref_gids = self.__extract_gids__(ref_gids)
         if sub_gids is not None:
             assert np.isin(sub_gids, self.gids).all(), "Sub gids are not part of the connectivity matrix"
@@ -119,75 +118,94 @@ class ConnectivityMatrix(object):
         else:
             sub_gids = self.gids
             assert np.isin(ref_gids, sub_gids).all(), "Reference gids are not part of the connectivity matrix"
-
-        sample_gids = np.random.choice(sub_gids, len(ref_gids), replace=False)
-        idx = self._lookup[sample_gids]
+        return np.random.choice(sub_gids, len(ref_gids), replace=False)
+        
+    def sample_matrix_n_neurons(self, ref_gids, sub_gids=None):
+        idx = self._lookup[self.sample_gids_n_neurons(ref_gids, sub_gids)]
         return self.matrix[np.ix_(idx, idx)]
 
-    def dense_sample_n_neurons(self, ref_gids, sub_gids):
-        return self.sample_matrix_n_neurons(ref_gids).todense()
+    def dense_sample_n_neurons(self, ref_gids, sub_gids=None):
+        return self.sample_matrix_n_neurons(ref_gids, sub_gids).todense()
 
-    def sample_n_neurons(self, ref_gids, sub_gids):
-        return np.array(self.dense_sample_n_neurons(ref_gids))
+    def sample_n_neurons(self, ref_gids, sub_gids=None):
+        return np.array(self.dense_sample_n_neurons(ref_gids, sub_gids))
 
-    def sample_gids_depth_profile(self, ref_gids, sub_gids, n_bins=50):
+    def sample_gids_depth_profile(self, ref_gids, sub_gids=None, n_bins=50):
         """
         Return gids with the same (binned) depth profile as `ref_gids`
         :param ref_gids: Subpopulation to use as reference for sampling.
                          Can be either a list of gids, or an Assembly object
+        :param sub_gids: (optional) if specified, subpopulation to sample from
+                         (e.g. union of a ConsensusAssembly vs. the core as ref_gids)
         :param n_bins: number of bins to be used to bin depth values
         """
         ref_gids = self.__extract_gids__(ref_gids)
-        assert np.isin(ref_gids, self.gids).all(), "Reference gids are not part of the connectivity matrix"
+        if sub_gids is not None:
+            assert np.isin(sub_gids, self.gids).all(), "Sub gids are not part of the connectivity matrix"
+            assert np.isin(ref_gids, sub_gids).all(), "Reference gids are not part of sub gids"
+            depths = self.depths[np.searchsorted(self.gids, sub_gids)]
+        else:
+            sub_gids = self.gids
+            assert np.isin(ref_gids, sub_gids).all(), "Reference gids are not part of the connectivity matrix"
+            depths = self.depths
 
-        ref_depths = self.depths[np.searchsorted(self.gids, ref_gids)]
+        ref_depths = depths[np.searchsorted(sub_gids, ref_gids)]
         hist, bin_edges = np.histogram(ref_depths, bins=n_bins)
-        depths_bins = np.digitize(self.depths, bins=bin_edges)
+        depths_bins = np.digitize(depths, bins=bin_edges)
         assert len(hist == len(depths_bins[1:-1]))  # `digitize` returns values below and above the spec. bin_edges
         sample_gids = []
         for i in range(n_bins):
             idx = np.where(depths_bins == i+1)[0]
             assert idx.shape[0] >= hist[i], "Not enough neurons at this depths to sample from"
-            sample_gids.extend(np.random.choice(self.gids[idx], hist[i], replace=False).tolist())
+            sample_gids.extend(np.random.choice(sub_gids[idx], hist[i], replace=False).tolist())
         return sample_gids
 
-    def sample_matrix_depth_profile(self, ref_gids, n_bins):
-        idx = self._lookup[self.sample_gids_depth_profile(ref_gids, n_bins)]
+    def sample_matrix_depth_profile(self, ref_gids, sub_gids=None, n_bins=50):
+        idx = self._lookup[self.sample_gids_depth_profile(ref_gids, sub_gids, n_bins)]
         return self.matrix[np.ix_(idx, idx)]
 
-    def dense_sample_depth_profile(self, ref_gids, n_bins):
-        return self.sample_matrix_depth_profile(ref_gids, n_bins).todense()
+    def dense_sample_depth_profile(self, ref_gids, sub_gids=None, n_bins=50):
+        return self.sample_matrix_depth_profile(ref_gids, sub_gids, n_bins).todense()
 
-    def sample_depth_profile(self, ref_gids, n_bins):
-        return np.array(self.dense_sample_depth_profile(ref_gids, n_bins))
+    def sample_depth_profile(self, ref_gids, sub_gids=None, n_bins=50):
+        return np.array(self.dense_sample_depth_profile(ref_gids, sub_gids, n_bins))
 
-    def sample_gids_mtype_composition(self, ref_gids):
+    def sample_gids_mtype_composition(self, ref_gids, sub_gids=None):
         """
         Return gids with the same mtype composition as `ref_gids`
         :param ref_gids: Subpopulation to use as reference for sampling.
                          Can be either a list of gids, or an Assembly object
+        :param sub_gids: (optional) if specified, subpopulation to sample from
+                         (e.g. union of a ConsensusAssembly vs. the core as ref_gids)
         """
         ref_gids = self.__extract_gids__(ref_gids)
-        assert np.isin(ref_gids, self.gids).all(), "Reference gids are not part of the connectivity matrix"
+        if sub_gids is not None:
+            assert np.isin(sub_gids, self.gids).all(), "Sub gids are not part of the connectivity matrix"
+            assert np.isin(ref_gids, sub_gids).all(), "Reference gids are not part of sub gids"
+            mtypes = self.mtypes[np.searchsorted(self.gids, sub_gids)]
+        else:
+            sub_gids = self.gids
+            assert np.isin(ref_gids, sub_gids).all(), "Reference gids are not part of the connectivity matrix"
+            mtypes = self.mtypes
 
-        ref_mtypes = self.mtypes[np.searchsorted(self.gids, ref_gids)]
+        ref_mtypes = mtypes[np.searchsorted(sub_gids, ref_gids)]
         mtypes_lst, counts = np.unique(ref_mtypes, return_counts=True)
         sample_gids = []
         for i, mtype in enumerate(mtypes_lst):
-            idx = np.where(self.mtypes == mtype)[0]
+            idx = np.where(mtypes == mtype)[0]
             assert idx.shape[0] >= counts[i], "Not enough %s to sample from" % mtype
-            sample_gids.extend(np.random.choice(self.gids[idx], counts[i], replace=False).tolist())
+            sample_gids.extend(np.random.choice(sub_gids[idx], counts[i], replace=False).tolist())
         return sample_gids
 
-    def sample_matrix_mtype_composition(self, ref_gids):
-        idx = self._lookup[self.sample_gids_mtype_composition(ref_gids)]
+    def sample_matrix_mtype_composition(self, ref_gids, sub_gids=None):
+        idx = self._lookup[self.sample_gids_mtype_composition(ref_gids, sub_gids)]
         return self.matrix[np.ix_(idx, idx)]
 
-    def dense_sample_mtype_composition(self, ref_gids):
-        return self.sample_matrix_mtype_composition(ref_gids).todense()
+    def dense_sample_mtype_composition(self, ref_gids, sub_gids=None):
+        return self.sample_matrix_mtype_composition(ref_gids, sub_gids).todense()
 
-    def sample_mtype_composition(self, ref_gids):
-        return np.array(self.dense_sample_mtype_composition(ref_gids))
+    def sample_mtype_composition(self, ref_gids, sub_gids=None):
+        return np.array(self.dense_sample_mtype_composition(ref_gids, sub_gids))
 
     @classmethod
     def from_h5(cls, fn, group_name=None, prefix=None):
