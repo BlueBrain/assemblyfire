@@ -143,13 +143,11 @@ def closeness_connected_components(matrix,directed=False):
 #Functions to compute things across seeds.  Maybe these should be methods of a class? --Daniela
 
 def simplex_counts_consensus(consensus_assemblies_dict, circuit):
-    """Computes the simplices of consensus assemblies and a random control of the size of the average of each instantion
-        :param consensus_assemblies_dict: A dictionary with the different consensus assemblies accross seeds
-        :param circuit: A NetworkAssembly object for the circuit where the assemblies belong to
-        :return simplex_count_dict: A dictionary with the same keys as consensus_assemblies_dict
-                                    with values lists of simplex counts for all the instantions of the consensus assembly in each key
-        :return simplex_count_control_dict: A dictionary with the same keys and values a simplex counts of random controls of
-                                            size the average size of the instantions of each conensus assembly
+    """Computes the simplices of consensus assemblies and a random control of the size of the average of each instantion.
+        :param consensus_assemblies_dict: A dictionary with consensus assemblies.
+        :param circuit: A NetworkAssembly object for the circuit where the assemblies belong to.
+        :return simplex_count_dict: A dictionary with the same keys as consensus_assemblies_dict with values lists of simplex counts for all the instantions of the consensus assembly in each key
+        :return simplex_count_control_dict: A dictionary with the same keys and values a simplex counts of random controls of size the average size of the instantions of each conensus assembly
     """
     #Compute simplex counts for assemblies within clusters
     simplex_count_dict={}
@@ -165,3 +163,18 @@ def simplex_counts_consensus(consensus_assemblies_dict, circuit):
     return simplex_count_dict, simplex_count_control_dict
     
 
+def simplex_counts_union(consensus_assemblies_dict, circuit):
+    """Computes the simplex counts of the union of the consensus assemblies across consensus_assemblies_dict
+        :param consensus_assemblies_dict: A dictionary with consensus assemblies.
+        :param circuit: A NetworkAssembly object for the circuit where the assemblies belong to.
+        :return simplex_count_union: A dictionary with the same keys as consensus_assemblies_dict with values simplex counts for for the union of the consensus assembly in each key
+        :return simplex_count_union_control: A dictionary with the same keys and values a simplex counts of random controls of the same size of its corresponding union
+    """
+    simplex_count_union={}
+    simplex_count_union_control={}
+    for c in consensus_assemblies_dict.keys():
+        union=consensus_assemblies_dict[c].union
+        simplex_count_union[c]=[circuit.simplex_counts(union)]
+        simplex_count_union_control[c]=[circuit.simplex_counts(circuit.sample_gids_n_neurons(union,None))]
+    #TODO: Add controls also for mtype and depth
+    return simplex_count_union, simplex_count_union_control
