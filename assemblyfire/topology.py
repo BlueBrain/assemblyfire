@@ -8,7 +8,7 @@ last modified: 12.2020
 import numpy as np
 
 from assemblyfire.connectivity import ConnectivityMatrix
-import numpy as np
+
 class NetworkAssembly(ConnectivityMatrix):
     """
     A class derived from ConnectivityMatrix with additional information on networks metrics
