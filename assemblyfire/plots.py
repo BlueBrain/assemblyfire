@@ -355,7 +355,7 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name):
         ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
         max_in_degree = np.max(in_degrees[assembly_label])
         ax.hist(in_degrees[assembly_label], bins=50, range=(0, max_in_degree),
-                color=cmap(assembly_label), edgecolor=cmap(assembly_label), alpha=0.7, label="assembly")
+                color=cmap(assembly_label), edgecolor=cmap(assembly_label), label="assembly")
         ax.hist(in_degrees_control["n"][assembly_label], bins=50, range=(0, max_in_degree),
                 color="black", histtype="step", linestyle="dashed", label="ctrl. n neurons")
         ax.hist(in_degrees_control["depths"][assembly_label], bins=50, range=(0, max_in_degree),
