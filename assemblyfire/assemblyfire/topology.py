@@ -11,12 +11,14 @@ from tqdm import tqdm
 from assemblyfire.connectivity import ConnectivityMatrix
 
 
-def closeness_connected_components(matrix, directed=False):
+def closeness_connected_components(matrix, directed=False, return_sum=True):
     """
     Compute the closeness of each connected component of more than 1 vertex
     :param matrix: shape (n,n)
     :param directed: if True compute using strong component and directed closeness
-    :return a list of array of shape n, containting closeness of vertex in this component
+    :param return_sum: if True return only one list given by summing over all the component
+    :return a signle array( if return_sum=True) or a list of array of shape n,
+    containting closeness of vertex in this component
     or 0 if vertex is not in the component, in any case closeness cant be zero otherwise
     """
     from sknetwork.ranking import Closeness
@@ -38,7 +40,11 @@ def closeness_connected_components(matrix, directed=False):
         if sub_mat.getnnz() > 0:
             c[idx] = closeness.fit_transform(sub_mat)
             all_c.append(c)
-    return all_c
+    if return_sum:
+        all_c = np.array(all_c)
+        return np.sum(all_c, axis=0)
+    else:
+        return all_c
 
 
 class NetworkAssembly(ConnectivityMatrix):
