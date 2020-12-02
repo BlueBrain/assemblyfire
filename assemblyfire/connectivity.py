@@ -107,12 +107,13 @@ class ConnectivityMatrix(object):
         """
         Return n gids sampled at random where n is the number of neurons in `ref_gids`
         :param ref_gids: Subpopulation to use as reference for sampling.
-                 Can be either a list of gids, or an Assembly object
+            Can be either a list of gids, or an Assembly object
         :param sub_gids: (optional) if specified, subpopulation to sample from
-                         (e.g. union of a ConsensusAssembly vs. the core as ref_gids)
+            Can be either a list of gids, or an Assembly object as above
         """
         ref_gids = self.__extract_gids__(ref_gids)
         if sub_gids is not None:
+            sub_gids = self.__extract_gids__(sub_gids)
             assert np.isin(sub_gids, self.gids).all(), "Sub gids are not part of the connectivity matrix"
             assert np.isin(ref_gids, sub_gids).all(), "Reference gids are not part of sub gids"
         else:
@@ -134,13 +135,14 @@ class ConnectivityMatrix(object):
         """
         Return gids with the same (binned) depth profile as `ref_gids`
         :param ref_gids: Subpopulation to use as reference for sampling.
-                         Can be either a list of gids, or an Assembly object
+            Can be either a list of gids, or an Assembly object
         :param sub_gids: (optional) if specified, subpopulation to sample from
-                         (e.g. union of a ConsensusAssembly vs. the core as ref_gids)
+            Can be either a list of gids, or an Assembly object as above
         :param n_bins: number of bins to be used to bin depth values
         """
         ref_gids = self.__extract_gids__(ref_gids)
         if sub_gids is not None:
+            sub_gids = self.__extract_gids__(sub_gids)
             assert np.isin(sub_gids, self.gids).all(), "Sub gids are not part of the connectivity matrix"
             assert np.isin(ref_gids, sub_gids).all(), "Reference gids are not part of sub gids"
             depths = self.depths[np.searchsorted(self.gids, sub_gids)]
@@ -174,12 +176,13 @@ class ConnectivityMatrix(object):
         """
         Return gids with the same mtype composition as `ref_gids`
         :param ref_gids: Subpopulation to use as reference for sampling.
-                         Can be either a list of gids, or an Assembly object
+            Can be either a list of gids, or an Assembly object
         :param sub_gids: (optional) if specified, subpopulation to sample from
-                         (e.g. union of a ConsensusAssembly vs. the core as ref_gids)
+            Can be either a list of gids, or an Assembly object as above
         """
         ref_gids = self.__extract_gids__(ref_gids)
         if sub_gids is not None:
+            sub_gids = self.__extract_gids__(sub_gids)
             assert np.isin(sub_gids, self.gids).all(), "Sub gids are not part of the connectivity matrix"
             assert np.isin(ref_gids, sub_gids).all(), "Reference gids are not part of sub gids"
             mtypes = self.mtypes[np.searchsorted(self.gids, sub_gids)]
