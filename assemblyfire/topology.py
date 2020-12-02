@@ -190,12 +190,24 @@ def simplex_counts_assemblies(assembly_grp_dict, circuit):
                                                   for assembly in assembly_grp.assemblies}
     return simplex_counts, simplex_counts_control
 
+def generate_controls(circuit, ref_gids, N, sub_gids=None, control_type="n_neurons"):
+    """Generates random controls for ref_gids within sub_gids.  If sub_gids is None,then samples in all of circuit.
+        :param N: Number of random controls
+        :param control_type:n_neurons, depth, mtype (see sample_gids_ in connectivity.py)"""
+    if control_type=="n_neurons":
+        return [circuit.sample_gids_n_neurons(ref_gids,sub_gids) for i in range(N)]
+    elif control_type=="depth_profile":
+        return [circuit.sample_gids_depth_profile(ref_gids,sub_gids) for i in range(N)]
+    elif control_type=="mtype_composition":
+        return [circuit.sample_gids_mtype_composition(ref_gids,sub_gids) for i in range(N)]
 
-def simplex_counts_consensus(consensus_assemblies_dict, circuit):
+
+def simplex_counts_consensus(consensus_assemblies_dict, circuit,N):
     """
     Computes the simplices of consensus assemblies and a random control of the size of the average of each instantion.
     :param consensus_assemblies_dict: A dictionary with consensus assemblies.
     :param circuit: A NetworkAssembly object for the circuit where the assemblies belong to.
+    :param N: Number of random controls
     :return simplex_count: A dictionary with the same keys as consensus_assemblies_dict
         with values lists of simplex counts for all the instantions of the consensus assembly in each key
     :return simplex_count_control: A dictionary with the same keys
@@ -210,32 +222,48 @@ def simplex_counts_consensus(consensus_assemblies_dict, circuit):
         simplex_count[k] = [circuit.simplex_counts(inst.gids) for inst in consensus_assembly.instantiations]
         # Comparison with random control of average size of the instantions
         mean_size = int(np.mean([len(inst.gids) for inst in consensus_assembly.instantiations]))
-        sample_gids = np.random.choice(circuit.gids, mean_size, replace=False)
-        simplex_count_control[k] = [circuit.simplex_counts(sample_gids)]
+        simplex_count_control[k]=[]
+        for i in range(N):
+            sample_gids = np.random.choice(circuit.gids, mean_size, replace=False)
+            simplex_count_control[k].append(circuit.simplex_counts(sample_gids))
+    return simplex_count, simplex_count_control
+
+def simplex_counts_dict(assemblies_dict, circuit,N):
+    """
+    Computes the simplex counts of the assemblies in assemblies_dict and random controls.
+    :param consensus_assemblies_dict: A dictionary with assembly objects.
+    :param circuit: A NetworkAssembly object for the circuit where the assemblies belong to.
+    :param N: Number of random samples
+    :return simplex_count: A dictionary with the same keys as assemblies_dict
+        with values simplex counts for the assemblies in each key
+    :return simplex_count_control: A dictionary with the same keys
+        and values a simplex counts of random controls
+    """
+    simplex_count = {}
+    simplex_count_control =  {seed: {} for seed in ["n","depth","mtype"]}
+    for k, assembly in assemblies_dict.items():
+        simplex_count[k] = [circuit.simplex_counts(assembly)]
+        simplex_count_control["n"][k] = [circuit.simplex_counts(x) for x in generate_controls(circuit, assembly,N)]
+        simplex_count_control["depth"][k] = [circuit.simplex_counts(x) for x in generate_controls(circuit, assembly,N, control_type="depth_profile")]
+        simplex_count_control["mtype"][k] = [circuit.simplex_counts(x) for x in generate_controls(circuit, assembly,N, control_type="mtype_composition")]
     return simplex_count, simplex_count_control
 
 
-def simplex_counts_union(consensus_assemblies_dict, circuit):
+def simplex_counts_union(consensus_assemblies_dict, circuit,N):
     """
     Computes the simplex counts of the union of the consensus assemblies across consensus_assemblies_dict
     :param consensus_assemblies_dict: A dictionary with consensus assemblies.
     :param circuit: A NetworkAssembly object for the circuit where the assemblies belong to.
+    :param N: Number of random samples
     :return simplex_count: A dictionary with the same keys as consensus_assemblies_dict
         with values simplex counts for for the union of the consensus assembly in each key
     :return simplex_count_control: A dictionary with the same keys
         and values a simplex counts of random controls of the same size of its corresponding union
     """
-    simplex_count = {}
-    simplex_count_control = {}
-    for k, consensus_assembly in consensus_assemblies_dict.items():
-        union = consensus_assembly.union
-        simplex_count[k] = [circuit.simplex_counts(union)]
-        simplex_count_control[k] = [circuit.simplex_counts(circuit.sample_gids_n_neurons(union,None))]
-    # TODO: Add controls also for mtype and depth
-    return simplex_count, simplex_count_control
+    assemblies_dict = dict((k, consensus_assembly.union) for k,consensus_assembly in consensus_assemblies_dict.items())
+    return simplex_counts_dict(assemblies_dict, circuit,N)
 
-
-def simplex_counts_core(consensus_assemblies_dict, circuit):
+def simplex_counts_core(consensus_assemblies_dict, circuit,N):
     """
     Computes the simplex counts of the core of the consensus assemblies across consensus_assemblies_dict
     :param consensus_assemblies_dict: A dictionary with consensus assemblies.
