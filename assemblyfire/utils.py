@@ -219,18 +219,16 @@ def load_single_cell_features_from_h5(h5f_name, prefix="spikes"):
     h5f.close()
     project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix=prefix)
     return single_cell_features, project_metadata
-    
-def all_equal(lst,ref=None):
-    """ return:
-        True for empty lst
-        if ref!=None
-            return: True if all of its elements are equal to ref, False otherwise.
-        if ref ==None
-            return: True if all elements for lst are equal to each other, False otherwise"""
-    if ref!=None:
-        iterator=iter([ref]+lst)
+
+
+def all_equal(lst, ref=None):
+    """Return: True for empty lst
+    if ref != None return: True if all of its elements are equal to ref, False otherwise.
+    if ref == None return: True if all elements for lst are equal to each other, False otherwise"""
+    if ref is not None:
+        iterator = iter([ref]+lst)
     else:
-        iterator= iter(lst)
+        iterator = iter(lst)
     try:
         first = next(iterator)
     except StopIteration:
