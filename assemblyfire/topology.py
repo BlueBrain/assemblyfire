@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 Advanced network metrics on `connectivity.py`
-authors: Daniela Egas Santander, Nicolas Ninin
+authors: Daniela Egas Santander, Nicolas Ninin, András Ecker
 last modified: 12.2020
 """
 
 import numpy as np
+from tqdm import tqdm
 
 from assemblyfire.connectivity import ConnectivityMatrix
 
@@ -136,6 +137,64 @@ class NetworkAssembly(ConnectivityMatrix):
     # or on edges (strength of connection).
 
 
+def in_degree_assemblies(assembly_grp_dict, circuit):
+    """
+    Computes the indegree distribution of assemblies across seeds
+    and a random controls of the same size/depth profile/mtype composition
+    :param assembly_grp_dict: dict with seeds as keys and assembly groups as values
+    :param circuit: NetworkAssembly object for the circuit where the assemblies belong to
+    :return in_degrees: dict with the same keys as `assembly_grp_dict` - within that an other dict
+        with keys as assembly labels and list of in degrees as values
+    :return in_degrees_control: dict with the same keys as `assembly_grp_dict` - within that an other dict
+        with keys ['n', 'depths', 'mtype'] and yet an other dict similar to `in_degrees` but values are simplex
+        counts of the random controls
+    """
+    in_degrees = {}
+    in_degrees_control = {seed: {} for seed in list(assembly_grp_dict.keys())}
+    for seed, assembly_grp in assembly_grp_dict.items():
+        in_degrees[seed] = {assembly.idx: circuit.degree(assembly, kind="in")
+                            for assembly in assembly_grp.assemblies}
+        in_degrees_control[seed]["n"] = {assembly.idx: circuit.degree(
+                                         circuit.sample_gids_n_neurons(assembly), kind="in")
+                                         for assembly in assembly_grp.assemblies}
+        in_degrees_control[seed]["depths"] = {assembly.idx: circuit.degree(
+                                              circuit.sample_gids_depth_profile(assembly), kind="in")
+                                              for assembly in assembly_grp.assemblies}
+        in_degrees_control[seed]["mtypes"] = {assembly.idx: circuit.degree(
+                                              circuit.sample_gids_mtype_composition(assembly), kind="in")
+                                              for assembly in assembly_grp.assemblies}
+    return in_degrees, in_degrees_control
+
+
+def simplex_counts_assemblies(assembly_grp_dict, circuit):
+    """
+    Computes the simplices of assemblies across seeds
+    and a random controls of the same size/depth profile/mtype composition
+    :param assembly_grp_dict: dict with seeds as keys and assembly groups as values
+    :param circuit: NetworkAssembly object for the circuit where the assemblies belong to
+    :return simplex_count: dict with the same keys as `assembly_grp_dict` - within that an other dict
+        with keys as assembly labels and list of simplex counts as values
+    :return simplex_counts_control: dict with the same keys as `assembly_grp_dict` - within that an other dict
+        with keys ['n', 'depths', 'mtype'] and yet an other dict similar to `simplex_count` but values are simplex
+        counts of the random controls
+    """
+    simplex_counts = {}
+    simplex_counts_control = {seed: {} for seed in list(assembly_grp_dict.keys())}
+    for seed, assembly_grp in tqdm(assembly_grp_dict.items(), desc="Counting simplices"):
+        simplex_counts[seed] = {assembly.idx: circuit.simplex_counts(assembly)
+                                for assembly in assembly_grp.assemblies}
+        simplex_counts_control[seed]["n"] = {assembly.idx: circuit.simplex_counts(
+                                             circuit.sample_gids_n_neurons(assembly))
+                                             for assembly in assembly_grp.assemblies}
+        simplex_counts_control[seed]["depths"] = {assembly.idx: circuit.simplex_counts(
+                                                  circuit.sample_gids_depth_profile(assembly))
+                                                  for assembly in assembly_grp.assemblies}
+        simplex_counts_control[seed]["mtypes"] = {assembly.idx: circuit.simplex_counts(
+                                                  circuit.sample_gids_mtype_composition(assembly))
+                                                  for assembly in assembly_grp.assemblies}
+    return simplex_counts, simplex_counts_control
+
+
 def simplex_counts_consensus(consensus_assemblies_dict, circuit):
     """
     Computes the simplices of consensus assemblies and a random control of the size of the average of each instantion.
@@ -224,11 +283,14 @@ def simplex_counts_intersection(consensus_assemblies_dict, circuit):
 
 
 def simplex_counts_core_vs_intersection(consensus_assemblies_dict, circuit):
-    """Computes the simplex counts of the core and intersection of the consensus assemblies across consensus_assemblies_dict
-        :param consensus_assemblies_dict: A dictionary with consensus assemblies.
-        :param circuit: A NetworkAssembly object for the circuit where the assemblies belong to.
-        :return simplex_count_core:
-        :return simplex_count_intersection:
+    """
+    Computes the simplex counts of the core and intersection of the consensus assemblies across consensus_assemblies_dict
+    :param consensus_assemblies_dict: A dictionary with consensus assemblies.
+    :param circuit: A NetworkAssembly object for the circuit where the assemblies belong to.
+    :return simplex_count_core: A dictionary with the same keys as consensus_assemblies_dict
+        with values simplex counts for for the core of the consensus assembly in each key
+    :return simplex_count_intersection: A dictionary with the same keys as consensus_assemblies_dict
+        with values simplex counts for the intersection of the consensus assembly in each key
     """
     simplex_count_core = {}
     simplex_count_intersection = {}
@@ -238,5 +300,5 @@ def simplex_counts_core_vs_intersection(consensus_assemblies_dict, circuit):
         gids_intersection = consensus_assembly.union.gids[np.where(consensus_assembly.coreness == max_filtration)]
         # TODO: Implement the above in a weighted assembly class where you can choose thresholds
         simplex_count_intersection[k] = [circuit.simplex_counts(gids_intersection)]
-    # TODO: Add controls also for mtype and depth
+    # TODO: Add controls
     return simplex_count_core, simplex_count_intersection

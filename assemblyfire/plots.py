@@ -342,6 +342,40 @@ def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_na
     plt.close(fig)
 
 
+def plot_in_degrees(in_degrees, in_degrees_control, fig_name):
+    """Plots in degrees for assemblies (within one seed) and random controls"""
+
+    assembly_labels = list(in_degrees.keys())
+    n = len(assembly_labels)
+    cmap = plt.cm.get_cmap("tab20", np.max(assembly_labels))
+
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(np.floor_divide(n, 5) + 1, 5)
+    for i, assembly_label in enumerate(assembly_labels):
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        max_in_degree = np.max(in_degrees[assembly_label])
+        ax.hist(in_degrees[assembly_label], bins=50, range=(0, max_in_degree),
+                color=cmap(i), edgecolor=cmap(i), alpha=0.7, label="assembly")
+        ax.hist(in_degrees_control["n"][assembly_label], bins=50, range=(0, max_in_degree),
+                color="black", histtype="step", linestyle="dashed", label="ctrl. n neurons")
+        ax.hist(in_degrees_control["depths"][assembly_label], bins=50, range=(0, max_in_degree),
+                color="black", histtype="step", linestyle="dashdot", label="ctrl. depth profile")
+        ax.hist(in_degrees_control["mtypes"][assembly_label], bins=50, range=(0, max_in_degree),
+                color="black", histtype="step", label="ctrl. mtype comp.")
+        ax.set_title("Assembly %i" % assembly_label)
+        ax.set_xlim([0, max_in_degree])
+        ax.set_yticks([])
+        sns.despine(ax=ax, left=True, offset=5)
+        if i == 0:
+            ax.legend(frameon=False)
+    fig.add_subplot(1, 1, 1, frameon=False)
+    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    plt.xlabel("In degree")
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name):
     """Plots similarity matrix of assemblies"""
 
@@ -706,3 +740,36 @@ def plot_simplex_counts(simplex_counts_dict, lst_simplex_counts_control_dict=Non
     if save_fig==True:
         assert path_fig!= None, "No path is given for the figure"
         savefig(path_fig, dpi=300)
+
+
+def plot_simplex_counts_seed(simplex_counts, simplex_counts_control, fig_name):
+    """Plots simplex counts for assemblies (within one seed) and random controls"""
+
+    assembly_labels = list(simplex_counts.keys())
+    n = len(assembly_labels)
+    cmap = plt.cm.get_cmap("tab20", np.max(assembly_labels))
+
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(np.floor_divide(n, 5) + 1, 5)
+    for i, assembly_label in enumerate(assembly_labels):
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        ax.plot(simplex_counts[assembly_label], color=cmap(assembly_label), label="assembly")
+        ax.plot(simplex_counts_control["n"][assembly_label], color="black", lw=0.5, ls="--", label="ctrl. n neurons")
+        ax.plot(simplex_counts_control["depths"][assembly_label], color="black", lw=0.5, ls="-.",
+                label="ctrl. depth profile")
+        ax.plot(simplex_counts_control["mtypes"][assembly_label], color="black", lw=0.5, label="ctrl. mtype comp.")
+        ax.set_title("Assembly %i" % assembly_label)
+        ax.set_yticks([])
+        ax.set_xlim([0, 6])  # TODO not hard code this
+        sns.despine(ax=ax, left=True, offset=5)
+        if i == 0:
+            ax.legend(frameon=False)
+    fig.add_subplot(1, 1, 1, frameon=False)
+    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    plt.xlabel("Simplex dimension")
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+
