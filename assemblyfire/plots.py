@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Assembly detection related plots
-author: András Ecker, last update: 10.2020
+author: András Ecker, last update: 12.2020
 """
 
 import numpy as np
@@ -657,3 +657,52 @@ def plot_coreness_t_in_bin(mean_ts, std_ts, coreness, fig_name):
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
+
+
+def plot_simplex_counts(simplex_counts_dict, lst_simplex_counts_control_dict=None, lst_control_label=None, save_fig=False, path_fig=None, title="Simplex counts"):
+    """Takes a dictionary of simplex counts and generates an grid of plots.  In each cell it plots the simplex counts
+    corresponding to a given key.
+    :param simplex_counts_dict: dictionary with a list of simplex counts in each key
+    :param lst_simplex_control_dict: a list of dictionaries with the structure above with random controls
+    :param lst_control_label: list of labels of the control types listed in lst_simplex_control_dict
+    """
+    
+    if lst_simplex_counts_control_dict!=None:
+        from assemblyfire.utils import all_equal
+        assert all_equal([x.keys() for x in lst_simplex_counts_control_dict], simplex_counts_dict.keys()),\
+        "The keys in simplex counts and random controls do not match"
+    
+
+    no_plots=len(simplex_counts_dict.keys())
+    if no_plots ==1:
+        figsize=(12,12)
+    else:
+        figsize=(12,25)
+    fig,ax=plt.subplots(no_plots//2+1,2,figsize=figsize,squeeze=False)
+
+    for indx, c in enumerate(sorted(simplex_counts_dict.keys())):
+        #Plotting simplex counts
+        for i in range(len(simplex_counts_dict[c])):
+            ax[indx//2,indx%2].plot(simplex_counts_dict[c][i])
+        ax[indx//2,indx%2].set_title("Group: " + str(c))
+
+        #Plotting controls
+        if lst_simplex_counts_control_dict!=None:
+            for j,control in enumerate(lst_simplex_counts_control_dict):
+                for t,i in enumerate(range(len(control[c]))):
+                    if t==0:
+                        if lst_control_label==None:
+                            control_label="Controls"
+                        else:
+                            assert len(lst_simplex_counts_control_dict) == len(lst_control_label), "The number of control labels doesn't match the number of controls"
+                            control_label=lst_control_label[j]
+                        ax[indx//2,indx%2].plot(control[c][i],label=control_label,color='C'+str(j+1),linestyle="dashed")
+                    else:
+                        ax[indx//2,indx%2].plot(control[c][i],color='C'+str(j+1),linestyle="dashed")
+                ax[indx//2,indx%2].legend()
+
+    plt.suptitle(title,fontsize=24)
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+    if save_fig==True:
+        assert path_fig!= None, "No path is given for the figure"
+        savefig(path_fig, dpi=300)

@@ -2,7 +2,7 @@
 """
 Assembly detection related utility functions
 (mostly loading simulation related stuff)
-author: András Ecker, last update: 11.2020
+author: András Ecker, last update: 12.2020
 """
 
 import os
@@ -219,3 +219,20 @@ def load_single_cell_features_from_h5(h5f_name, prefix="spikes"):
     h5f.close()
     project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix=prefix)
     return single_cell_features, project_metadata
+    
+def all_equal(lst,ref=None):
+    """ return:
+        True for empty lst
+        if ref!=None
+            return: True if all of its elements are equal to ref, False otherwise.
+        if ref ==None
+            return: True if all elements for lst are equal to each other, False otherwise"""
+    if ref!=None:
+        iterator=iter([ref]+lst)
+    else:
+        iterator= iter(lst)
+    try:
+        first = next(iterator)
+    except StopIteration:
+        return True
+    return all(first == rest for rest in iterator)
