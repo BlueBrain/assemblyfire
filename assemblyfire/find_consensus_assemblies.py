@@ -61,7 +61,7 @@ def run(config_path):
 
     config = ConsensusConfig(config_path)
     L.info(" Load in assemblies from %s" % config.h5f_name)
-    assembly_grp_dict, _ = load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+    assembly_grp_dict = load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies, load_metadata=False)
 
     L.info(" Creating consensus assemblies and saving them to the same file")
     if config.clustering_method == "hamming":

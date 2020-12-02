@@ -162,27 +162,33 @@ def read_spikes(f_name, t_start, t_end):
     return spike_times[idx], spiking_gids[idx]
 
 
-def load_assemblies_from_h5(h5f_name, prefix="assemblies"):
+def load_assemblies_from_h5(h5f_name, prefix="assemblies", load_metadata=False):
     """Load assemblies over seeds from saved h5 file into dict of AssemblyGroups"""
     from assemblyfire.assemblies import AssemblyGroup, AssemblyProjectMetadata
 
     with h5py.File(h5f_name, "r") as h5f:
-        keys = list(h5f[prefix].keys())
-    project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix="spikes")
-    return dict([(k, AssemblyGroup.from_h5(h5f_name, k, prefix=prefix))
-                 for k in keys]), project_metadata
+        seeds = list(h5f[prefix].keys())
+    assembly_grp_dict = {seed:AssemblyGroup.from_h5(h5f_name, k, prefix=prefix) for seed in seeds}
+    if load_metadata:
+        project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix="spikes")
+        return assembly_grp_dict, project_metadata
+    else:
+        return assembly_grp_dict
 
 
-def load_consensus_assemblies_from_h5(h5f_name, prefix="consensus"):
+def load_consensus_assemblies_from_h5(h5f_name, prefix="consensus", load_metadata=False):
     """Load consensus (clustered and thresholded )assemblies
     from saved h5 file into dict of ConsensusAssembly objects"""
     from assemblyfire.assemblies import ConsensusAssembly, AssemblyProjectMetadata
 
     with h5py.File(h5f_name, "r") as h5f:
         keys = list(h5f[prefix].keys())
-    project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix="spikes")
-    return dict([(k, ConsensusAssembly.from_h5(h5f_name, k, prefix=prefix))
-                 for k in keys]), project_metadata
+    assembly_grp_dict = {k: ConsensusAssembly.from_h5(h5f_name, k, prefix=prefix) for k in keys}
+    if load_metadata:
+        project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix="spikes")
+        return assembly_grp_dict, project_metadata
+    else:
+        return assembly_grp_dict
 
 
 def load_spikes_from_h5(h5f_name, prefix="spikes"):

@@ -24,7 +24,7 @@ def consensus_vs_single_cell_features(config_path):
 
     # loading single cell features and consensus assemblies from h5
     single_cell_features, _ = load_single_cell_features_from_h5(spikes.h5f_name, prefix="spikes")
-    consensus_assemblies, _ = load_consensus_assemblies_from_h5(spikes.h5f_name, prefix="consensus")
+    consensus_assemblies = load_consensus_assemblies_from_h5(spikes.h5f_name, prefix="consensus", load_metadata=False)
     all_gids = single_cell_features.gids
     consensus_gids = [assembly.gids for _, assembly in consensus_assemblies.items()]
     union_gids = [assembly.union.gids for _, assembly in consensus_assemblies.items()]

@@ -18,7 +18,7 @@ def consensus_botany(config_path):
 
     # only used for the config part...
     spikes = SpikeMatrixGroup(config_path)
-    consensus_assemblies, _ = load_consensus_assemblies_from_h5(spikes.h5f_name, prefix="consensus")
+    consensus_assemblies = load_consensus_assemblies_from_h5(spikes.h5f_name, prefix="consensus", load_metadata=False)
     topology = NetworkAssembly.from_h5(spikes.h5f_name, group_name="full_matrix", prefix="connectivity")
 
     all_gids = topology.gids
