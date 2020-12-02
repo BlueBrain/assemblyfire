@@ -168,7 +168,7 @@ def load_assemblies_from_h5(h5f_name, prefix="assemblies", load_metadata=False):
 
     with h5py.File(h5f_name, "r") as h5f:
         seeds = list(h5f[prefix].keys())
-    assembly_grp_dict = {seed:AssemblyGroup.from_h5(h5f_name, k, prefix=prefix) for seed in seeds}
+    assembly_grp_dict = {seed: AssemblyGroup.from_h5(h5f_name, seed, prefix=prefix) for seed in seeds}
     if load_metadata:
         project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix="spikes")
         return assembly_grp_dict, project_metadata
