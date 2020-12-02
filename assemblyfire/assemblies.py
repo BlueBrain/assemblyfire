@@ -713,7 +713,6 @@ def consensus_over_seeds_hamming(assembly_grp_dict, h5f_name, h5_prefix, fig_pat
     """
     from assemblyfire.clustering import cluster_assemblies
     from assemblyfire.plots import plot_assembly_sim_matrix, plot_dendogram_silhouettes
-    assert criterion in ["distance", "maxclust"]
 
     # concatenate assemblies over seed into 1 big AssemblyGroup
     gids = []
@@ -734,6 +733,9 @@ def consensus_over_seeds_hamming(assembly_grp_dict, h5f_name, h5_prefix, fig_pat
     elif criterion == "distance":
         sim_matrix, clusters, plotting = cluster_assemblies(all_assemblies.as_bool().T, n_assemblies,
                                                             criterion, threshold)
+    else:
+        ValueError("Criterion must be 'distance' or 'maxclust'!")
+
     # plotting clustering results
     fig_name = os.path.join(fig_path, "simmat_assemblies_hamming.png")
     plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name)
