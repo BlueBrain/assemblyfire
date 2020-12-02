@@ -32,6 +32,7 @@ setup(
                       "pandas>=1.1.4",
                       "scikit-learn>=0.23.2",
                       "networkx>=2.5",
+                      "scikit-network>=0.20.0",
                       "pyflagser>=0.4.2",
                       "matplotlib>=3.1.3",
                       "seaborn>=0.11.0",
