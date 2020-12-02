@@ -202,7 +202,7 @@ def generate_controls(circuit, ref_gids, N, sub_gids=None, control_type="n_neuro
         return [circuit.sample_gids_n_neurons(ref_gids,sub_gids) for i in range(N)]
     elif control_type=="depth_profile":
         return [circuit.sample_gids_n_neurons(ref_gids,sub_gids) for i in range(N)]
-    elif control_type=="mtype_composition"
+    elif control_type=="mtype_composition":
         return [circuit.sample_gids_n_neurons(ref_gids,sub_gids) for i in range(N)]
 
 
