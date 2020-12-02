@@ -64,21 +64,20 @@ class NetworkAssembly(ConnectivityMatrix):
     def simplex_counts(self, sub_gids):
         """Return the simplex counts of submatrix specified by `sub_gids`"""
         import pyflagser
-
-        sub_gids = self.__extract_gids__(sub_gids)
-        sub_mat = self.submatrix(sub_gids)
+        sub_mat = self.submatrix(self.__extract_gids__(sub_gids))
         return pyflagser.flagser_count_unweighted(sub_mat, directed=True)
 
     def betti_counts(self, sub_gids):
         """Return the betti counts of submatrix specified by `sub_gids`"""
         import pyflagser
-
-        sub_gids = self.__extract_gids__(sub_gids)
-        sub_mat = self.submatrix(sub_gids)
-        return pyflagser.flagser_unweighted(sub_mat, directed=True)
+        sub_mat = self.submatrix(self.__extract_gids__(sub_gids))
+        return pyflagser.flagser_unweighted(sub_mat, directed=True)["betti"]
 
     def convex_hull(self, sub_gids):
         """Return the convex hull of the sub gids in the 3D space. Require to know x,y,z position for gids"""
+        pass
+
+    def communicability(self, sub_gids):
         pass
 
     def centrality(self, sub_gids, kind="closeness", directed=False):
@@ -87,9 +86,6 @@ class NetworkAssembly(ConnectivityMatrix):
             return self.closeness(sub_gids, directed)
         else:
             ValueError("Kind must be 'closeness'!")
-
-    def communicability(self, sub_gids):
-        pass
 
     def closeness(self, sub_gids=None, directed=False):
         """Compute closeness centrality using sknetwork on all connected components or strongly connected
