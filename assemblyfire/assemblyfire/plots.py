@@ -772,4 +772,31 @@ def plot_simplex_counts_seed(simplex_counts, simplex_counts_control, fig_name):
     plt.close(fig)
 
 
+def plot_simplex_counts_consensus(simplex_counts, simplex_counts_control, fig_name):
+    """Plots simplex counts for all instantiations of a consensus assembly
+    and random control with the same size as the mean number of neurons in the instantiations"""
+
+    n = len(simplex_counts)
+    cmap = plt.cm.get_cmap("tab20", n)
+
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(np.floor_divide(n, 5) + 1, 5)
+    for i, (label, simplex_counts_cons) in enumerate(simplex_counts.items()):
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        for simlex_count_inst in simplex_counts_cons:
+            ax.plot(simlex_count_inst, color=cmap(i))
+        for ctrl in simplex_counts_control[label]:
+            ax.plot(ctrl, color="black", lw=0.5, ls="--")
+        ax.set_title("cons%i\n(n=%s)" % (i, len(simplex_counts_cons)))
+        ax.set_yticks([])
+        ax.set_xlim([0, 6])  # TODO not hard code this
+        sns.despine(ax=ax, left=True, offset=5)
+    fig.add_subplot(1, 1, 1, frameon=False)
+    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    plt.xlabel("Simplex dimension")
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 
