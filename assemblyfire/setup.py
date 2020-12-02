@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 if sys.version_info < (3, 6):
     sys.exit("Sorry, Python < 3.6 is not supported")
 
-with open("README.rst", encoding="utf-8") as f:
+with open("../README.rst", encoding="utf-8") as f:
     README = f.read()
 
 VERSION = imp.load_source("", "assemblyfire/version.py").__version__
