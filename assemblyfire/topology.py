@@ -46,7 +46,7 @@ class NetworkAssembly(ConnectivityMatrix):
     A class derived from ConnectivityMatrix with additional information on networks metrics
     of the subgraph associated to an assembly within the connectivity matrix of the circuit.
     """
-
+        
     def degree(self, sub_gids=None, kind="in"):
         """Return in/out degrees of the subgraph, if None compute on the whole graph"""
         if sub_gids is not None:
@@ -234,7 +234,7 @@ def simplex_counts_union(consensus_assemblies_dict, circuit):
     for k, consensus_assembly in consensus_assemblies_dict.items():
         union = consensus_assembly.union
         simplex_count[k] = [circuit.simplex_counts(union)]
-        simplex_count_control[k] = [circuit.simplex_counts(circuit.sample_gids_n_neurons(union))]
+        simplex_count_control[k] = [circuit.simplex_counts(circuit.sample_gids_n_neurons(union,None))]
     # TODO: Add controls also for mtype and depth
     return simplex_count, simplex_count_control
 
