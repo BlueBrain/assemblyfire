@@ -2,7 +2,7 @@
 """
 Class to get, save and load connection matrix and sample submatrices from it
 authors: Michael Reimann, András Ecker
-last modified: 11.2020
+last modified: 12.2020
 """
 
 import h5py
@@ -103,7 +103,7 @@ class ConnectivityMatrix(object):
     def subarray(self, sub_gids, sub_gids_post=None):
         return np.array(self.dense_submatrix(sub_gids, sub_gids_post=sub_gids_post))
         
-    def sample_gids_n_neurons(self, ref_gids, sub_gids):
+    def sample_gids_n_neurons(self, ref_gids, sub_gids=None):
         """
         Return n gids sampled at random where n is the number of neurons in `ref_gids`
         :param ref_gids: Subpopulation to use as reference for sampling.
