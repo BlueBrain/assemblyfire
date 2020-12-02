@@ -618,13 +618,16 @@ class ConsensusAssembly(Assembly):
             raise ValueError("Need to specify one of 'raw', 'number' or 'p-value' for core_method")
         super(ConsensusAssembly, self).__init__(self.union.gids[self.coreness > self._thresh], index=index)
 
-    def at_threshold(self, new_thresh):
+    def at_threshold(self, new_thresh, core_method=None):
         """
         :param new_thresh: new threshold in terms of "coreness" that determines consensus cluster membership
+        :param core_method: (Optional) instantiate the copy using a different core_method
         :return:
         """
+        if core_method is None:
+            core_method = self._core_method
         return ConsensusAssembly(self.instantiations, index=self.idx,
-                                 core_method=self._core_method, core_threshold=new_thresh)
+                                 core_method=core_method, core_threshold=new_thresh)
 
     @staticmethod
     def calculate_coreness(vec_num_contained, expected_n=None, expected_distribution=None, epsilon=1E-5):
