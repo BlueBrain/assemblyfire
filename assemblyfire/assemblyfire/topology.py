@@ -136,7 +136,7 @@ class NetworkAssembly(ConnectivityMatrix):
         return networkx.algorithms.core.core_number(G)
 
     # TODO: Filtered simplex counts with different weights on vertices (coreness, intersection)
-    # or on edges (strength of connection).
+    #  or on edges (strength of connection).
 
 
 def in_degree_assemblies(assembly_grp_dict, circuit):
@@ -210,7 +210,7 @@ def get_intersection_gids(consensus_assemblies_dict):
 
 
 def generate_controls(circuit, ref_gids, N, sub_gids=None, control_type="n_neurons"):
-    """Generates `N` random controls for `ref_gids` within `sub_gids`.
+    """Generates `N` random controls of `control_type` for `ref_gids` within `sub_gids`.
     If `sub_gids=None`, then sample from the whole circuit."""
     if control_type == "n_neurons":
         return [circuit.sample_gids_n_neurons(ref_gids, sub_gids) for _ in range(N)]
@@ -224,15 +224,16 @@ def generate_controls(circuit, ref_gids, N, sub_gids=None, control_type="n_neuro
 
 def simplex_counts_dict(ref_assemblies_dict, circuit, N, sub_assemblies_dict=None):
     """
-    Computes the simplex counts of the assemblies in assemblies_dict and random controls.
-    :param ref_assemblies_dict: A dictionary with assembly objects.
-    :param circuit: A NetworkAssembly object for the circuit where the assemblies belong to.
-    :param N: Number of random samples
-    :param sub_assemblies_dict:
-    :return simplex_count: A dictionary with the same keys as ref_assemblies_dict
-        with values simplex counts for the assemblies in each key
-    :return simplex_count_control: A dictionary with the same keys
-        and values a simplex counts of random controls within sub_assemblies or within circuit if sub_assemblies=None
+    Computes the simplex counts of the assemblies and thier random controls.
+    :param ref_assemblies_dict: dictionary with Assembly objects
+    :param circuit: NetworkAssembly object of the circuit where the assemblies belong to
+    :param N: number of random samples from each kind
+    :param sub_assemblies_dict: dictionary with (bigger) Assembly objects. E.g. union of a ConsensusAssembly
+    :return simplex_count: dictionary with the same keys as ref_assemblies_dict
+        and simplex counts for the assemblies as values
+    :return simplex_count_control: A dictionary with keys of random control names. Within those an other dictionary
+        with the same keys as ref_assemblies_dict and simplex counts of random controls (within sub_assemblies
+        or within the whole circuit if 'sub_assemblies=None') as values
     """
     simplex_count = {}
     simplex_count_control = {key: {} for key in ["n", "depth", "mtype"]}
