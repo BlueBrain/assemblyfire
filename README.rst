@@ -15,13 +15,18 @@ Installation
   module load python
   python -m venv dev-assemblyfire
   source dev-assemblyfire/bin/activate
-  git pull https://github.com/andrisecker/assemblyfire.git
+  pip install --upgrade cmake
+  git clone --recursive https://github.com/andrisecker/assemblyfire.git
   cd assemblyfire/assemblyfire
   pip install -i https://bbpteam.epfl.ch/repository/devpi/simple -e .[bluepy]
+  cd ../pyflagsercontain
+  pip install -e .
 
   # to install it locally without having to install bluepy
-  git pull https://github.com/andrisecker/assemblyfire.git
+  git clone --recursive https://github.com/andrisecker/assemblyfire.git
   cd assemblyfire/assemblyfire
+  pip install -e .
+  cd ../pyflagsercontain
   pip install -e .
 
 
