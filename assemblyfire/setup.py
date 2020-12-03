@@ -7,8 +7,6 @@ from setuptools import setup, find_packages
 if sys.version_info < (3, 6):
     sys.exit("Sorry, Python < 3.6 is not supported")
 
-with open("../README.rst", encoding="utf-8") as f:
-    README = f.read()
 
 VERSION = imp.load_source("", "assemblyfire/version.py").__version__
 
@@ -18,7 +16,12 @@ setup(
     author_email="andras.ecker@epfl.ch",
     version=VERSION,
     description="find and analyze cell assemblies",
-    long_description=README,
+    long_description=\
+        """assemblyfire
+           ============
+
+           find and analyze cell assemblies
+        """,
     long_description_content_type="text/x-rst",
     url="http://bluebrain.epfl.ch",
     license="LGPL-3.0",

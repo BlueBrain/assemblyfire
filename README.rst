@@ -16,12 +16,12 @@ Installation
   python -m venv dev-assemblyfire
   source dev-assemblyfire/bin/activate
   git pull https://github.com/andrisecker/assemblyfire.git
-  cd assemblyfire/
+  cd assemblyfire/assemblyfire
   pip install -i https://bbpteam.epfl.ch/repository/devpi/simple -e .[bluepy]
 
   # to install it locally without having to install bluepy
   git pull https://github.com/andrisecker/assemblyfire.git
-  cd assemblyfire/
+  cd assemblyfire/assemblyfire
   pip install -e .
 
 
