@@ -578,6 +578,32 @@ class AssemblyGroup(object):
         else:
             raise Exception("Unknown score function: {0}".format(score_function))
 
+class WeightedAssembly(Assembly):
+   """Represents an assembly with weights on neurons.  Weights can be given in different ways, by activity,
+   by network properties, or by coreness in the ConsensusAssembly child class"""
+
+   #TODO: Maybe we want to add read/write functions if the weights come from network metrics that are hard to compute.
+   def __init__(self,lst_gids, weights):
+       """
+       :param weights: A list of the same size of the assembly.  It reprsents the weights of neurons used to compute a
+       filtration.
+       """
+       self.gids = np.array(lst_gids)
+       self.weights=np.array(weights)
+
+   def at_weight(self,thresh,method='strength'):
+       """ Returns thresholded assembly
+       :param method:  distance returns gids with weight smaller or equal than thresh
+                        strength returns gids with weight larger or equal than tresh"""
+       if method=='strength':
+           return Assembly(self.gids[np.where(self.weights<=thresh)])
+       else:
+           assert method=='distance', "method must be either strength or distance"
+           return Assembly(self.gids[np.where(self.weights>=thresh)])
+
+
+#At weight (gids with more or less than that weight)
+   #Filtration --> gives the whole filtration --> as a list of assembly objects?
 
 class ConsensusAssembly(Assembly):
     """
