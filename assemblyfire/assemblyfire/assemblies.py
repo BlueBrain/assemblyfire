@@ -594,12 +594,26 @@ class WeightedAssembly(Assembly):
    def at_weight(self,thresh,method='strength'):
        """ Returns thresholded assembly
        :param method:  distance returns gids with weight smaller or equal than thresh
-                        strength returns gids with weight larger or equal than tresh"""
+                       strength returns gids with weight larger or equal than tresh"""
        if method=='strength':
-           return Assembly(self.gids[np.where(self.weights<=thresh)])
+           return Assembly(self.gids[np.where(self.weights>= thresh)])
        else:
            assert method=='distance', "method must be either strength or distance"
-           return Assembly(self.gids[np.where(self.weights>=thresh)])
+           return Assembly(self.gids[np.where(self.weights<=thresh)])
+
+   def filtration(self,method='strength'):
+       """Returns an AssemblyGroup object represeting the filtration of that assembly.
+       :param method: distance smaller weights enter the filtration first
+                      strength larger weights enter the filtration first"""
+       if method == 'strength':
+           filtration_weights=np.unique(self.weights)[::-1]
+       else:
+           assert method=='distance', "method must be either strength or distance"
+           filtration_weights=np.unique(self.weights)
+       filtration=[]
+       for i in range(len(filtration_weights)):
+           filtration.append(self.at_weight(filtration_weights[i],method=method))
+       return AssemblyGroup(filtration, self.gids, label=None, metadata=None)
 
 
 #At weight (gids with more or less than that weight)
