@@ -9,6 +9,7 @@ import numpy as np
 from tqdm import tqdm
 
 from assemblyfire.connectivity import ConnectivityMatrix
+from assemblyfire.assemblies import WeightedAssembly, AssemblyGroup
 
 
 def closeness_connected_components(matrix, directed=False, return_sum=True):
@@ -196,6 +197,12 @@ def simplex_counts_assemblies(assembly_grp_dict, circuit):
                                                   for assembly in assembly_grp.assemblies}
     return simplex_counts, simplex_counts_control
 
+def filtered_simplex_counts(weighted_assembly,circuit,method="strength"):
+    filtration=weighted_assembly.filtration(method=method)
+    simplex_counts=[]
+    for i in range(len(filtration.assemblies)):
+        simplex_counts.append(circuit.simplex_counts(filtration.assemblies[i]))
+    return  simplex_counts
 
 # TODO: maybe this should be moved to the ConsensusAssembly class
 def get_intersection_gids(consensus_assemblies_dict):

@@ -588,8 +588,10 @@ class WeightedAssembly(Assembly):
        :param weights: A list of the same size of the assembly.  It reprsents the weights of neurons used to compute a
        filtration.
        """
+       assert len(lst_gids)==len(weights), "The list of gids and the list of weights must be of the same length"
        self.gids = np.array(lst_gids)
        self.weights=np.array(weights)
+
 
    def at_weight(self,thresh,method='strength'):
        """ Returns thresholded assembly
