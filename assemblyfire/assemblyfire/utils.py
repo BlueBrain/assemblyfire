@@ -46,7 +46,7 @@ def get_patterns(root_path):
 
     # get spike train name from json
     proj_name = root_path.split('/')[-1]
-    jf_name = os.path.join(root_path, "%s.json"%proj_name)
+    jf_name = os.path.join(root_path, "%s.json" % proj_name)
     with open(jf_name, "rb") as f:
         configs = json.load(f)
         for param in configs["project_parameters"]:
@@ -55,11 +55,9 @@ def get_patterns(root_path):
     spike_train_name = spike_train_dir.split('/')[-2]
 
     # load in pattern order txt saved by `spikewriter.py`
-    patterns = []
-    f_name = os.path.join("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/spiketrains", "%s.txt"%spike_train_name)
+    f_name = os.path.join("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/spiketrains", "%s.txt" % spike_train_name)
     with open(f_name, "r") as f:
-        for l in f:
-            patterns.append(l.strip())
+        patterns = [line.strip() for line in f]
     return patterns
 
 
@@ -141,25 +139,6 @@ def get_spikes(sim, gids, t_start, t_end):
     else:
         spikes = sim.spikes.get(gids, t_start=t_start, t_end=t_end)
     return np.asarray(spikes.index), np.asarray(spikes.values)
-
-
-def read_spikes(f_name, t_start, t_end):
-    """Reads spikes from file"""
-
-    ts = []
-    gids = []
-    with open(f_name, "rb") as f:
-        next(f)  # skip "\scatter"
-        for line in f:
-            tmp = line.split()
-            ts.append(float(tmp[0]))
-            gids.append(int(tmp[1]))
-    spike_times = np.asarray(ts)
-    spiking_gids = np.asarray(gids)
-
-    idx = np.where((t_start < spike_times) & (spike_times < t_end))[0]
-
-    return spike_times[idx], spiking_gids[idx]
 
 
 def load_assemblies_from_h5(h5f_name, prefix="assemblies", load_metadata=False):
