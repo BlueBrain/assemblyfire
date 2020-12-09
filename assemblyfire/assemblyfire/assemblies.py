@@ -578,6 +578,48 @@ class AssemblyGroup(object):
         else:
             raise Exception("Unknown score function: {0}".format(score_function))
 
+class WeightedAssembly(Assembly):
+   """Represents an assembly with weights on neurons.  Weights can be given in different ways, by activity,
+   by network properties, or by coreness in the ConsensusAssembly child class"""
+
+   #TODO: Maybe we want to add read/write functions if the weights come from network metrics that are hard to compute.
+   def __init__(self,lst_gids, weights):
+       """
+       :param weights: A list of the same size of the assembly.  It reprsents the weights of neurons used to compute a
+       filtration.
+       """
+       assert len(lst_gids)==len(weights), "The list of gids and the list of weights must be of the same length"
+       self.gids = np.array(lst_gids)
+       self.weights=np.array(weights)
+
+
+   def at_weight(self,thresh,method='strength'):
+       """ Returns thresholded assembly
+       :param method:  distance returns gids with weight smaller or equal than thresh
+                       strength returns gids with weight larger or equal than tresh"""
+       if method=='strength':
+           return Assembly(self.gids[np.where(self.weights>= thresh)])
+       else:
+           assert method=='distance', "method must be either strength or distance"
+           return Assembly(self.gids[np.where(self.weights<=thresh)])
+
+   def filtration(self,method='strength'):
+       """Returns an AssemblyGroup object represeting the filtration of that assembly.
+       :param method: distance smaller weights enter the filtration first
+                      strength larger weights enter the filtration first"""
+       if method == 'strength':
+           filtration_weights=np.unique(self.weights)[::-1]
+       else:
+           assert method=='distance', "method must be either strength or distance"
+           filtration_weights=np.unique(self.weights)
+       filtration=[]
+       for i in range(len(filtration_weights)):
+           filtration.append(self.at_weight(filtration_weights[i],method=method))
+       return AssemblyGroup(filtration, self.gids, label=None, metadata=None)
+
+
+#At weight (gids with more or less than that weight)
+   #Filtration --> gives the whole filtration --> as a list of assembly objects?
 
 class ConsensusAssembly(Assembly):
     """
