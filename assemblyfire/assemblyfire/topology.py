@@ -60,7 +60,6 @@ class NetworkAssembly(ConnectivityMatrix):
             matrix = self.subarray(self.__extract_gids__(sub_gids))
         else:
             matrix = self.array
-
         if kind == "in":
             return np.sum(matrix, axis=0)
         elif kind == "out":
@@ -203,6 +202,7 @@ def filtered_simplex_counts(weighted_assembly,circuit,method="strength"):
     for i in range(len(filtration.assemblies)):
         simplex_counts.append(circuit.simplex_counts(filtration.assemblies[i]))
     return  simplex_counts
+
 
 # TODO: maybe this should be moved to the ConsensusAssembly class
 def get_intersection_gids(consensus_assemblies_dict):
