@@ -19,63 +19,6 @@ import seaborn as sns
 sns.set(style="ticks", context="notebook")
 
 
-def _avg_rate(rate, bin_, t_start, t_end):
-    """Helper function to bin rate for bar plots"""
-
-    t1 = np.arange(t_start, t_end, bin_)
-    t2 = t1 + bin_
-    avg_rate = np.zeros_like(t1, dtype=np.float)
-    t = np.linspace(t_start, t_end, len(rate))
-    for i, (t1_, t2_) in enumerate(zip(t1, t2)):
-        avg_ = np.mean(rate[np.where((t1_ <= t) & (t < t2_))])
-        if avg_ != 0.:
-            avg_rate[i] = avg_
-    return avg_rate
-
-
-def _gids_to_depth(gids, depths):
-    """Converts unique gids to cortical depths"""
-    return [depths[gid] for gid in gids]
-
-
-def _spiking_gids_to_depth(spiking_gids, depths):
-    """Converts array of gids to array of cortical depths"""
-
-    spiking_depths = np.zeros_like(spiking_gids, dtype=np.float)
-    for gid in np.unique(spiking_gids):
-        idx = np.where(spiking_gids == gid)
-        spiking_depths[idx] = depths[gid]
-    return spiking_depths
-
-
-def plot_raster(spike_timesE, spiking_gidsE, rateE, spike_timesI, spiking_gidsI, rateI,
-                t_start, t_end, depths, ystuff, fig_name):
-    """Plots raster"""
-
-    fig = plt.figure(figsize=(20, 8))
-    ax = fig.add_subplot(1, 1, 1)
-
-    ax.scatter(spike_timesI, _spiking_gids_to_depth(spiking_gidsI, depths), color="blue", marker='.', s=2, edgecolor="none")
-    ax.scatter(spike_timesE, _spiking_gids_to_depth(spiking_gidsE, depths), color="red", marker='.', s=2, edgecolor="none")
-    for h in ystuff["hlines"]:
-        ax.axhline(h, color="gray", lw=0.5)
-    ax2 = ax.twinx()
-    bin_ = (t_end-t_start)/len(rateI)
-    t_steps = np.arange(t_start, t_end, bin_) + bin_
-    ax2.step(t_steps, rateI, where="pre", color="blue")
-    ax2.step(t_steps, rateE, where="pre", color="red")
-    ax.set_xlim([t_start, t_end])
-    ax.set_xlabel("Time (ms)")
-    ax.set_yticks(ystuff["yticks"])
-    ax.set_yticklabels(ystuff["yticklabels"])
-    ax.set_ylim([ystuff["hlines"][-1], ystuff["hlines"][0]])
-    ax2.set_ylabel("Rate (spikes/(N*s))")
-    ax2.set_ylim(bottom=0)
-
-    fig.savefig(fig_name, bbox_inches="tight", dpi=100)
-    plt.close(fig)
-
-
 def plot_rate(rate, rate_th, t_start, t_end, fig_name):
     """Plots thresholded rate (it's actually spike count)"""
 
@@ -311,6 +254,11 @@ def plot_cluster_seqs(clusters, patterns, t_bins, fig_name):
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
+
+
+def _gids_to_depth(gids, depths):
+    """Converts unique gids to cortical depths"""
+    return [depths[gid] for gid in gids]
 
 
 def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_name):
