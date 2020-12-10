@@ -1,5 +1,7 @@
 root_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/random_stream_20trials"
 
+patterns_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/spiketrains/random_stream_60/stim.dat"
+
 h5_out:
     file_name: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/random_stream_20trials/assemblies_simmat.h5"
     prefixes:

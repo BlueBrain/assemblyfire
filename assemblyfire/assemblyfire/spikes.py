@@ -141,6 +141,10 @@ class SpikeMatrixGroup(object):
         return self.config["root_path"]
 
     @property
+    def patterns_path(self):
+        return self.config["patterns_path"]
+
+    @property
     def h5f_name(self):
         return self.config["h5_out"]["file_name"]
 
