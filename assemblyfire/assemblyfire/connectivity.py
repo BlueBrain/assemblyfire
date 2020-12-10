@@ -41,6 +41,36 @@ class _MatrixNodeIndexer(object):
         pop = self._parent._vertex_properties.index.values[self._prop > other]
         return self._parent.subpopulation(pop)
 
+    def random_numerical(self, ref, n_bins=50):
+        all_gids = self._prop.index.values
+        ref_gids = self._parent.__extract_vertex_ids__(ref)
+        assert np.isin(ref_gids, all_gids).all(), "Reference gids are not part of the connectivity matrix"
+
+        ref_values = self._prop[ref_gids]
+        hist, bin_edges = np.histogram(ref_values.values, bins=n_bins)
+        value_bins = np.digitize(self._prop.values, bins=bin_edges)
+        assert len(hist == len(value_bins[1:-1]))  # `digitize` returns values below and above the spec. bin_edges
+        sample_gids = []
+        for i in range(n_bins):
+            idx = np.where(value_bins == i+1)[0]
+            assert idx.shape[0] >= hist[i], "Not enough neurons at this depths to sample from"
+            sample_gids.extend(np.random.choice(all_gids[idx], hist[i], replace=False).tolist())
+        return self._parent.subpopulation(sample_gids)
+
+    def random_categorical(self, ref):
+        all_gids = self._prop.index.values
+        ref_gids = self._parent.__extract_vertex_ids__(ref)
+        assert np.isin(ref_gids, all_gids).all(), "Reference gids are not part of the connectivity matrix"
+
+        ref_values = self._prop[ref_gids].values
+        value_lst, counts = np.unique(ref_values, return_counts=True)
+        sample_gids = []
+        for i, mtype in enumerate(value_lst):
+            idx = np.where(self._prop == mtype)[0]
+            assert idx.shape[0] >= counts[i], "Not enough %s to sample from" % mtype
+            sample_gids.extend(np.random.choice(all_gids[idx], counts[i], replace=False).tolist())
+        return self._parent.subpopulation(sample_gids)
+
 
 class ConnectivityMatrix(object):
     """Small utility class to hold a connections matrix and generate submatrices"""
@@ -108,7 +138,7 @@ class ConnectivityMatrix(object):
             #  TODO: Check colname against existing properties
             setattr(self, colname, self._vertex_properties[colname].values)
 
-        # TODO: Below is for backwards compatibility. This is too BlueBrain-specific and should not be here!
+        # TODO: calling it "gids" might be too BlueBrain-specific! Change name?
         self.gids = self._vertex_properties.index.values
 
     def __make_lookup__(self):
@@ -247,6 +277,9 @@ class ConnectivityMatrix(object):
     def dense_sample_n_neurons(self, ref_gids, sub_gids=None):
         return self.sample_matrix_n_neurons(ref_gids, sub_gids).todense()
 
+    def sample_population_n_neurons(self, ref_gids, sub_gids=None):
+        return self.subpopulation(self.sample_vertices_n_neurons(ref_gids, sub_gids))
+
     def sample_n_neurons(self, ref_gids, sub_gids=None):
         return np.array(self.dense_sample_n_neurons(ref_gids, sub_gids))
 
@@ -259,6 +292,7 @@ class ConnectivityMatrix(object):
             Can be either a list of gids, or an Assembly object as above
         :param n_bins: number of bins to be used to bin depth values
         """
+        print("DEPRECATED! Use the .index(property_name).random_numerical functionality instead!")
         ref_gids = self.__extract_vertex_ids__(ref_gids)
         if sub_gids is not None:
             sub_gids = self.__extract_vertex_ids__(sub_gids)
@@ -302,6 +336,7 @@ class ConnectivityMatrix(object):
         :param sub_gids: (optional) if specified, subpopulation to sample from
             Can be either a list of gids, or an Assembly object as above
         """
+        print("DEPRECATED! Use the .index(property_name).random_categorical functionality instead!")
         ref_gids = self.__extract_vertex_ids__(ref_gids)
         if sub_gids is not None:
             sub_gids = self.__extract_vertex_ids__(sub_gids)
