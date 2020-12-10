@@ -8,4 +8,5 @@ from assemblyfire.topology import NetworkAssembly
 from assemblyfire.clustering import cluster_spikes, detect_assemblies, cluster_assemblies
 from assemblyfire import utils
 from assemblyfire import plots
+from .topological_analysis import TopologicalAnalysis
 
