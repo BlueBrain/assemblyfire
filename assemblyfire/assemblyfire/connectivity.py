@@ -22,7 +22,7 @@ class _MatrixNodeIndexer(object):
         return self._parent.subpopulation(pop)
 
     def isin(self, other):
-        pop = self._parent._vertex_properties.index.values[np.in1d(self._prop == other)]
+        pop = self._parent._vertex_properties.index.values[np.in1d(self._prop, other)]
         return self._parent.subpopulation(pop)
 
     def le(self, other):
@@ -82,7 +82,7 @@ class _MatrixEdgeIndexer(object):
         return self._parent.subedges(idxx)
 
     def isin(self, other):
-        idxx = self._prop == other
+        idxx = np.isin(self._prop, other)
         return self._parent.subedges(idxx)
 
     def le(self, other):
