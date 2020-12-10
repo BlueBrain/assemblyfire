@@ -41,9 +41,9 @@ def get_seeds(root_path):
     return seeds
 
 
-def get_patterns(patterns_path):
+def get_patterns(patterns_fname):
     """Return list of patterns presented during the simulation"""
-    with open(patterns_path, "r") as f:
+    with open(patterns_fname, "r") as f:
         patterns = [line.strip() for line in f]
     return patterns
 
