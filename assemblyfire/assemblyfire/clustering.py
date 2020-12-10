@@ -254,7 +254,7 @@ def cluster_spikes(spike_matrix_dict, method, FigureArgs):
             sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix)
 
             fig_name = os.path.join(FigureArgs.fig_path, "similarity_matrix_seed%i.png" % seed)
-            plot_sim_matrix(sim_matrix, FigureArgs.patterns, t_bins, fig_name)
+            plot_sim_matrix(sim_matrix, t_bins, FigureArgs.patterns, FigureArgs.stim_times, fig_name)
             fig_name = os.path.join(FigureArgs.fig_path, "Ward_clustering_seed%i.png" % seed)
             plot_dendogram_silhouettes(clusters, *plotting, fig_name)
 

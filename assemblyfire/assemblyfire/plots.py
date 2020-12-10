@@ -20,7 +20,7 @@ sns.set(style="ticks", context="notebook")
 
 
 def plot_rate(rate, rate_th, t_start, t_end, fig_name):
-    """Plots thresholded rate (it's actually spike count)"""
+    """Plots thresholded rate"""
 
     fig = plt.figure(figsize=(20, 5))
     ax = fig.add_subplot(1, 1, 1)
@@ -30,22 +30,22 @@ def plot_rate(rate, rate_th, t_start, t_end, fig_name):
     ax.set_xlim([t_start, t_end])
     ax.set_xlabel("Time (ms)")
     ax.set_ylabel("Rate (spikes/(N*s))")
+    ax.set_ylim(bottom=0)
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 
 
-def _get_pattern_idx(t_bins):
+def _get_pattern_idx(t_bins, stim_times):
     """maps stimulus times to column idx in the spike_matrix
     Note: doesn't guarantee that the time bin is gonna be *after* the stim presentation"""
-
-    stim_times = np.arange(2000, 61001, 1000) # this is hard coded...
+    # TODO: update this to know if some patterns should be dropped...
     return [np.abs(t_bins - t).argmin() for t in stim_times]
 
 
-def plot_sim_matrix(sim_matrix, patterns, col_map, fig_name):
+def plot_sim_matrix(sim_matrix, t_bins, patterns, stim_times, fig_name):
     """Plots similarity matrix"""
 
-    t_idx = _get_pattern_idx(col_map)
+    t_idx = _get_pattern_idx(t_bins, stim_times)
     sim_mat = deepcopy(sim_matrix)
     np.fill_diagonal(sim_mat, np.nan)
 
