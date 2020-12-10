@@ -35,15 +35,16 @@ class TopologicalAnalysis(ConnectivityMatrix):
             description = "A custom population"
         self._populations[label] = (population, description)
 
-    def run(self, analysis, population):
+    def run(self, analysis, population, *args, **kwargs):
         #  TODO: Test if it is already int he results
         if analysis not in analysis_implementations.__dict__:
             raise ValueError("Analysis {0} unknown!".format(analysis))
         if population not in self._populations:
             raise ValueError("Population {0} undefined!".format(population))
         func = analysis_implementations.__dict__[analysis]
-        res = func.run(self._populations[population][0])
-        self._add_result(res, population, analysis)
+        label = kwargs.pop("analysis_label", analysis)
+        res = func.run(self._populations[population][0], *args, **kwargs)
+        self._add_result(res, population, label)
         return res
 
 
