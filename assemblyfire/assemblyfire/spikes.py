@@ -107,7 +107,7 @@ def spikes_to_h5(h5f_name, spike_matrix_dict, metadata, prefix):
             grp.attrs[k] = v
         for seed, SpikeMatrixResult in spike_matrix_dict.items():
             grp_out = grp.create_group("seed%i" % seed)
-            grp_out.create_dataset("spike_matrix", data=SpikeMatrixResult.spike_matrix)
+            grp_out.create_dataset("spike_matrix", data=SpikeMatrixResult.spike_matrix, compression="gzip")
             grp_out.create_dataset("gids", data=SpikeMatrixResult.gids)
             grp_out.create_dataset("t_bins", data=SpikeMatrixResult.t_bins)
 
@@ -141,8 +141,8 @@ class SpikeMatrixGroup(object):
         return self.config["root_path"]
 
     @property
-    def patterns_path(self):
-        return self.config["patterns_path"]
+    def patterns_fname(self):
+        return self.config["patterns_fname"]
 
     @property
     def h5f_name(self):
@@ -169,12 +169,30 @@ class SpikeMatrixGroup(object):
         return self.config["preprocessing_protocol"]["t_start"]
 
     @property
+    def t_start_exception(self):
+        if "t_start_exception" in self.config["preprocessing_protocol"]:
+            return self.config["preprocessing_protocol"]["t_start_exception"]
+        else:
+            return self.t_start
+
+    @property
+    def seeds_exception(self):
+        if "seeds_exception" in self.config["preprocessing_protocol"]:
+            return self.config["preprocessing_protocol"]["seeds_exception"]
+        else:
+            return []
+
+    @property
     def t_end(self):
         return self.config["preprocessing_protocol"]["t_end"]
 
     @property
     def bin_size(self):
         return self.config["preprocessing_protocol"]["bin_size"]
+
+    @property
+    def threshold_rate(self):
+        return self.config["preprocessing_protocol"]["threshold_rate"]
 
     @property
     def clustering_method(self):
@@ -189,17 +207,23 @@ class SpikeMatrixGroup(object):
     @cached_property
     def patterns(self):
         from assemblyfire.utils import get_patterns
-        return get_patterns(self.root_path)
+        return get_patterns(self.patterns_fname)
+
+    @cached_property
+    def stim_times(self):
+        """This assumes that one specified t_start 1000 ms before the first stimuli,
+        and t_end 1000 ms after the last one... (which cannot be guaranteed)"""
+        return np.linspace(self.t_start+1000, self.t_end-1000, len(self.patterns))
 
     def get_blueconfig_path(self, seed):
         return os.path.join(self.root_path, "stimulusstim_a0", "seed%i" % seed, "BlueConfig")
 
-    def load_spikes(self, seed):
+    def load_spikes(self, seed, t_start):
         """Loads in spikes from simulations using bluepy"""
         from assemblyfire.utils import get_E_gids, get_spikes
         sim = get_bluepy_simulation(self.get_blueconfig_path(seed))
         gids = get_E_gids(sim.circuit, sim.target)
-        spike_times, spiking_gids = get_spikes(sim, gids, self.t_start, self.t_end)
+        spike_times, spiking_gids = get_spikes(sim, gids, t_start, self.t_end)
         return spike_times, spiking_gids
 
     def get_sign_spike_matrices(self):
@@ -208,24 +232,29 @@ class SpikeMatrixGroup(object):
 
         spike_matrix_dict = {}
         for seed in tqdm(self.seeds, desc="Loading in simulation results"):
-            spike_times, spiking_gids = self.load_spikes(seed)
+            t_start = self.t_start if seed not in self.seeds_exception else self.t_start_exception
+            spike_times, spiking_gids = self.load_spikes(seed, t_start)
             spike_matrix, gids, t_bins = spikes2mat(spike_times, spiking_gids,
-                                                    self.t_start, self.t_end, self.bin_size)
+                                                    t_start, self.t_end, self.bin_size)
             assert (spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1)))
-
-            # threshold rate: this could be a separate function...
-            # but then one would need to store `spike_times` and `spiking_gids`
             rate = calc_rate(spike_matrix)
-            # get sign threshold (compare to Monte-Carlo shuffles)
-            rate_th = sign_rate_std(spike_times, spiking_gids,
-                                    self.t_start, self.t_end, self.bin_size)
+
+            if self.threshold_rate:
+                # this could be a separate function but then one would need to store `spike_times` and `spiking_gids`
+                rate_th = sign_rate_std(spike_times, spiking_gids,
+                                        t_start, self.t_end, self.bin_size)
+                # get ids of significant (above threshold) time bins
+                t_idx = np.where(rate > np.mean(rate) + rate_th)[0]
+                spike_matrix_dict[seed] = SpikeMatrixResult(spike_matrix[:, t_idx], gids, t_bins[t_idx])
+            else:
+                rate_th = np.nan
+                spike_matrix_dict[seed] = SpikeMatrixResult(spike_matrix, gids, t_bins)
+
             # plotting rate
             rate_norm = get_rate_norm(len(np.unique(spiking_gids)), self.bin_size)
             fig_name = os.path.join(self.fig_path, "rate_seed%i.png" % seed)
-            plot_rate(rate / rate_norm, rate_th / rate_norm, self.t_start, self.t_end, fig_name)
-            # get ids of significant (above threshold) time bins
-            t_idx = np.where(rate > np.mean(rate) + rate_th)[0]
-            spike_matrix_dict[seed] = SpikeMatrixResult(spike_matrix[:, t_idx], gids, t_bins[t_idx])
+            plot_rate(rate/rate_norm, rate_th/rate_norm, t_start, self.t_end, fig_name)
+
         # save spikes to h5
         metadata = {"root_path": self.root_path, "seeds": self.seeds, "patterns": self.patterns}
         spikes_to_h5(self.h5f_name, spike_matrix_dict, metadata, prefix=self.h5_prefix_spikes)
@@ -239,7 +268,8 @@ class SpikeMatrixGroup(object):
         indiv_gids = []
         ts_in_bin = {}
         for seed in tqdm(self.seeds, desc="Loading in simulation results"):
-            spike_times, spiking_gids = self.load_spikes(seed)
+            t_start = self.t_start if seed not in self.seeds_exception else self.t_start_exception
+            spike_times, spiking_gids = self.load_spikes(seed, t_start)
             indiv_gids.extend(np.unique(spiking_gids).tolist())
             ts_in_bin[seed] = get_ts_in_bin(spike_times, spiking_gids, self.bin_size)
 
@@ -258,10 +288,11 @@ class SpikeMatrixGroup(object):
 
     def convolve_spike_matrix(self, seed):
         """Bins spikes and convolves it with a 1D Gaussian kernel row-by-row"""
-        spike_times, spiking_gids = self.load_spikes(seed)
+        t_start = self.t_start if seed not in self.seeds_exception else self.t_start_exception
+        spike_times, spiking_gids = self.load_spikes(seed, t_start)
         # bin size = 1 ms and kernel's std = 0.5 ms from Nolte et al. 2019
         spike_matrix, gids, _ = spikes2mat(spike_times, spiking_gids,
-                                           self.t_start, self.t_end, bin_size=1)
+                                           t_start, self.t_end, bin_size=1)
         assert (spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1)))
         return spike_train_convolution(spike_matrix, std=0.5), gids
 
