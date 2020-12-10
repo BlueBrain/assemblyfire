@@ -72,6 +72,40 @@ class _MatrixNodeIndexer(object):
         return self._parent.subpopulation(sample_gids)
 
 
+class _MatrixEdgeIndexer(object):
+    def __init__(self, parent, prop_name):
+        self._parent = parent
+        self._prop = parent._edges[prop_name]
+
+    def eq(self, other):
+        idxx = self._prop == other
+        return self._parent.subedges(idxx)
+
+    def isin(self, other):
+        idxx = self._prop == other
+        return self._parent.subedges(idxx)
+
+    def le(self, other):
+        idxx = self._prop <= other
+        return self._parent.subedges(idxx)
+
+    def lt(self, other):
+        idxx = self._prop < other
+        return self._parent.subedges(idxx)
+
+    def ge(self, other):
+        idxx = self._prop >= other
+        return self._parent.subedges(idxx)
+
+    def gt(self, other):
+        idxx = self._prop > other
+        return self._parent.subedges(idxx)
+
+    def full_sweep(self, direction='decreasing'):
+        #  For an actual filtration. Take all values and sweep
+        raise NotImplementedError()
+
+
 class ConnectivityMatrix(object):
     """Small utility class to hold a connections matrix and generate submatrices"""
     def __init__(self, *args, vertex_labels=None, vertex_properties=None,
@@ -147,7 +181,17 @@ class ConnectivityMatrix(object):
     def matrix_(self, edge_property=None):
         if edge_property is None:
             edge_property = self._default_edge
-        return sparse.coo_matrix((self._edges[edge_property], (self._edges['row'], self._edges['col'])))
+        return sparse.coo_matrix((self._edges[edge_property], (self._edges['row'], self._edges['col'])),
+                                 shape=self._shape)
+
+    @property
+    def edge_properties(self):
+        # TODO: Maybe exclude 'row' and 'col'?
+        return self._edges.columns.values
+
+    @property
+    def vertex_properties(self):
+        return self._vertex_properties.columns.values
 
     @property
     def matrix(self):
@@ -169,6 +213,9 @@ class ConnectivityMatrix(object):
 
     def index(self, prop_name):
         return _MatrixNodeIndexer(self, prop_name)
+
+    def filter(self, prop_name):
+        return _MatrixEdgeIndexer(self, prop_name)
 
     @staticmethod
     def __extract_vertex_ids__(an_obj):
@@ -216,7 +263,7 @@ class ConnectivityMatrix(object):
         population
         :return: the adjacency submatrix of the specified population(s).
         """
-        m = self.matrix_(edge_property=edge_property)
+        m = self.matrix_(edge_property=edge_property).tocsc()
         if sub_gids_post is not None:
             return m[np.ix_(self._lookup[self.__extract_vertex_ids__(sub_gids)],
                             self._lookup[self.__extract_vertex_ids__(sub_gids_post)])]
@@ -236,13 +283,28 @@ class ConnectivityMatrix(object):
             raise NotImplementedError()
         assert np.all(np.in1d(subpop_ids, self._vertex_properties.index.values))
 
-        out_edges = pandas.DataFrame(dict([(prop,
-                                            self.submatrix(subpop_ids, edge_property=prop).data)
-                                           for prop in self._edges.columns]
-                                          )
-                                     )
-        out_vertices = self._vertex_properties[subpop_ids]
+        tmp_submat = self.submatrix(subpop_ids).tocoo()
+        out_edges = {'row': tmp_submat.row, 'col': tmp_submat.col}
+        for edge_prop in self.edge_properties:
+            if edge_prop not in ['row', 'col']:
+                out_edges[edge_prop] = self.submatrix(subpop_ids, edge_property=edge_prop).data
+        out_edges = pandas.DataFrame(out_edges)
+        out_vertices = self._vertex_properties.loc[subpop_ids]
         return ConnectivityMatrix(out_edges, vertex_properties=out_vertices, shape=(len(subpop_ids), len(subpop_ids)),
+                                  default_edge_property=self._default_edge)
+
+    def subedges(self, subedge_indices, copy=True):
+        """A ConnectivityMatrix object representing the specified subpopulation"""
+        if not copy:
+            #  TODO: Return a view on this object
+            raise NotImplementedError()
+
+        if subedge_indices.dtype == bool:
+            out_edges = self._edges[subedge_indices]
+        else:
+            out_edges = self._edges.iloc[subedge_indices]
+        return ConnectivityMatrix(out_edges, vertex_properties=self._vertex_properties,
+                                  shape=self._shape,
                                   default_edge_property=self._default_edge)
         
     def sample_vertices_n_neurons(self, ref_gids, sub_gids=None):
@@ -272,7 +334,7 @@ class ConnectivityMatrix(object):
         
     def sample_matrix_n_neurons(self, ref_gids, sub_gids=None):
         idx = self._lookup[self.sample_vertices_n_neurons(ref_gids, sub_gids)]
-        return self.matrix[np.ix_(idx, idx)]
+        return self.matrix.tocsc()[np.ix_(idx, idx)]
 
     def dense_sample_n_neurons(self, ref_gids, sub_gids=None):
         return self.sample_matrix_n_neurons(ref_gids, sub_gids).todense()
