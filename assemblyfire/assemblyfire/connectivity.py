@@ -12,6 +12,36 @@ import numpy as np
 import pandas
 
 
+class _MatrixNodeIndexer(object):
+    def __init__(self, parent, prop_name):
+        self._parent = parent
+        self._prop = parent._vertex_properties[prop_name]
+
+    def eq(self, other):
+        pop = self._parent._vertex_properties.index.values[self._prop == other]
+        return self._parent.subpopulation(pop)
+
+    def isin(self, other):
+        pop = self._parent._vertex_properties.index.values[np.in1d(self._prop == other)]
+        return self._parent.subpopulation(pop)
+
+    def le(self, other):
+        pop = self._parent._vertex_properties.index.values[self._prop <= other]
+        return self._parent.subpopulation(pop)
+
+    def lt(self, other):
+        pop = self._parent._vertex_properties.index.values[self._prop < other]
+        return self._parent.subpopulation(pop)
+
+    def ge(self, other):
+        pop = self._parent._vertex_properties.index.values[self._prop >= other]
+        return self._parent.subpopulation(pop)
+
+    def gt(self, other):
+        pop = self._parent._vertex_properties.index.values[self._prop > other]
+        return self._parent.subpopulation(pop)
+
+
 class ConnectivityMatrix(object):
     """Small utility class to hold a connections matrix and generate submatrices"""
     def __init__(self, *args, vertex_labels=None, vertex_properties=None,
@@ -107,6 +137,9 @@ class ConnectivityMatrix(object):
     def array(self):
         return self.array_()
 
+    def index(self, prop_name):
+        return _MatrixNodeIndexer(self, prop_name)
+
     @staticmethod
     def __extract_vertex_ids__(an_obj):
         from assemblyfire.assemblies import Assembly
@@ -145,7 +178,7 @@ class ConnectivityMatrix(object):
                                         index=gids)
         return cls(adj_mat, vertex_properties=vertex_props)
 
-    def submatrix(self, sub_gids, sub_gids_post=None):
+    def submatrix(self, sub_gids, edge_property=None, sub_gids_post=None):
         """
         Return a submatrix specified by `sub_gids`
         :param sub_gids: Subpopulation to get the submatrix for. Can be either a list of gids, or an Assembly object
@@ -153,17 +186,34 @@ class ConnectivityMatrix(object):
         population
         :return: the adjacency submatrix of the specified population(s).
         """
+        m = self.matrix_(edge_property=edge_property)
         if sub_gids_post is not None:
-            return self.matrix[np.ix_(self._lookup[self.__extract_vertex_ids__(sub_gids)],
-                                      self._lookup[self.__extract_vertex_ids__(sub_gids_post)])]
+            return m[np.ix_(self._lookup[self.__extract_vertex_ids__(sub_gids)],
+                            self._lookup[self.__extract_vertex_ids__(sub_gids_post)])]
         idx = self._lookup[self.__extract_vertex_ids__(sub_gids)]
-        return self.matrix[np.ix_(idx, idx)]
+        return m[np.ix_(idx, idx)]
 
-    def dense_submatrix(self, sub_gids, sub_gids_post=None):
-        return self.submatrix(sub_gids, sub_gids_post=sub_gids_post).todense()
+    def dense_submatrix(self, sub_gids, edge_property=None, sub_gids_post=None):
+        return self.submatrix(sub_gids, edge_property=edge_property, sub_gids_post=sub_gids_post).todense()
 
-    def subarray(self, sub_gids, sub_gids_post=None):
-        return np.array(self.dense_submatrix(sub_gids, sub_gids_post=sub_gids_post))
+    def subarray(self, sub_gids, edge_property=None, sub_gids_post=None):
+        return np.array(self.dense_submatrix(sub_gids, edge_property=edge_property, sub_gids_post=sub_gids_post))
+
+    def subpopulation(self, subpop_ids, copy=True):
+        """A ConnectivityMatrix object representing the specified subpopulation"""
+        if not copy:
+            #  TODO: Return a view on this object
+            raise NotImplementedError()
+        assert np.all(np.in1d(subpop_ids, self._vertex_properties.index.values))
+
+        out_edges = pandas.DataFrame(dict([(prop,
+                                            self.submatrix(subpop_ids, edge_property=prop).data)
+                                           for prop in self._edges.columns]
+                                          )
+                                     )
+        out_vertices = self._vertex_properties[subpop_ids]
+        return ConnectivityMatrix(out_edges, vertex_properties=out_vertices, shape=(len(subpop_ids), len(subpop_ids)),
+                                  default_edge_property=self._default_edge)
         
     def sample_vertices_n_neurons(self, ref_gids, sub_gids=None):
         """
