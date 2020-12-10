@@ -1,6 +1,6 @@
 root_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/random_stream_20trials"
 
-patterns_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/spiketrains/random_stream_60/stim.dat"
+patterns_fname: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/spiketrains/random_stream_60.txt"
 
 h5_out:
     file_name: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/random_stream_20trials/assemblies_simmat.h5"
@@ -16,6 +16,7 @@ preprocessing_protocol:
     t_start: 1000
     t_end: 62000
     bin_size: 10
+    threshold_rate: True
 
 clustering_methods:
     spikes: "hierarchical"
