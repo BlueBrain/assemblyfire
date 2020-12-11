@@ -214,8 +214,15 @@ class ConnectivityMatrix(object):
     def index(self, prop_name):
         return _MatrixNodeIndexer(self, prop_name)
 
-    def filter(self, prop_name):
+    def filter(self, prop_name=None):
+        if prop_name is None:
+            prop_name = self._default_edge
         return _MatrixEdgeIndexer(self, prop_name)
+
+    def default(self, new_default_property):
+        assert new_default_property in self.edge_properties, "Edge property {0} unknown!".format(new_default_property)
+        return ConnectivityMatrix(self._edges, vertex_properties=self._vertex_properties, shape=self._shape,
+                                  default_edge_property=new_default_property)
 
     @staticmethod
     def __extract_vertex_ids__(an_obj):
