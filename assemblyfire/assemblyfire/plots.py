@@ -29,7 +29,7 @@ def plot_rate(rate, rate_th, t_start, t_end, fig_name):
     ax.axhline(np.mean(rate)+rate_th, color="gray", ls="--")
     ax.set_xlim([t_start, t_end])
     ax.set_xlabel("Time (ms)")
-    ax.set_ylabel("Rate (spikes/(N*s))")
+    ax.set_ylabel("Rate (Hz)")
     ax.set_ylim(bottom=0)
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -181,7 +181,7 @@ def plot_dendogram_silhouettes(clusters, linkage, silhouettes, fig_name):
 
 def _group_by_patterns(clusters, t_bins, stim_times, patterns):
     """reorders time series (of clusters) based on patterns
-    returns a matrix for each pattern (max stim*max length)"""
+    returns a matrix for each pattern (max n stims * max length)"""
 
     pattern_names, counts = np.unique(patterns, return_counts=True)
     max_count = np.max(counts)
@@ -190,11 +190,11 @@ def _group_by_patterns(clusters, t_bins, stim_times, patterns):
     extended_pattern_idx = []
     for t_start, t_end in zip(pattern_idx[:-1], pattern_idx[1:]):
         extended_pattern_idx.append(np.arange(t_start, t_end))
-    extended_pattern_idx.append(np.arange(pattern_idx[-1], len(t_bins)))
+    extended_pattern_idx.append(np.arange(pattern_idx[-1], len(t_bins)-1))
     max_len = np.max([len(idx) for idx in extended_pattern_idx])
 
-    pattern_matrices = {pattern:np.full((max_count, max_len), np.nan) for pattern in pattern_names}
-    row_idx = {pattern:0 for pattern in pattern_names}
+    pattern_matrices = {pattern: np.full((max_count, max_len), np.nan) for pattern in pattern_names}
+    row_idx = {pattern: 0 for pattern in pattern_names}
     for pattern, idx in zip(patterns, extended_pattern_idx):
         clusters_slice = clusters[idx]
         pattern_matrices[pattern][row_idx[pattern], 0:len(clusters_slice)] = clusters_slice
@@ -206,7 +206,7 @@ def _group_by_patterns(clusters, t_bins, stim_times, patterns):
 def update(changed_image):
     """mpl hack to set 1 colorbar for multiple images"""
     for im in images:
-        if (changed_image.get_cmap() != im.get_cmap() or changed_image.get_clim() != im.get_clim()):
+        if changed_image.get_cmap() != im.get_cmap() or changed_image.get_clim() != im.get_clim():
             im.set_cmap(changed_image.get_cmap())
             im.set_clim(changed_image.get_clim())
 
