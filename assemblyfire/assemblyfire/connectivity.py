@@ -460,7 +460,7 @@ class ConnectivityMatrix(object):
         if prefix is None:
             prefix = "connectivity"
         if group_name is None:
-            prefix = "full_matrix"
+            group_name = "full_matrix"
         full_prefix = prefix + "/" + group_name
         self._vertex_properties.to_hdf(fn, key=full_prefix + "/vertex_properties")
         self._edges.to_hdf(fn, key=full_prefix + "/edges")
