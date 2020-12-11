@@ -220,6 +220,7 @@ class ConnectivityMatrix(object):
         return self.array_()
 
     def index(self, prop_name):
+        assert prop_name in self._vertex_properties, "vertex property should be in " + str(self.vertex_properties)
         return _MatrixNodeIndexer(self, prop_name)
 
     def filter(self, prop_name=None):

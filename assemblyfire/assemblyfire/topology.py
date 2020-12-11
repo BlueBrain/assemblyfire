@@ -53,7 +53,8 @@ class NetworkAssembly(ConnectivityMatrix):
     A class derived from ConnectivityMatrix with additional information on networks metrics
     of the subgraph associated to an assembly within the connectivity matrix of the circuit.
     """
-        
+    def __extract_gids__(self,sub_gids):
+        return self.__extract_vertex_ids__(sub_gids)
     def degree(self, sub_gids=None, kind="in"):
         """Return in/out degrees of the subgraph, if None compute on the whole graph"""
         if sub_gids is not None:
