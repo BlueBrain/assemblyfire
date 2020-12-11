@@ -29,7 +29,7 @@ L = logging.getLogger("assemblyfire")
 
 
 # hierarchical clustering (using scipy and sklearn)
-def cluster_sim_mat(spike_matrix):
+def cluster_sim_mat(spike_matrix, min_n_clusts=4, max_n_clusts=20):
     """Hieararchical (Ward linkage) clustering of cosine similarity matrix of significant time bins"""
 
     cond_dists = pdist(spike_matrix.T, metric="cosine")
@@ -40,10 +40,10 @@ def cluster_sim_mat(spike_matrix):
 
     # determine number of clusters using silhouette scores
     silhouette_scores = []
-    for n in range(4, 21):
+    for n in range(min_n_clusts, max_n_clusts+1):
         clusters = fcluster(linkage, n, criterion="maxclust")
         silhouette_scores.append(silhouette_score(dists, clusters))
-    n_clust = np.argmax(silhouette_scores) + 4
+    n_clust = np.argmax(silhouette_scores) + min_n_clusts
 
     clusters = fcluster(linkage, int(n_clust), criterion="maxclust")
     silhouettes = silhouette_samples(dists, clusters)
