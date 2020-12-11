@@ -1,0 +1,25 @@
+root_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/random_stream_20trials_set2"
+
+patterns_fname: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/spiketrains/random_stream_60_2sets.txt"
+
+h5_out:
+    file_name: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/random_stream_20trials_set2/assemblies.h5"
+    prefixes:
+        spikes: "spikes"
+        assemblies: "assemblies"
+        consensus_assemblies: "consensus"
+        connectivity: "connectivity"
+
+root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures"
+
+preprocessing_protocol:
+    t_start: 2000
+    t_start_exception: 4000
+    seeds_exception: [973121]
+    t_end: 63000
+    bin_size: 10
+    threshold_rate: True
+
+clustering_methods:
+    spikes: "hierarchical"
+    assemblies: "hamming"
