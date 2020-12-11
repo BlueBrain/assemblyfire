@@ -37,27 +37,21 @@ def get_seeds(root_path):
     """Reads sim seeds from simwriter generated file"""
     f_name = os.path.join(root_path, "project_simulations.txt")
     with open(f_name, "r") as f:
-        seeds = [int(l.strip().split('/')[-1][4:]) for l in f]
+        seeds = [int(line.strip().split('/')[-1][4:]) for line in f]
     return seeds
 
 
-def get_patterns(root_path):
+def get_stim_times(patterns_fname):
+    """Return list of stimulus times used during the simulation"""
+    with open(patterns_fname, "r") as f:
+        stim_times = [int(line.strip().split()[0]) for line in f]
+    return stim_times
+
+
+def get_patterns(patterns_fname):
     """Return list of patterns presented during the simulation"""
-
-    # get spike train name from json
-    proj_name = root_path.split('/')[-1]
-    jf_name = os.path.join(root_path, "%s.json" % proj_name)
-    with open(jf_name, "rb") as f:
-        configs = json.load(f)
-        for param in configs["project_parameters"]:
-            if param["name"] == "stimulus":
-                spike_train_dir = param["kwargs"]["spike_train_dir"]
-    spike_train_name = spike_train_dir.split('/')[-2]
-
-    # load in pattern order txt saved by `spikewriter.py`
-    f_name = os.path.join("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/spiketrains", "%s.txt" % spike_train_name)
-    with open(f_name, "r") as f:
-        patterns = [line.strip() for line in f]
+    with open(patterns_fname, "r") as f:
+        patterns = [line.strip().split()[1] for line in f]
     return patterns
 
 
