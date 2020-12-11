@@ -183,6 +183,13 @@ class SpikeMatrixGroup(object):
             return []
 
     @property
+    def ignore_seeds(self):
+        if "ignore_seeds" in self.config["preprocessing_protocol"]:
+            return self.config["preprocessing_protocol"]["ignore_seeds"]
+        else:
+            return []
+
+    @property
     def t_end(self):
         return self.config["preprocessing_protocol"]["t_end"]
 
@@ -231,6 +238,8 @@ class SpikeMatrixGroup(object):
 
         spike_matrix_dict = {}
         for seed in tqdm(self.seeds, desc="Loading in simulation results"):
+            if seed in self.ignore_seeds:
+                pass
             t_start = self.t_start if seed not in self.seeds_exception else self.t_start_exception
             spike_times, spiking_gids = self.load_spikes(seed, t_start)
             spike_matrix, gids, t_bins = spikes2mat(spike_times, spiking_gids,
