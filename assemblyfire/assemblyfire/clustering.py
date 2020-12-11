@@ -254,7 +254,7 @@ def cluster_spikes(spike_matrix_dict, method, FigureArgs):
             sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix)
 
             fig_name = os.path.join(FigureArgs.fig_path, "similarity_matrix_seed%i.png" % seed)
-            plot_sim_matrix(sim_matrix, t_bins, FigureArgs.patterns, FigureArgs.stim_times, fig_name)
+            plot_sim_matrix(sim_matrix, t_bins, FigureArgs.stim_times, FigureArgs.patterns, fig_name)
             fig_name = os.path.join(FigureArgs.fig_path, "Ward_clustering_seed%i.png" % seed)
             plot_dendogram_silhouettes(clusters, *plotting, fig_name)
 
@@ -264,7 +264,7 @@ def cluster_spikes(spike_matrix_dict, method, FigureArgs):
             clusters, plotting = db_clustering(pca_transformed)
 
             fig_name = os.path.join(FigureArgs.fig_path, "PCA_transformed_seed%i.png" % seed)
-            plot_transformed(pca_transformed, FigureArgs.patterns, t_bins, fig_name)
+            plot_transformed(pca_transformed, t_bins, FigureArgs.stim_times, FigureArgs.patterns, fig_name)
             fig_name = os.path.join(FigureArgs.fig_path, "PCA_components_seed%i.png" % seed)
             plot_components(pca_components, SpikeMatrixResult.gids, FigureArgs.depths, fig_name)
             fig_name = os.path.join(FigureArgs.fig_path, "rho_delta_seed%i.png" % seed)
@@ -272,7 +272,7 @@ def cluster_spikes(spike_matrix_dict, method, FigureArgs):
 
         clusters_dict[seed] = clusters
         fig_name = os.path.join(FigureArgs.fig_path, "clusters_seed%i.png" % seed)
-        plot_cluster_seqs(clusters, FigureArgs.patterns, t_bins, fig_name)
+        plot_cluster_seqs(clusters, t_bins, FigureArgs.stim_times, FigureArgs.patterns, fig_name)
 
     return clusters_dict
 

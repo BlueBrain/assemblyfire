@@ -205,15 +205,14 @@ class SpikeMatrixGroup(object):
         return get_seeds(self.root_path)
 
     @cached_property
+    def stim_times(self):
+        from assemblyfire.utils import get_stim_times
+        return get_stim_times(self.patterns_fname)
+
+    @cached_property
     def patterns(self):
         from assemblyfire.utils import get_patterns
         return get_patterns(self.patterns_fname)
-
-    @cached_property
-    def stim_times(self):
-        """This assumes that one specified t_start 1000 ms before the first stimuli,
-        and t_end 1000 ms after the last one... (which cannot be guaranteed)"""
-        return np.linspace(self.t_start+1000, self.t_end-1000, len(self.patterns))
 
     def get_blueconfig_path(self, seed):
         return os.path.join(self.root_path, "stimulusstim_a0", "seed%i" % seed, "BlueConfig")
@@ -256,7 +255,8 @@ class SpikeMatrixGroup(object):
             plot_rate(rate/rate_norm, rate_th/rate_norm, t_start, self.t_end, fig_name)
 
         # save spikes to h5
-        metadata = {"root_path": self.root_path, "seeds": self.seeds, "patterns": self.patterns}
+        metadata = {"root_path": self.root_path, "seeds": self.seeds,
+                    "stim_times": self.stim_times, "patterns": self.patterns}
         spikes_to_h5(self.h5f_name, spike_matrix_dict, metadata, prefix=self.h5_prefix_spikes)
 
         return spike_matrix_dict

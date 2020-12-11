@@ -37,14 +37,21 @@ def get_seeds(root_path):
     """Reads sim seeds from simwriter generated file"""
     f_name = os.path.join(root_path, "project_simulations.txt")
     with open(f_name, "r") as f:
-        seeds = [int(l.strip().split('/')[-1][4:]) for l in f]
+        seeds = [int(line.strip().split('/')[-1][4:]) for line in f]
     return seeds
+
+
+def get_stim_times(patterns_fname):
+    """Return list of stimulus times used during the simulation"""
+    with open(patterns_fname, "r") as f:
+        stim_times = [int(line.strip().split()[0]) for line in f]
+    return stim_times
 
 
 def get_patterns(patterns_fname):
     """Return list of patterns presented during the simulation"""
     with open(patterns_fname, "r") as f:
-        patterns = [line.strip() for line in f]
+        patterns = [line.strip().split()[1] for line in f]
     return patterns
 
 

@@ -11,7 +11,7 @@ from assemblyfire.spikes import SpikeMatrixGroup
 from assemblyfire.clustering import cluster_spikes, detect_assemblies
 
 L = logging.getLogger("assemblyfire")
-FigureArgs = namedtuple("FigureArgs", ["patterns", "stim_times", "depths", "ystuff", "fig_path"])
+FigureArgs = namedtuple("FigureArgs", ["stim_times", "patterns", "depths", "ystuff", "fig_path"])
 
 
 def run(config_path):
@@ -33,7 +33,7 @@ def run(config_path):
     spike_matrix_dict = spikes.get_sign_spike_matrices()
     L.info(" Cluster time bins via %s clustering..." % spikes.clustering_method)
     clusters_dict = cluster_spikes(spike_matrix_dict, method=spikes.clustering_method,
-                                   FigureArgs=FigureArgs(spikes.patterns, spikes.stim_times,
+                                   FigureArgs=FigureArgs(spikes.stim_times, spikes.patterns,
                                                          depths, None, spikes.fig_path))
     L.info(" Detecting assemblies within clustered time bins and saving them to file...")
     detect_assemblies(spike_matrix_dict, clusters_dict, spikes.h5f_name, spikes.h5_prefix_assemblies,

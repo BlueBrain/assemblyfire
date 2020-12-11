@@ -38,11 +38,10 @@ def plot_rate(rate, rate_th, t_start, t_end, fig_name):
 def _get_pattern_idx(t_bins, stim_times):
     """maps stimulus times to column idx in the spike_matrix
     Note: doesn't guarantee that the time bin is gonna be *after* the stim presentation"""
-    # TODO: update this to know if some patterns should be dropped...
     return [np.abs(t_bins - t).argmin() for t in stim_times]
 
 
-def plot_sim_matrix(sim_matrix, t_bins, patterns, stim_times, fig_name):
+def plot_sim_matrix(sim_matrix, t_bins, stim_times, patterns, fig_name):
     """Plots similarity matrix"""
 
     t_idx = _get_pattern_idx(t_bins, stim_times)
@@ -63,10 +62,10 @@ def plot_sim_matrix(sim_matrix, t_bins, patterns, stim_times, fig_name):
     plt.close(fig)
 
 
-def plot_transformed(transformed, patterns, t_bins, fig_name):
+def plot_transformed(transformed, t_bins, stim_times, patterns, fig_name):
     """Plots time series in factor analysis/PCA space"""
 
-    t_idx = _get_pattern_idx(t_bins)
+    t_idx = _get_pattern_idx(t_bins, stim_times)
     transformed_T = transformed.T
 
     fig = plt.figure(figsize=(20, 8))
@@ -180,14 +179,14 @@ def plot_dendogram_silhouettes(clusters, linkage, silhouettes, fig_name):
     plt.close(fig)
 
 
-def _group_by_patterns(clusters, t_bins, patterns):
+def _group_by_patterns(clusters, t_bins, stim_times, patterns):
     """reorders time series (of clusters) based on patterns
     returns a matrix for each pattern (max stim*max length)"""
 
     pattern_names, counts = np.unique(patterns, return_counts=True)
     max_count = np.max(counts)
 
-    pattern_idx = _get_pattern_idx(t_bins)
+    pattern_idx = _get_pattern_idx(t_bins, stim_times)
     extended_pattern_idx = []
     for t_start, t_end in zip(pattern_idx[:-1], pattern_idx[1:]):
         extended_pattern_idx.append(np.arange(t_start, t_end))
@@ -212,13 +211,13 @@ def update(changed_image):
             im.set_clim(changed_image.get_clim())
 
 
-def plot_cluster_seqs(clusters, patterns, t_bins, fig_name):
+def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
     """plots sequence of time bins color coded by clusters"""
 
     cmap = plt.cm.get_cmap("tab20", len(np.unique(clusters)))
     images = []
 
-    t_idx, pattern_matrices, row_idx = _group_by_patterns(clusters, t_bins, patterns)
+    t_idx, pattern_matrices, row_idx = _group_by_patterns(clusters, t_bins, stim_times, patterns)
     clusters = np.reshape(clusters, (1, len(clusters)))
 
     fig = plt.figure(figsize=(20, 8))
