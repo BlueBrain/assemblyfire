@@ -175,6 +175,14 @@ class ConnectivityMatrix(object):
         # TODO: calling it "gids" might be too BlueBrain-specific! Change name?
         self.gids = self._vertex_properties.index.values
 
+    def __len__(self):
+        return len(self.gids)
+
+    def add_vertex_property(self, new_label, new_values):
+        assert len(new_values) == len(self), "New values size mismatch"
+        assert new_label not in self._vertex_properties, "Property {0} already exists!".format(new_label)
+        self._vertex_properties[new_label] = new_values
+
     def __make_lookup__(self):
         return pandas.Series(np.arange(self._shape[0]), index=self._vertex_properties.index)
 
