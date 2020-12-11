@@ -41,7 +41,7 @@ class _MatrixNodeIndexer(object):
         pop = self._parent._vertex_properties.index.values[self._prop > other]
         return self._parent.subpopulation(pop)
 
-    def random_numerical(self, ref, n_bins=50):
+    def random_numerical_gids(self, ref, n_bins=50):
         all_gids = self._prop.index.values
         ref_gids = self._parent.__extract_vertex_ids__(ref)
         assert np.isin(ref_gids, all_gids).all(), "Reference gids are not part of the connectivity matrix"
@@ -55,9 +55,11 @@ class _MatrixNodeIndexer(object):
             idx = np.where(value_bins == i+1)[0]
             assert idx.shape[0] >= hist[i], "Not enough neurons at this depths to sample from"
             sample_gids.extend(np.random.choice(all_gids[idx], hist[i], replace=False).tolist())
-        return self._parent.subpopulation(sample_gids)
+        return sample_gids
+    def random_numerical(self, ref, n_bins=50):
+        return self._parent.subpopulation(self.random_numerical_gids(ref,n_bins))
 
-    def random_categorical(self, ref):
+    def random_categorical_gids(self, ref):
         all_gids = self._prop.index.values
         ref_gids = self._parent.__extract_vertex_ids__(ref)
         assert np.isin(ref_gids, all_gids).all(), "Reference gids are not part of the connectivity matrix"
@@ -69,7 +71,9 @@ class _MatrixNodeIndexer(object):
             idx = np.where(self._prop == mtype)[0]
             assert idx.shape[0] >= counts[i], "Not enough %s to sample from" % mtype
             sample_gids.extend(np.random.choice(all_gids[idx], counts[i], replace=False).tolist())
-        return self._parent.subpopulation(sample_gids)
+        return sample_gids
+    def random_categorical(self,ref):
+        return self._parent.subpopulation(self.random_categorical_gids(ref))
 
 
 class _MatrixEdgeIndexer(object):

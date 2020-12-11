@@ -67,7 +67,12 @@ class NetworkAssembly(ConnectivityMatrix):
             return np.sum(matrix, axis=1)
         else:
             ValueError("Need to specify 'in' or 'out' degree!")
-
+    def density(self,sub_gids=None):
+        if sub_gids is None:
+            m = self.matrix
+        else:
+            m = self.submatrix(sub_gids)
+        return m.getnnz()/np.prod(m.shape)
     def simplex_counts(self, sub_gids):
         """Return the simplex counts of submatrix specified by `sub_gids`"""
         import pyflagser
