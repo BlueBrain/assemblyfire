@@ -482,4 +482,5 @@ class ConnectivityMatrix(object):
             data_grp = h5[full_prefix]
             data_grp.attrs["NEUROTOP_SHAPE"] = self._shape
             data_grp.attrs["NEUROTOP_DEFAULT_EDGE"] = self._default_edge
+            data_grp.attrs["NEUROTOP_CLASS"] = "ConnectivityMatrix"
 
