@@ -252,7 +252,7 @@ class ConnectivityMatrix(object):
             depths = np.asarray(get_depths(sim.circuit, gids))
         else:  # probably SSCx
             from assemblyfire.utils import get_depths_SSCx
-            depths = get_depths_SSCx(gids)
+            depths = np.asarray(get_depths_SSCx(gids))
         mtypes = np.asarray(get_mtypes(sim.circuit, gids))
         conv = pandas.Series(np.arange(len(gids)), index=gids)
         indptr = [0]

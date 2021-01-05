@@ -9,6 +9,7 @@ import os
 import h5py
 from collections import namedtuple
 import numpy as np
+import pandas as pd
 
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
 SingleCellFeatures = namedtuple("SingleCellFeatures", ["gids", "r_spikes", "mean_ts", "std_ts"])
@@ -84,54 +85,33 @@ def get_depths(c, gids):
 
 
 def get_depths_SSCx(gids):
-    """Reads depth values from file saved by Sirio"""
+    """Reads depth values from file saved by Sirio and return bluepy style Series"""
 
-    depths = []
     # this is super hard coded ...
     f_name = "/gpfs/bbp.cscs.ch/data/scratch/proj83/home/bolanos/circuits/Bio_M/20200805/hexgrid/depths.txt"
-    with open(f_name, "r") as f:
-        for l in f:
-            gid = int(l.strip().split(" ")[0])
-            if gid in gids:
-                depths.append(float(l.strip().split()[1]))
-    return np.asarray(depths)
-
-
-def get_depths_dict_SSCx(gids):
-    """Reads depth values from file saved by Sirio and return a dict"""
-
-    depths = {}
-    # this is super hard coded ...
-    f_name = "/gpfs/bbp.cscs.ch/data/scratch/proj83/home/bolanos/circuits/Bio_M/20200805/hexgrid/depths.txt"
-    with open(f_name, "r") as f:
-        for l in f:
-            gid = int(l.strip().split(" ")[0])
-            if gid in gids:
-                depths[gid] = float(l.strip().split()[1])
-    return depths
+    data = np.genfromtxt(f_name)
+    idx = np.searchsorted(data[:, 0], gids)
+    return pd.Series(data[idx, 1], index=gids)
 
 
 def map_gids_to_depth(circuit_config, target, gids=[]):
-    """Creates gid-depth map (for better figure asthetics)"""
+    """Creates gid-depth map (for figure asthetics)"""
 
+    c = _get_bluepy_circuit(circuit_config)
+    if not len(gids):
+        gids = _get_gids(c, target)
     if target == "mc2_Column":  # O1.v5
-        c = _get_bluepy_circuit(circuit_config)
-        if not len(gids):
-            gids = _get_gids(c, target)
         ys = get_depths(c, gids)
-        # convert pd.Series to dictionary...
-        gids = np.asarray(ys.index)
-        depths = ys.values
-        return {gid: depths[i] for i, gid in enumerate(gids)}
-    else:  # probably SSCx
-        c = _get_bluepy_circuit(circuit_config)
-        if not len(gids):
-            gids = _get_gids(c, target)
-        return get_depths_dict_SSCx(gids)
+    else:
+        ys = get_depths_SSCx(gids)
+    # convert pd.Series to dictionary...
+    gids = np.asarray(ys.index)
+    depths = ys.values
+    return {gid: depths[i] for i, gid in enumerate(gids)}
 
 
 def get_layer_boundaries(circuit_config, target):
-    """Gets layer boundaries and cell numbers (used for raster plots)"""
+    """Gets layer boundaries and cell numbers (for figure asthetics)"""
 
     c = _get_bluepy_circuit(circuit_config)
     yticks = []
