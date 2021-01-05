@@ -6,7 +6,6 @@ author: András Ecker, last update: 12.2020
 """
 
 import os
-import json
 import h5py
 from collections import namedtuple
 import numpy as np
@@ -61,20 +60,11 @@ def _get_gids(c, target):
     return c.cells.ids({"$target": target})
 
 
-def get_E_gids(c, target="mc2_Column"):
+def get_E_gids(c, target):
     from bluepy.v2.enums import Cell
     import warnings
     warnings.simplefilter(action="ignore", category=FutureWarning)
     return c.cells.ids({"$target": target, Cell.SYNAPSE_CLASS: "EXC"})
-
-
-def get_EI_gids(c, target="mc2_Column"):
-    from bluepy.v2.enums import Cell
-    import warnings
-    warnings.simplefilter(action="ignore", category=FutureWarning)
-    gidsE = get_E_gids(c, target)
-    gidsI = c.cells.ids({"$target": target, Cell.SYNAPSE_CLASS: "INH"})
-    return gidsE, gidsI
 
 
 def _get_layer_gids(c, layer, target):
@@ -92,7 +82,7 @@ def get_depths(c, gids):
     return c.cells.get(gids)["y"]
 
 
-def map_gids_to_depth(circuit_config, gids=[], target="mc2_Column"):
+def map_gids_to_depth(circuit_config, target, gids=[]):
     """Creates gid-depth map (for better figure asthetics)"""
 
     c = _get_bluepy_circuit(circuit_config)
@@ -105,7 +95,7 @@ def map_gids_to_depth(circuit_config, gids=[], target="mc2_Column"):
     return {gid: depths[i] for i, gid in enumerate(gids)}
 
 
-def get_layer_boundaries(circuit_config, target="mc2_Column"):
+def get_layer_boundaries(circuit_config, target):
     """Gets layer boundaries and cell numbers (used for raster plots)"""
 
     c = _get_bluepy_circuit(circuit_config)
@@ -192,18 +182,3 @@ def load_single_cell_features_from_h5(h5f_name, prefix="spikes"):
     h5f.close()
     project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix=prefix)
     return single_cell_features, project_metadata
-
-
-def all_equal(lst, ref=None):
-    """Return: True for empty lst
-    if ref != None return: True if all of its elements are equal to ref, False otherwise.
-    if ref == None return: True if all elements for lst are equal to each other, False otherwise"""
-    if ref is not None:
-        iterator = iter([ref]+lst)
-    else:
-        iterator = iter(lst)
-    try:
-        first = next(iterator)
-    except StopIteration:
-        return True
-    return all(first == rest for rest in iterator)

@@ -232,7 +232,7 @@ class ConnectivityMatrix(object):
         return an_obj
 
     @classmethod
-    def from_bluepy(cls, blueconfig_path, gids=None):
+    def from_bluepy(cls, blueconfig_path, target, gids=None):
         """
         BlueConfig based constructor
         :paramfig_path: path to BlueConfig
@@ -245,7 +245,7 @@ class ConnectivityMatrix(object):
         sim = get_bluepy_simulation(blueconfig_path)
         if gids is None:
             from assemblyfire.utils import get_E_gids
-            gids = get_E_gids(sim.circuit, sim.target)
+            gids = get_E_gids(sim.circuit, target)
         depths = np.asarray(get_depths(sim.circuit, gids))
         mtypes = np.asarray(get_mtypes(sim.circuit, gids))
         conv = pandas.Series(np.arange(len(gids)), index=gids)

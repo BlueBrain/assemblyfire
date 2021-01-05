@@ -26,8 +26,8 @@ def run(config_path):
 
     L.info(" Figures will be saved to: %s" % spikes.fig_path)
     ensure_dir(spikes.fig_path)
-    depths = map_gids_to_depth(spikes.get_blueconfig_path(spikes.seeds[0]))
-    ystuff = get_layer_boundaries(spikes.get_blueconfig_path(spikes.seeds[0]))
+    depths = map_gids_to_depth(spikes.get_blueconfig_path(spikes.seeds[0]), spikes.target)
+    ystuff = get_layer_boundaries(spikes.get_blueconfig_path(spikes.seeds[0]), spikes.target)
 
     L.info(" Preprocessed spikes and assemblies will be saved to: %s" % spikes.h5f_name)
     spike_matrix_dict = spikes.get_sign_spike_matrices()

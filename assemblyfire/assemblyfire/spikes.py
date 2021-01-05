@@ -165,6 +165,10 @@ class SpikeMatrixGroup(object):
         return os.path.join(self.root_fig_path, self._config_path.split('/')[-1][:-5])
 
     @property
+    def target(self):
+        return self.config["preprocessing_protocol"]["target"]
+
+    @property
     def t_start(self):
         return self.config["preprocessing_protocol"]["t_start"]
 
@@ -223,12 +227,13 @@ class SpikeMatrixGroup(object):
 
     def get_blueconfig_path(self, seed):
         return os.path.join(self.root_path, "stimulusstim_a0", "seed%i" % seed, "BlueConfig")
+        #return os.path.join(self.root_path, "seed%i" % seed, "BlueConfig")  # changed to analyse Sirio's sims
 
     def load_spikes(self, seed, t_start):
         """Loads in spikes from simulations using bluepy"""
         from assemblyfire.utils import get_E_gids, get_spikes
         sim = get_bluepy_simulation(self.get_blueconfig_path(seed))
-        gids = get_E_gids(sim.circuit, sim.target)
+        gids = get_E_gids(sim.circuit, self.target)
         spike_times, spiking_gids = get_spikes(sim, gids, t_start, self.t_end)
         return spike_times, spiking_gids
 
