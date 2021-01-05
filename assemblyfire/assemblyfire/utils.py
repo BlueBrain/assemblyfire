@@ -122,15 +122,23 @@ def get_layer_boundaries(circuit_config, target):
         yticklables.append("L%i\n(%i)" % (layer, len(gids)))
         if target == "mc2_Column":  # O1.v5
             ys = get_depths(c, gids)
-        else:  # probably SSCx
+            yticks.append(ys.mean())
+            if layer == 1:
+                hlines.append(ys.max())
+                hlines.append(ys.min())
+            else:
+                hlines.append(ys.min())
+        else:  # probably SSCx -> not so clear boundaries, so we'll just use top and bottom
             ys = get_depths_SSCx(gids)
-        yticks.append(ys.mean())
-        if layer == 1:
-            hlines.append(ys.max())
-            hlines.append(ys.min())
-        else:
-            hlines.append(ys.min())
+            yticks.append(ys.mean())
+            if layer == 2:
+                hlines.append(ys.min())
+            elif layer == 6:
+                hlines.append(ys.max())
+
     return {"yticks": yticks, "yticklabels": yticklables, "hlines": hlines}
+
+
 
 
 def get_spikes(sim, gids, t_start, t_end):

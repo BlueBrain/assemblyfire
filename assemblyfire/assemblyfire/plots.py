@@ -264,26 +264,34 @@ def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_na
     """Plots depth profile of all assemblies"""
 
     cmap = plt.cm.get_cmap("tab20", core_cell_idx.shape[1])
-    yrange = [ystuff["hlines"][-1], ystuff["hlines"][1]]
+
+    if len(ystuff["hlines"] > 2):
+        yrange = [ystuff["hlines"][-1], ystuff["hlines"][1]]
+        v5 = True
+    else:
+        yrange = [ystuff["hlines"][0], ystuff["hlines"][1]]
+        v5 = False
 
     fig = plt.figure(figsize=(20, 8))
     gs = gridspec.GridSpec(np.floor_divide(len(assembly_idx), 5)+1, 5)
     for i, assembly_id in enumerate(assembly_idx):
-        gids = row_map[np.where(core_cell_idx[:, assembly_id]==1)[0]]
+        gids = row_map[np.where(core_cell_idx[:, assembly_id] == 1)[0]]
         assembly_depths = _gids_to_depth(gids, depths)
 
         ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)-5])
         ax.hist(assembly_depths, bins=50, range=yrange, orientation="horizontal",
                 color=cmap(assembly_id), edgecolor=cmap(assembly_id))
-        for i in range(2, 6):
-            ax.axhline(ystuff["hlines"][i], color="gray", ls="--")
+        if v5:
+            for i in range(2, 6):
+                ax.axhline(ystuff["hlines"][i], color="gray", ls="--")
         ax.set_title("Assembly %i (n=%i)" % (assembly_id, len(assembly_depths)))
         ax.set_xticks([])
         ax.set_yticks(ystuff["yticks"][1:])
         ax.set_ylim(yrange)
         ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"][1:]])
         sns.despine(bottom=True, offset=5)
-
+    if not v5:
+        plt.gca().invert_yaxis()
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
