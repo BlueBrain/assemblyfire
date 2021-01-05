@@ -265,7 +265,7 @@ def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_na
 
     cmap = plt.cm.get_cmap("tab20", core_cell_idx.shape[1])
 
-    if len(ystuff["hlines"] > 2):
+    if len(ystuff["hlines"]) > 2:
         yrange = [ystuff["hlines"][-1], ystuff["hlines"][1]]
         v5 = True
     else:
@@ -290,8 +290,8 @@ def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_na
         ax.set_ylim(yrange)
         ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"][1:]])
         sns.despine(bottom=True, offset=5)
-    if not v5:
-        plt.gca().invert_yaxis()
+        if not v5:
+            plt.gca().invert_yaxis()
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
