@@ -79,20 +79,55 @@ def get_mtypes(c, gids):
 
 
 def get_depths(c, gids):
+    """Get depths AKA. y-coordinates for v5 circuits"""
     return c.cells.get(gids)["y"]
+
+
+def get_depths_SSCx(gids):
+    """Reads depth values from file saved by Sirio"""
+
+    depths = []
+    # this is super hard coded ...
+    f_name = "/gpfs/bbp.cscs.ch/data/scratch/proj83/home/bolanos/circuits/Bio_M/20200805/hexgrid/depths.txt"
+    with open(f_name, "r") as f:
+        for l in f:
+            gid = int(l.strip().split(" ")[0])
+            if gid in gids:
+                depths.append(float(l.strip().split()[1]))
+    return np.asarray(depths)
+
+
+def get_depths_dict_SSCx(gids):
+    """Reads depth values from file saved by Sirio and return a dict"""
+
+    depths = {}
+    # this is super hard coded ...
+    f_name = "/gpfs/bbp.cscs.ch/data/scratch/proj83/home/bolanos/circuits/Bio_M/20200805/hexgrid/depths.txt"
+    with open(f_name, "r") as f:
+        for l in f:
+            gid = int(l.strip().split(" ")[0])
+            if gid in gids:
+                depths[gid] = float(l.strip().split()[1])
+    return depths
 
 
 def map_gids_to_depth(circuit_config, target, gids=[]):
     """Creates gid-depth map (for better figure asthetics)"""
 
-    c = _get_bluepy_circuit(circuit_config)
-    if not len(gids):
-        gids = _get_gids(c, target)
-    ys = c.cells.get(gids)["y"]
-    # convert pd.Series to dictionary...
-    gids = np.asarray(ys.index)
-    depths = ys.values
-    return {gid: depths[i] for i, gid in enumerate(gids)}
+    if target == "mc2_Column":  # O1.v5
+        c = _get_bluepy_circuit(circuit_config)
+        if not len(gids):
+            gids = _get_gids(c, target)
+        ys = get_depths(c, gids)
+        # convert pd.Series to dictionary...
+        gids = np.asarray(ys.index)
+        depths = ys.values
+        return {gid: depths[i] for i, gid in enumerate(gids)}
+    else:  # probably SSCx
+        c = _get_bluepy_circuit(circuit_config)
+        if not len(gids):
+            gids = _get_gids(c, target)
+        return get_depths_dict_SSCx(gids)
 
 
 def get_layer_boundaries(circuit_config, target):
@@ -105,7 +140,10 @@ def get_layer_boundaries(circuit_config, target):
     for layer in range(1, 7):
         gids = _get_layer_gids(c, layer, target)
         yticklables.append("L%i\n(%i)" % (layer, len(gids)))
-        ys = c.cells.get(gids)["y"]
+        if target == "mc2_Column":  # O1.v5
+            ys = get_depths(c, gids)
+        else:  # probably SSCx
+            ys = get_depths_SSCx(gids)
         yticks.append(ys.mean())
         if layer == 1:
             hlines.append(ys.max())

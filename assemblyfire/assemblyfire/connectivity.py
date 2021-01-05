@@ -239,14 +239,20 @@ class ConnectivityMatrix(object):
         :param gids: array of gids aka. nodes of the graph, if None - all excitatory gids from the circuit are used
         """
         from scipy import sparse
-        from .spikes import get_bluepy_simulation
-        from .utils import get_depths, get_mtypes
+        from assemblyfire.spikes import get_bluepy_simulation
+        from assemblyfire.utils import get_mtypes
 
         sim = get_bluepy_simulation(blueconfig_path)
         if gids is None:
             from assemblyfire.utils import get_E_gids
             gids = get_E_gids(sim.circuit, target)
-        depths = np.asarray(get_depths(sim.circuit, gids))
+
+        if target == "mc2_Column":  # O1.v5
+            from assemblyfire.utils import get_depths
+            depths = np.asarray(get_depths(sim.circuit, gids))
+        else:  # probably SSCx
+            from assemblyfire.utils import get_depths_SSCx
+            depths = get_depths_SSCx(gids)
         mtypes = np.asarray(get_mtypes(sim.circuit, gids))
         conv = pandas.Series(np.arange(len(gids)), index=gids)
         indptr = [0]
@@ -257,9 +263,9 @@ class ConnectivityMatrix(object):
             indptr.append(len(indices))
         data = np.ones_like(indices, dtype=bool)
         adj_mat = sparse.csc_matrix((data, indices, indptr), shape=(len(gids), len(gids)))
-        vertex_props = pandas.DataFrame({'depths': depths,
-                                         'mtypes': mtypes},
-                                        index=gids)
+        vertex_props = pandas.DataFrame({"depths": depths,
+                                         "mtypes": mtypes},
+                                         index=gids)
         return cls(adj_mat, vertex_properties=vertex_props)
 
     def submatrix(self, sub_gids, edge_property=None, sub_gids_post=None):
