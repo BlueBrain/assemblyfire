@@ -56,6 +56,7 @@ class _MatrixNodeIndexer(object):
             assert idx.shape[0] >= hist[i], "Not enough neurons at this depths to sample from"
             sample_gids.extend(np.random.choice(all_gids[idx], hist[i], replace=False).tolist())
         return sample_gids
+
     def random_numerical(self, ref, n_bins=50):
         return self._parent.subpopulation(self.random_numerical_gids(ref,n_bins))
 
@@ -72,6 +73,7 @@ class _MatrixNodeIndexer(object):
             assert idx.shape[0] >= counts[i], "Not enough %s to sample from" % mtype
             sample_gids.extend(np.random.choice(all_gids[idx], counts[i], replace=False).tolist())
         return sample_gids
+
     def random_categorical(self,ref):
         return self._parent.subpopulation(self.random_categorical_gids(ref))
 
@@ -298,6 +300,7 @@ class ConnectivityMatrix(object):
 
     def subpopulation(self, subpop_ids, copy=True):
         """A ConnectivityMatrix object representing the specified subpopulation"""
+        subpop_ids = self.__extract_vertex_ids__(subpop_ids)
         if not copy:
             #  TODO: Return a view on this object
             raise NotImplementedError()
