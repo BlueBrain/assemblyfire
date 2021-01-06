@@ -55,6 +55,7 @@ class NetworkAssembly(ConnectivityMatrix):
     """
     def __extract_gids__(self,sub_gids):
         return self.__extract_vertex_ids__(sub_gids)
+
     def degree(self, sub_gids=None, kind="in"):
         """Return in/out degrees of the subgraph, if None compute on the whole graph"""
         if sub_gids is not None:
@@ -67,12 +68,14 @@ class NetworkAssembly(ConnectivityMatrix):
             return np.sum(matrix, axis=1)
         else:
             ValueError("Need to specify 'in' or 'out' degree!")
+
     def density(self,sub_gids=None):
         if sub_gids is None:
             m = self.matrix
         else:
             m = self.submatrix(sub_gids)
         return m.getnnz()/np.prod(m.shape)
+
     def simplex_counts(self, sub_gids):
         """Return the simplex counts of submatrix specified by `sub_gids`"""
         import pyflagser
@@ -163,13 +166,13 @@ def in_degree_assemblies(assembly_grp_dict, circuit):
         in_degrees[seed] = {assembly.idx: circuit.degree(assembly, kind="in")
                             for assembly in assembly_grp.assemblies}
         in_degrees_control[seed]["n"] = {assembly.idx: circuit.degree(
-                                         circuit.sample_gids_n_neurons(assembly), kind="in")
+                                         circuit.sample_vertices_n_neurons(assembly), kind="in")
                                          for assembly in assembly_grp.assemblies}
         in_degrees_control[seed]["depths"] = {assembly.idx: circuit.degree(
-                                              circuit.sample_gids_depth_profile(assembly), kind="in")
+                                              circuit.sample_vertices_from_numerical_property(assembly), kind="in")
                                               for assembly in assembly_grp.assemblies}
         in_degrees_control[seed]["mtypes"] = {assembly.idx: circuit.degree(
-                                              circuit.sample_gids_mtype_composition(assembly), kind="in")
+                                              circuit.sample_vertices_from_categorical_property(assembly), kind="in")
                                               for assembly in assembly_grp.assemblies}
     return in_degrees, in_degrees_control
 
@@ -192,13 +195,13 @@ def simplex_counts_assemblies(assembly_grp_dict, circuit):
         simplex_counts[seed] = {assembly.idx: circuit.simplex_counts(assembly)
                                 for assembly in assembly_grp.assemblies}
         simplex_counts_control[seed]["n"] = {assembly.idx: circuit.simplex_counts(
-                                             circuit.sample_gids_n_neurons(assembly))
+                                             circuit.sample_vertices_n_neurons(assembly))
                                              for assembly in assembly_grp.assemblies}
         simplex_counts_control[seed]["depths"] = {assembly.idx: circuit.simplex_counts(
-                                                  circuit.sample_gids_depth_profile(assembly))
+                                                  circuit.sample_vertices_from_numerical_property(assembly))
                                                   for assembly in assembly_grp.assemblies}
         simplex_counts_control[seed]["mtypes"] = {assembly.idx: circuit.simplex_counts(
-                                                  circuit.sample_gids_mtype_composition(assembly))
+                                                  circuit.sample_vertices_from_categorical_property(assembly))
                                                   for assembly in assembly_grp.assemblies}
     return simplex_counts, simplex_counts_control
 
