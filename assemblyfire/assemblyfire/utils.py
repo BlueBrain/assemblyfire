@@ -6,10 +6,10 @@ author: András Ecker, last update: 12.2020
 """
 
 import os
-import json
 import h5py
 from collections import namedtuple
 import numpy as np
+import pandas as pd
 
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
 SingleCellFeatures = namedtuple("SingleCellFeatures", ["gids", "r_spikes", "mean_ts", "std_ts"])
@@ -61,20 +61,11 @@ def _get_gids(c, target):
     return c.cells.ids({"$target": target})
 
 
-def get_E_gids(c, target="mc2_Column"):
+def get_E_gids(c, target):
     from bluepy.v2.enums import Cell
     import warnings
     warnings.simplefilter(action="ignore", category=FutureWarning)
     return c.cells.ids({"$target": target, Cell.SYNAPSE_CLASS: "EXC"})
-
-
-def get_EI_gids(c, target="mc2_Column"):
-    from bluepy.v2.enums import Cell
-    import warnings
-    warnings.simplefilter(action="ignore", category=FutureWarning)
-    gidsE = get_E_gids(c, target)
-    gidsI = c.cells.ids({"$target": target, Cell.SYNAPSE_CLASS: "INH"})
-    return gidsE, gidsI
 
 
 def _get_layer_gids(c, layer, target):
@@ -89,24 +80,38 @@ def get_mtypes(c, gids):
 
 
 def get_depths(c, gids):
+    """Get depths AKA. y-coordinates for v5 circuits"""
     return c.cells.get(gids)["y"]
 
 
-def map_gids_to_depth(circuit_config, gids=[], target="mc2_Column"):
-    """Creates gid-depth map (for better figure asthetics)"""
+def get_depths_SSCx(gids):
+    """Reads depth values from file saved by Sirio and return bluepy style Series"""
+
+    # this is super hard coded ...
+    f_name = "/gpfs/bbp.cscs.ch/data/scratch/proj83/home/bolanos/circuits/Bio_M/20200805/hexgrid/depths.txt"
+    data = np.genfromtxt(f_name)
+    idx = np.searchsorted(data[:, 0], gids)
+    return pd.Series(data[idx, 1], index=gids)
+
+
+def map_gids_to_depth(circuit_config, target, gids=[]):
+    """Creates gid-depth map (for figure asthetics)"""
 
     c = _get_bluepy_circuit(circuit_config)
     if not len(gids):
         gids = _get_gids(c, target)
-    ys = c.cells.get(gids)["y"]
+    if target == "mc2_Column":  # O1.v5
+        ys = get_depths(c, gids)
+    else:
+        ys = get_depths_SSCx(gids)
     # convert pd.Series to dictionary...
     gids = np.asarray(ys.index)
     depths = ys.values
     return {gid: depths[i] for i, gid in enumerate(gids)}
 
 
-def get_layer_boundaries(circuit_config, target="mc2_Column"):
-    """Gets layer boundaries and cell numbers (used for raster plots)"""
+def get_layer_boundaries(circuit_config, target):
+    """Gets layer boundaries and cell numbers (for figure asthetics)"""
 
     c = _get_bluepy_circuit(circuit_config)
     yticks = []
@@ -115,14 +120,25 @@ def get_layer_boundaries(circuit_config, target="mc2_Column"):
     for layer in range(1, 7):
         gids = _get_layer_gids(c, layer, target)
         yticklables.append("L%i\n(%i)" % (layer, len(gids)))
-        ys = c.cells.get(gids)["y"]
-        yticks.append(ys.mean())
-        if layer == 1:
-            hlines.append(ys.max())
-            hlines.append(ys.min())
-        else:
-            hlines.append(ys.min())
+        if target == "mc2_Column":  # O1.v5
+            ys = get_depths(c, gids)
+            yticks.append(ys.mean())
+            if layer == 1:
+                hlines.append(ys.max())
+                hlines.append(ys.min())
+            else:
+                hlines.append(ys.min())
+        else:  # probably SSCx -> not so clear boundaries, so we'll just use top and bottom
+            ys = get_depths_SSCx(gids)
+            yticks.append(ys.mean())
+            if layer == 2:
+                hlines.append(ys.min())
+            elif layer == 6:
+                hlines.append(ys.max())
+
     return {"yticks": yticks, "yticklabels": yticklables, "hlines": hlines}
+
+
 
 
 def get_spikes(sim, gids, t_start, t_end):
@@ -192,18 +208,3 @@ def load_single_cell_features_from_h5(h5f_name, prefix="spikes"):
     h5f.close()
     project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix=prefix)
     return single_cell_features, project_metadata
-
-
-def all_equal(lst, ref=None):
-    """Return: True for empty lst
-    if ref != None return: True if all of its elements are equal to ref, False otherwise.
-    if ref == None return: True if all elements for lst are equal to each other, False otherwise"""
-    if ref is not None:
-        iterator = iter([ref]+lst)
-    else:
-        iterator = iter(lst)
-    try:
-        first = next(iterator)
-    except StopIteration:
-        return True
-    return all(first == rest for rest in iterator)

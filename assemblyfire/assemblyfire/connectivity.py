@@ -247,21 +247,27 @@ class ConnectivityMatrix(object):
         return an_obj
 
     @classmethod
-    def from_bluepy(cls, blueconfig_path, gids=None):
+    def from_bluepy(cls, blueconfig_path, target, gids=None):
         """
         BlueConfig based constructor
         :paramfig_path: path to BlueConfig
         :param gids: array of gids aka. nodes of the graph, if None - all excitatory gids from the circuit are used
         """
         from scipy import sparse
-        from .spikes import get_bluepy_simulation
-        from .utils import get_depths, get_mtypes
+        from assemblyfire.spikes import get_bluepy_simulation
+        from assemblyfire.utils import get_mtypes
 
         sim = get_bluepy_simulation(blueconfig_path)
         if gids is None:
             from assemblyfire.utils import get_E_gids
-            gids = get_E_gids(sim.circuit, sim.target)
-        depths = np.asarray(get_depths(sim.circuit, gids))
+            gids = get_E_gids(sim.circuit, target)
+
+        if target == "mc2_Column":  # O1.v5
+            from assemblyfire.utils import get_depths
+            depths = np.asarray(get_depths(sim.circuit, gids))
+        else:  # probably SSCx
+            from assemblyfire.utils import get_depths_SSCx
+            depths = np.asarray(get_depths_SSCx(gids))
         mtypes = np.asarray(get_mtypes(sim.circuit, gids))
         conv = pandas.Series(np.arange(len(gids)), index=gids)
         indptr = [0]
@@ -272,9 +278,9 @@ class ConnectivityMatrix(object):
             indptr.append(len(indices))
         data = np.ones_like(indices, dtype=bool)
         adj_mat = sparse.csc_matrix((data, indices, indptr), shape=(len(gids), len(gids)))
-        vertex_props = pandas.DataFrame({'depths': depths,
-                                         'mtypes': mtypes},
-                                        index=gids)
+        vertex_props = pandas.DataFrame({"depths": depths,
+                                         "mtypes": mtypes},
+                                         index=gids)
         return cls(adj_mat, vertex_properties=vertex_props)
 
     def submatrix(self, sub_gids, edge_property=None, sub_gids_post=None):
@@ -368,7 +374,7 @@ class ConnectivityMatrix(object):
     def sample_n_neurons(self, ref_gids, sub_gids=None):
         return np.array(self.dense_sample_n_neurons(ref_gids, sub_gids))
 
-    def sample_vertices_from_numerical_property(self, ref_gids, property_name='depth', sub_gids=None, n_bins=50):
+    def sample_vertices_from_numerical_property(self, ref_gids, property_name='depths', sub_gids=None, n_bins=50):
         """
         Return gids with the same (binned) depth profile as `ref_gids`
         :param ref_gids: Subpopulation to use as reference for sampling.
@@ -400,20 +406,20 @@ class ConnectivityMatrix(object):
             sample_gids.extend(np.random.choice(sub_gids[idx], hist[i], replace=False).tolist())
         return sample_gids
 
-    def sample_matrix_from_numerical_property(self, ref_gids, property_name='depth', sub_gids=None, n_bins=50):
+    def sample_matrix_from_numerical_property(self, ref_gids, property_name='depths', sub_gids=None, n_bins=50):
         idx = self._lookup[self.sample_vertices_from_numerical_property(ref_gids, sub_gids=sub_gids,
                                                                         property_name=property_name, n_bins=n_bins)]
         return self.matrix[np.ix_(idx, idx)]
 
-    def dense_sample_from_numerical_property(self, ref_gids, property_name='depth', sub_gids=None, n_bins=50):
+    def dense_sample_from_numerical_property(self, ref_gids, property_name='depths', sub_gids=None, n_bins=50):
         return self.sample_matrix_from_numerical_property(ref_gids, sub_gids=sub_gids,
                                                           property_name=property_name, n_bins=n_bins).todense()
 
-    def sample_from_numerical_property(self, ref_gids, property_name='depth', sub_gids=None, n_bins=50):
+    def sample_from_numerical_property(self, ref_gids, property_name='depths', sub_gids=None, n_bins=50):
         return np.array(self.dense_sample_from_numerical_property(ref_gids, sub_gids=sub_gids,
                                                                   property_name=property_name, n_bins=n_bins))
 
-    def sample_vertices_from_categorical_property(self, ref_gids, property_name='mtype', sub_gids=None):
+    def sample_vertices_from_categorical_property(self, ref_gids, property_name='mtypes', sub_gids=None):
         """
         Return gids with the same mtype composition as `ref_gids`
         :param ref_gids: Subpopulation to use as reference for sampling.
@@ -442,16 +448,16 @@ class ConnectivityMatrix(object):
             sample_gids.extend(np.random.choice(sub_gids[idx], counts[i], replace=False).tolist())
         return sample_gids
 
-    def sample_matrix_from_categorical_property(self, ref_gids, property_name='mtype', sub_gids=None):
+    def sample_matrix_from_categorical_property(self, ref_gids, property_name='mtypes', sub_gids=None):
         idx = self._lookup[self.sample_vertices_from_categorical_property(ref_gids, property_name=property_name,
                                                                           sub_gids=sub_gids)]
         return self.matrix[np.ix_(idx, idx)]
 
-    def dense_sample_from_categorical_property(self, ref_gids, property_name='mtype', sub_gids=None):
+    def dense_sample_from_categorical_property(self, ref_gids, property_name='mtypes', sub_gids=None):
         return self.sample_matrix_from_categorical_property(ref_gids, property_name=property_name,
                                                             sub_gids=sub_gids).todense()
 
-    def sample_from_categorical_property(self, ref_gids, property_name='mtype', sub_gids=None):
+    def sample_from_categorical_property(self, ref_gids, property_name='mtypes', sub_gids=None):
         return np.array(self.dense_sample_from_categorical_property(ref_gids, property_name=property_name,
                                                                     sub_gids=sub_gids))
 

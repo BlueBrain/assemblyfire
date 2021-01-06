@@ -13,6 +13,7 @@ h5_out:
 root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures"
 
 preprocessing_protocol:
+    target: "mc2_Column"
     t_start: 2000
     t_start_exception: 4000
     seeds_exception: [973121]

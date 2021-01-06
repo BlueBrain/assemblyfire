@@ -13,6 +13,7 @@ h5_out:
 root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures"
 
 preprocessing_protocol:
+    target: "mc2_Column"
     t_start: 1000
     t_end: 62000
     bin_size: 10
