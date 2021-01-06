@@ -41,7 +41,7 @@ class _MatrixNodeIndexer(object):
         pop = self._parent._vertex_properties.index.values[self._prop > other]
         return self._parent.subpopulation(pop)
 
-    def random_numerical(self, ref, n_bins=50):
+    def random_numerical_gids(self, ref, n_bins=50):
         all_gids = self._prop.index.values
         ref_gids = self._parent.__extract_vertex_ids__(ref)
         assert np.isin(ref_gids, all_gids).all(), "Reference gids are not part of the connectivity matrix"
@@ -55,9 +55,11 @@ class _MatrixNodeIndexer(object):
             idx = np.where(value_bins == i+1)[0]
             assert idx.shape[0] >= hist[i], "Not enough neurons at this depths to sample from"
             sample_gids.extend(np.random.choice(all_gids[idx], hist[i], replace=False).tolist())
-        return self._parent.subpopulation(sample_gids)
+        return sample_gids
+    def random_numerical(self, ref, n_bins=50):
+        return self._parent.subpopulation(self.random_numerical_gids(ref,n_bins))
 
-    def random_categorical(self, ref):
+    def random_categorical_gids(self, ref):
         all_gids = self._prop.index.values
         ref_gids = self._parent.__extract_vertex_ids__(ref)
         assert np.isin(ref_gids, all_gids).all(), "Reference gids are not part of the connectivity matrix"
@@ -69,7 +71,9 @@ class _MatrixNodeIndexer(object):
             idx = np.where(self._prop == mtype)[0]
             assert idx.shape[0] >= counts[i], "Not enough %s to sample from" % mtype
             sample_gids.extend(np.random.choice(all_gids[idx], counts[i], replace=False).tolist())
-        return self._parent.subpopulation(sample_gids)
+        return sample_gids
+    def random_categorical(self,ref):
+        return self._parent.subpopulation(self.random_categorical_gids(ref))
 
 
 class _MatrixEdgeIndexer(object):
@@ -175,6 +179,14 @@ class ConnectivityMatrix(object):
         # TODO: calling it "gids" might be too BlueBrain-specific! Change name?
         self.gids = self._vertex_properties.index.values
 
+    def __len__(self):
+        return len(self.gids)
+
+    def add_vertex_property(self, new_label, new_values):
+        assert len(new_values) == len(self), "New values size mismatch"
+        assert new_label not in self._vertex_properties, "Property {0} already exists!".format(new_label)
+        self._vertex_properties[new_label] = new_values
+
     def __make_lookup__(self):
         return pandas.Series(np.arange(self._shape[0]), index=self._vertex_properties.index)
 
@@ -212,6 +224,7 @@ class ConnectivityMatrix(object):
         return self.array_()
 
     def index(self, prop_name):
+        assert prop_name in self._vertex_properties, "vertex property should be in " + str(self.vertex_properties)
         return _MatrixNodeIndexer(self, prop_name)
 
     def filter(self, prop_name=None):
@@ -466,7 +479,7 @@ class ConnectivityMatrix(object):
         if prefix is None:
             prefix = "connectivity"
         if group_name is None:
-            prefix = "full_matrix"
+            group_name = "full_matrix"
         full_prefix = prefix + "/" + group_name
         self._vertex_properties.to_hdf(fn, key=full_prefix + "/vertex_properties")
         self._edges.to_hdf(fn, key=full_prefix + "/edges")
@@ -475,4 +488,5 @@ class ConnectivityMatrix(object):
             data_grp = h5[full_prefix]
             data_grp.attrs["NEUROTOP_SHAPE"] = self._shape
             data_grp.attrs["NEUROTOP_DEFAULT_EDGE"] = self._default_edge
+            data_grp.attrs["NEUROTOP_CLASS"] = "ConnectivityMatrix"
 
