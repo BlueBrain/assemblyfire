@@ -1,7 +1,7 @@
 """assemblyfire"""
 
 from assemblyfire.version import __version__
-from assemblyfire.spikes import SpikeMatrixGroup
+from assemblyfire.spikes import SpikeMatrixGroup, spikes2mat, sign_rate_std, spikes_to_h5
 from assemblyfire.assemblies import AssemblyProjectMetadata, Assembly, AssemblyGroup, ConsensusAssembly
 from assemblyfire.connectivity import ConnectivityMatrix
 from assemblyfire.topology import NetworkAssembly

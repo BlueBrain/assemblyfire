@@ -8,3 +8,5 @@ MANIFEST.in
 tox.ini
 assemblyfire/__pycache__
 *.pyc
+use_cases/input_data
+use_cases/assemblies.h5
