@@ -28,13 +28,25 @@ from sklearn.metrics import silhouette_score, silhouette_samples
 L = logging.getLogger("assemblyfire")
 
 
+def cosine_similarity(X):
+    """Cosine similarity matrix calculation (using only core numpy)
+    much faster then `1-squareform(pdist(X, metrix="cosine"))`"""
+    X_norm = X / np.linalg.norm(X, axis=-1)[:, np.newaxis]
+    return np.dot(X_norm, X_norm.T)
+
+
 # hierarchical clustering (using scipy and sklearn)
 def cluster_sim_mat(spike_matrix, min_n_clusts=4, max_n_clusts=20):
     """Hieararchical (Ward linkage) clustering of cosine similarity matrix of significant time bins"""
 
-    cond_dists = pdist(spike_matrix.T, metric="cosine")
-    dists = squareform(cond_dists)
-    sim_matrix = 1 - dists
+    # cond_dists = pdist(spike_matrix.T, metric="cosine")
+    # dists = squareform(cond_dists)
+    # sim_matrix = 1 - dists
+
+    sim_matrix = cosine_similarity(spike_matrix.T)
+    dists = 1 - sim_matrix
+    dists[dists < 1e-10] = 0.  # fixing numerical errors
+    cond_dists = squareform(dists)  # squareform implements its inverse if the input is a square matrix
 
     linkage = ward(cond_dists)
 
@@ -56,7 +68,6 @@ def cluster_sim_mat(spike_matrix, min_n_clusts=4, max_n_clusts=20):
 # density based clustering (built from core numpy and scipy functions)
 def PCA_ncomps(matrix, n_components):
     """PCA wrapper with fixed number of components"""
-
     F = PCA(n_components)
     transformed = F.fit_transform(matrix)
     return transformed, F.components_
