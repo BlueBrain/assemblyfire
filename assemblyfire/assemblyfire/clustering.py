@@ -9,7 +9,7 @@ of spike matrix projected to PCA space a la Herzog et al. 2020.
 Then "core-cells" and cell assemblies are detected with correlation
 based methods from (Montijn et al. 2016 and) Herzog et al. 2020
 Assemblies are clustered into consensus assemblies via hierarchical clustering
-last modified: András Ecker 11.2020
+last modified: András Ecker 02.2021
 """
 
 import os
@@ -23,7 +23,7 @@ from scipy.stats.distributions import t
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.cluster.hierarchy import ward, fcluster
 from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_score, silhouette_samples
+from sklearn.metrics import silhouette_samples, davies_bouldin_score
 
 L = logging.getLogger("assemblyfire")
 
@@ -50,12 +50,12 @@ def cluster_sim_mat(spike_matrix, min_n_clusts=4, max_n_clusts=20):
 
     linkage = ward(cond_dists)
 
-    # determine number of clusters using silhouette scores
-    silhouette_scores = []
+    # determine number of clusters using Davies-Bouldin index
+    DB_scores = []
     for n in range(min_n_clusts, max_n_clusts+1):
         clusters = fcluster(linkage, n, criterion="maxclust")
-        silhouette_scores.append(silhouette_score(dists, clusters))
-    n_clust = np.argmax(silhouette_scores) + min_n_clusts
+        DB_scores.append(davies_bouldin_score(dists, clusters))
+    n_clust = np.argmin(DB_scores) + min_n_clusts
 
     clusters = fcluster(linkage, int(n_clust), criterion="maxclust")
     silhouettes = silhouette_samples(dists, clusters)
@@ -253,7 +253,7 @@ def cluster_spikes(spike_matrix_dict, method, FigureArgs):
     :param FigureArgs: plotting related arguments (see `cli.py`)
     :return: dict with seed as key and clustered (significant) time bins as value
     """
-    from assemblyfire.plots import plot_cluster_seqs
+    from assemblyfire.plots import plot_cluster_seqs, plot_pattern_clusters
 
     clusters_dict = {}
     for seed, SpikeMatrixResult in tqdm(spike_matrix_dict.items(), desc="Clustering"):
@@ -282,8 +282,10 @@ def cluster_spikes(spike_matrix_dict, method, FigureArgs):
             plot_rhos_deltas(*plotting, fig_name)
 
         clusters_dict[seed] = clusters
-        fig_name = os.path.join(FigureArgs.fig_path, "clusters_seed%i.png" % seed)
+        fig_name = os.path.join(FigureArgs.fig_path, "cluster_seq_seed%i.png" % seed)
         plot_cluster_seqs(clusters, t_bins, FigureArgs.stim_times, FigureArgs.patterns, fig_name)
+        fig_name = os.path.join(FigureArgs.fig_path, "clusters_patterns_seed%i.png" % seed)
+        plot_pattern_clusters(clusters, t_bins, FigureArgs.stim_times, FigureArgs.patterns, fig_name)
 
     return clusters_dict
 
