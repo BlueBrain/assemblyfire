@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-
+Testing the analysis pipeline on synthetic spike trains
 last modified: András Ecker 02.2021
 """
 
