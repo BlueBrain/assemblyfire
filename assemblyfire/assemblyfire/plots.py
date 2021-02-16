@@ -50,7 +50,7 @@ def plot_sim_matrix(sim_matrix, t_bins, stim_times, patterns, fig_name):
 
     fig = plt.figure(figsize=(10, 9))
     ax = fig.add_subplot(1, 1, 1)
-    i = ax.imshow(sim_mat, cmap="coolwarm",
+    i = ax.imshow(sim_mat, cmap="cividis",
                   aspect="auto", interpolation="none")
     fig.colorbar(i)
     ax.set_xticks(t_idx); ax.set_xticklabels(patterns)
@@ -94,7 +94,7 @@ def plot_components(components, row_map, depths, fig_name):
     fig = plt.figure(figsize=(20, 8))
     ax = fig.add_subplot(1, 1, 1)
     i = ax.imshow(components[:, gid_idx], cmap="coolwarm", aspect="auto")
-    ax.set_xlabel("gids (n=%i)"%n)
+    ax.set_xlabel("gids (n=%i)" % n)
     ax.set_xticks([0, n])
     ax.set_xticklabels(["L2", "L6"])
     ax.xaxis.tick_top()
@@ -255,6 +255,35 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
     plt.close(fig)
 
 
+def plot_pattern_clusters(clusters, t_bins, stim_times, patterns, fig_name):
+    """Plots counts of clusters for every pattern"""
+
+    n = len(np.unique(clusters))
+    cmap = plt.cm.get_cmap("tab20", n)
+    cols = [colors.to_hex(cmap(i)) for i in range(n)]
+    _, pattern_matrices, _ = _group_by_patterns(clusters, t_bins, stim_times, patterns)
+
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(2, 5)
+
+    for i, (name, matrix) in enumerate(pattern_matrices.items()):
+        clusts, counts = np.unique(matrix[~np.isnan(matrix)], return_counts=True)
+        heights = np.zeros(n)
+        for j in range(n):
+            if j in clusts:
+                heights[j] = counts[clusts == j]
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        x = np.arange(n)
+        ax.bar(x, heights, width=0.5, align="center", color=cols)
+        ax.set_title(name)
+        ax.set_xticks(x)
+        ax.set_xlim([-0.5, n-0.5])
+    sns.despine()
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def _gids_to_depth(gids, depths):
     """Converts unique gids to cortical depths"""
     return [depths[gid] for gid in gids]
@@ -264,6 +293,7 @@ def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_na
     """Plots depth profile of all assemblies"""
 
     cmap = plt.cm.get_cmap("tab20", core_cell_idx.shape[1])
+    n = len(assembly_idx)
 
     if len(ystuff["hlines"]) > 2:
         yrange = [ystuff["hlines"][-1], ystuff["hlines"][1]]
@@ -273,7 +303,8 @@ def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_na
         v5 = False
 
     fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(np.floor_divide(len(assembly_idx), 5)+1, 5)
+    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
+    gs = gridspec.GridSpec(n_rows, 5)
     for i, assembly_id in enumerate(assembly_idx):
         gids = row_map[np.where(core_cell_idx[:, assembly_id] == 1)[0]]
         assembly_depths = _gids_to_depth(gids, depths)
@@ -305,7 +336,8 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name):
     cmap = plt.cm.get_cmap("tab20", np.max(assembly_labels)+1)
 
     fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(np.floor_divide(n, 5) + 1, 5)
+    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
+    gs = gridspec.GridSpec(n_rows, 5)
     for i, assembly_label in enumerate(assembly_labels):
         ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
         max_in_degree = np.max(in_degrees[assembly_label])
@@ -327,7 +359,7 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name):
     plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
     plt.xlabel("In degree")
     fig.tight_layout()
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight", transparent=True)
     plt.close(fig)
 
 
@@ -705,17 +737,18 @@ def plot_simplex_counts_seed(simplex_counts, simplex_counts_control, fig_name):
     cmap = plt.cm.get_cmap("tab20", np.max(assembly_labels)+1)
 
     fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(np.floor_divide(n, 5) + 1, 5)
+    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
+    gs = gridspec.GridSpec(n_rows, 5)
     for i, assembly_label in enumerate(assembly_labels):
         ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
-        ax.plot(simplex_counts[assembly_label], color=cmap(assembly_label), label="assembly")
-        ax.plot(simplex_counts_control["n"][assembly_label], color="black", lw=0.5, ls="--", label="ctrl. n neurons")
-        ax.plot(simplex_counts_control["depths"][assembly_label], color="black", lw=0.5, ls="-.",
+        ax.plot(simplex_counts[assembly_label], color=cmap(assembly_label), lw=3, label="assembly")
+        ax.plot(simplex_counts_control["n"][assembly_label], color="black", lw=1, ls="--", label="ctrl. n neurons")
+        ax.plot(simplex_counts_control["depths"][assembly_label], color="black", lw=1, ls="-.",
                 label="ctrl. depth profile")
-        ax.plot(simplex_counts_control["mtypes"][assembly_label], color="black", lw=0.5, label="ctrl. mtype comp.")
+        ax.plot(simplex_counts_control["mtypes"][assembly_label], color="black", lw=1, label="ctrl. mtype comp.")
         ax.set_title("Assembly %i" % assembly_label)
         ax.set_yticks([])
-        ax.set_xlim([0, 6])  # TODO not hard code this
+        ax.set_xlim([0, 5])  # TODO not hard code this
         sns.despine(ax=ax, left=True, offset=5)
         if i == 0:
             ax.legend(frameon=False)
@@ -723,7 +756,7 @@ def plot_simplex_counts_seed(simplex_counts, simplex_counts_control, fig_name):
     plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
     plt.xlabel("Simplex dimension")
     fig.tight_layout()
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    fig.savefig(fig_name, bbox_inches="tight", transparent=True)
     plt.close(fig)
 
 
@@ -735,7 +768,8 @@ def plot_simplex_counts_consensus(simplex_counts, simplex_counts_control, fig_na
     cmap = plt.cm.get_cmap("tab20", n)
 
     fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(np.floor_divide(n, 5) + 1, 5)
+    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
+    gs = gridspec.GridSpec(n_rows, 5)
     for i, (label, simplex_counts_cons) in enumerate(simplex_counts.items()):
         ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
         for simlex_count_inst in simplex_counts_cons:
