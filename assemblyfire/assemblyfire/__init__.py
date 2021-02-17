@@ -5,7 +5,7 @@ from assemblyfire.spikes import SpikeMatrixGroup, spikes2mat, sign_rate_std, spi
 from assemblyfire.assemblies import AssemblyProjectMetadata, Assembly, AssemblyGroup, ConsensusAssembly
 from assemblyfire.connectivity import ConnectivityMatrix
 from assemblyfire.topology import NetworkAssembly
-from assemblyfire.clustering import cluster_spikes, detect_assemblies, cluster_assemblies
+from assemblyfire.clustering import cluster_sim_mat, cluster_spikes, detect_assemblies, cluster_assemblies
 from assemblyfire import utils
 from assemblyfire import plots
 from .topological_analysis import TopologicalAnalysis
