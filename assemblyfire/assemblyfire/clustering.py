@@ -23,7 +23,7 @@ from scipy.stats.distributions import t
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.cluster.hierarchy import ward, fcluster
 from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_samples, davies_bouldin_score
+from sklearn.metrics import silhouette_score, silhouette_samples, davies_bouldin_score
 
 L = logging.getLogger("assemblyfire")
 
@@ -50,12 +50,15 @@ def cluster_sim_mat(spike_matrix, min_n_clusts=4, max_n_clusts=20):
 
     linkage = ward(cond_dists)
 
-    # determine number of clusters using Davies-Bouldin index
+    # determine number of clusters using silhouette scores (?Davies-Bouldin index?)
+    silhouette_scores = []
     DB_scores = []
     for n in range(min_n_clusts, max_n_clusts+1):
         clusters = fcluster(linkage, n, criterion="maxclust")
+        silhouette_scores.append(silhouette_score(dists, clusters))
         DB_scores.append(davies_bouldin_score(dists, clusters))
-    n_clust = np.argmin(DB_scores) + min_n_clusts
+    n_clust = np.argmax(silhouette_scores) + min_n_clusts
+    #n_clust = np.argmin(DB_scores) + min_n_clusts
 
     clusters = fcluster(linkage, int(n_clust), criterion="maxclust")
     silhouettes = silhouette_samples(dists, clusters)
