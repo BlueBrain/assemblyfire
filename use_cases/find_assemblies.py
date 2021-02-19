@@ -9,8 +9,10 @@ import os
 import pickle
 from collections import namedtuple
 import numpy as np
-from assemblyfire.spikes import spikes2mat, sign_rate_std, spikes_to_h5
+from assemblyfire.spikes import spikes2mat, spikes_to_h5  # sign_rate_std
 from assemblyfire.clustering import cluster_sim_mat, detect_assemblies
+from assemblyfire.utils import load_assemblies_from_h5
+from assemblyfire.assemblies import consensus_over_seeds_hamming
 from assemblyfire.plots import plot_rate, plot_sim_matrix,\
     plot_dendogram_silhouettes, plot_cluster_seqs, plot_pattern_clusters
 
@@ -67,7 +69,7 @@ def get_layer_boundaries(data_dir):
     return {"yticks": yticks, "yticklabels": yticklables, "hlines": hlines}
 
 
-def get_sign_spike_matrices(data_dir, h5f_name, fig_path, bin_size=10):
+def get_sign_spike_matrices(data_dir, h5f_name, fig_path, bin_size=20):
     """Quick and dirty rewrite of `assemblyfire/spikes.py/SpikeMatrixGroup.get_sign_spike_matrices()`
     for the use case of the topological sampling paper (to loading spikes from file)"""
 
@@ -82,9 +84,9 @@ def get_sign_spike_matrices(data_dir, h5f_name, fig_path, bin_size=10):
         idx = np.where((t_start <= spike_times) & (spike_times < t_end))[0]
         spike_matrix, gids, t_bins = spikes2mat(spike_times[idx], spiking_gids[idx], t_start, t_end, bin_size)
         assert (spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1)))
-        # threshold rate
         rate = np.sum(spike_matrix, axis=0)
-        rate_th = sign_rate_std(spike_times[idx], spiking_gids[idx], t_start, t_end, bin_size, N=100)
+        #rate_th = sign_rate_std(spike_times[idx], spiking_gids[idx], t_start, t_end, bin_size, N=100)
+        rate_th = 0.  # don't threshold
         t_idx = np.where(rate > rate_th)[0]  # just std, not mean + std
         rate_norm = len(np.unique(spiking_gids[idx])) * 1e-3 * bin_size
         fig_name = os.path.join(fig_path, "rate_seed%i.png" % i)
@@ -93,7 +95,7 @@ def get_sign_spike_matrices(data_dir, h5f_name, fig_path, bin_size=10):
         spike_matrix_dict[i] = SpikeMatrixResult(spike_matrix[:, t_idx], gids, t_bins[t_idx])
 
     # metadata = {"stim_times": stim_times, "patterns": patterns}  # can't be saved as attr because it's too long
-    #spikes_to_h5(h5f_name, spike_matrix_dict, metadata={}, prefix="spikes")
+    spikes_to_h5(h5f_name, spike_matrix_dict, metadata={}, prefix="spikes")
 
     return spike_matrix_dict, stim_times, patterns, t_slices
 
@@ -131,3 +133,7 @@ if __name__ == "__main__":
     ystuff = get_layer_boundaries(data_dir)
     detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, h5_prefix="assemblies",
                       FigureArgs=FigureArgs(None, None, depths, ystuff, fig_path))
+    # load assemblies from file, create consensus assemblies and saving them to h5...
+    assembly_grp_dict = load_assemblies_from_h5(h5f_name, prefix="assemblies", load_metadata=False)
+    consensus_over_seeds_hamming(assembly_grp_dict, h5f_name,
+                                 h5_prefix="consensus", fig_path=fig_path)
