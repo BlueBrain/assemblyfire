@@ -760,7 +760,7 @@ def consensus_over_seeds_hamming(assembly_grp_dict, h5f_name, h5_prefix, fig_pat
     gids = []
     n_assemblies = []
     assembly_lst = []
-    for _, assembly_grp in assembly_grp_dict[0].items():
+    for _, assembly_grp in assembly_grp_dict.items():
         gids.extend(assembly_grp.all.tolist())
         n = len(assembly_grp.assemblies)
         n_assemblies.append(n)
