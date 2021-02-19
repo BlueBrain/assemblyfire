@@ -9,8 +9,10 @@ import os
 import pickle
 from collections import namedtuple
 import numpy as np
+from scipy.sparse import load_npz
 from assemblyfire.spikes import spikes2mat, spikes_to_h5  # sign_rate_std
 from assemblyfire.clustering import cluster_sim_mat, detect_assemblies
+from assemblyfire.connectivity import ConnectivityMatrix
 from assemblyfire.utils import load_assemblies_from_h5
 from assemblyfire.assemblies import consensus_over_seeds_hamming
 from assemblyfire.plots import plot_rate, plot_sim_matrix,\
@@ -37,6 +39,18 @@ def load_patterns(data_dir):
     for pattern_id, pattern_name in zip(np.arange(8), ["A", "B", "C", "D", "E", "F", "G", "H"]):
         patterns[data == pattern_id] = pattern_name
     return stim_times, patterns
+
+
+def load_connectivity(data_dir, h5f_name):
+    """Loads connectivity matrix from .npz files and saves in assemblyfire's format"""
+    adj_mat = load_npz(os.path.join(data_dir, "connectivity.npz"))
+    with open(os.path.join(data_dir, "neuron_info.pickle"), "rb") as f:
+        nrn_info = pickle.load(f)
+    vertex_props = nrn_info[["y", "mtype"]]
+    vertex_props = vertex_props.rename(columns={"y": "depths", "mtype": "mtypes"})
+    vertex_props = vertex_props.astype({"depths": float, "mtypes": str})
+    conn_mat = ConnectivityMatrix(adj_mat, vertex_properties=vertex_props)
+    conn_mat.to_h5(h5f_name, group_name="full_matrix", prefix="connectivity")
 
 
 def map_gids_to_depth(data_dir):
@@ -127,6 +141,7 @@ def cluster_spikes(spike_matrix_dict, stim_times, patterns, t_slices, fig_path):
 if __name__ == "__main__":
 
     h5f_name = "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/use_cases/assemblies.h5"
+
     spike_matrix_dict, stim_times, patterns, t_slices = get_sign_spike_matrices(data_dir, h5f_name, fig_path)
     clusters_dict = cluster_spikes(spike_matrix_dict, stim_times, patterns, t_slices, fig_path)
     depths = map_gids_to_depth(data_dir)
@@ -137,3 +152,5 @@ if __name__ == "__main__":
     assembly_grp_dict = load_assemblies_from_h5(h5f_name, prefix="assemblies", load_metadata=False)
     consensus_over_seeds_hamming(assembly_grp_dict, h5f_name,
                                  h5_prefix="consensus", fig_path=fig_path)
+    # load connectivity matrix from file
+    load_connectivity(data_dir, h5f_name)
