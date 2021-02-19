@@ -35,7 +35,7 @@ Examples
 
 .. code-block::
 
-  assemblyfire find-assemblies -v configs/100p_depol_simmat.yaml
-  assemblyfire consenus -v configs/100p_depol_simmat.yaml
-  assemblyfire conn-mat -v configs/100p_depol_simmat.yaml
-  assemblyfire single-cell -v configs/100p_depol_simmat.yaml
+  assemblyfire -v find-assemblies configs/100p_depol_simmat.yaml
+  assemblyfire -v consensus configs/100p_depol_simmat.yaml
+  assemblyfire -v conn-mat configs/100p_depol_simmat.yaml
+  assemblyfire -v single-cell configs/100p_depol_simmat.yaml
