@@ -243,7 +243,7 @@ def _update_block_diagonal_dists(dists, n_assemblies):
     for i, j in zip(n_assemblies_cum[:-1], n_assemblies_cum[1:]):
         dists[i:j, i:j] = inf_dist
     np.fill_diagonal(dists, 0)
-    return n_assemblies_cum, squareform(dists)
+    return squareform(dists)
 
 
 def cluster_spikes(spike_matrix_dict, method, FigureArgs):
@@ -323,7 +323,7 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, h5_prefix, Fig
 
         # save to h5
         metadata = {"clusters": clusters}
-        assembly_lst = [Assembly(gids[core_cell_idx[:, i] == 1], i)
+        assembly_lst = [Assembly(gids[core_cell_idx[:, i] == 1], index=(i, seed))
                                  for i in assembly_idx]
         assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=gids,
                                    label="seed%i" % seed, metadata=metadata)
@@ -349,7 +349,7 @@ def cluster_assemblies(assemblies, n_assemblies, criterion, criterion_arg):
     dists = squareform(cond_dists)
     sim_matrix = 1 - dists
 
-    n_assemblies_cum, cond_dists = _update_block_diagonal_dists(dists, n_assemblies)
+    cond_dists = _update_block_diagonal_dists(dists, n_assemblies)
 
     linkage = ward(cond_dists)
 
@@ -360,4 +360,4 @@ def cluster_assemblies(assemblies, n_assemblies, criterion, criterion_arg):
     L.info("Total number of assemblies: %i, Number of clusters: %i" % (np.sum(counts), len(counts)))
 
     plotting = [linkage, silhouettes]
-    return sim_matrix, clusters, n_assemblies_cum, plotting
+    return sim_matrix, clusters, plotting
