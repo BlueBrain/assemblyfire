@@ -62,8 +62,8 @@ def __to_h5_1p0__(data, h5, prefix=None):
         if isinstance(assembly, ConsensusAssembly):
             __consensus_to_h5_1p0__(assembly, grp_out, prefix=strings["consensus"], label=str(i))
 
-    grp_out.attrs[strings["indices"]] = [assembly.idx if assembly.idx is not None else -1
-                                         for assembly in data]
+    grp_out.attrs[strings["indices"]] = np.array([assembly.idx if assembly.idx is not None else (-1, -1)
+                                                  for assembly in data])
     return prefix
 
 
@@ -203,7 +203,10 @@ class AssemblyProjectMetadata(object):
 class Assembly(object):
     def __init__(self, lst_gids, index=None):
         self.gids = np.array(lst_gids)
-        self.idx = index
+        if hasattr(index, "__len__"):
+            self.idx = tuple(index)
+        else:
+            self.idx = index
 
     def __len__(self):
         """
@@ -265,6 +268,9 @@ class AssemblyGroup(object):
             self.assemblies = [Assembly(all_gids[assemblies[:, i]], index=i) for i in range(assemblies.shape[1])]
         else:
             raise ValueError("Specify either a list of Assembly objects or a boolean matrix of assembly membership!")
+
+        idx_type = [isinstance(asmbl.idx, tuple) for asmbl in self.assemblies]
+        assert np.mod(np.sum(idx_type), len(idx_type)) == 0, "Assembly.idx must be all tuples or all scalar in a group!"
         self.label = label
         self.all = all_gids
         if metadata is None:
