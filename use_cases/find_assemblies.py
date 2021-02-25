@@ -13,8 +13,6 @@ from scipy.sparse import load_npz
 from assemblyfire.spikes import spikes2mat, spikes_to_h5  # sign_rate_std
 from assemblyfire.clustering import cluster_sim_mat, detect_assemblies
 from assemblyfire.connectivity import ConnectivityMatrix
-from assemblyfire.utils import load_assemblies_from_h5
-from assemblyfire.assemblies import consensus_over_seeds_hamming
 from assemblyfire.plots import plot_rate, plot_sim_matrix,\
     plot_dendogram_silhouettes, plot_cluster_seqs, plot_pattern_clusters
 
@@ -148,9 +146,6 @@ if __name__ == "__main__":
     ystuff = get_layer_boundaries(data_dir)
     detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, h5_prefix="assemblies",
                       FigureArgs=FigureArgs(None, None, depths, ystuff, fig_path))
-    # load assemblies from file, create consensus assemblies and saving them to h5...
-    assembly_grp_dict = load_assemblies_from_h5(h5f_name, prefix="assemblies", load_metadata=False)
-    consensus_over_seeds_hamming(assembly_grp_dict, h5f_name,
-                                 h5_prefix="consensus", fig_path=fig_path)
-    # load connectivity matrix from file
+
+    # load connectivity matrix from file and save it in assemblyfire's h5 format
     load_connectivity(data_dir, h5f_name)
