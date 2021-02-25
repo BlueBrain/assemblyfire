@@ -243,7 +243,7 @@ def _update_block_diagonal_dists(dists, n_assemblies):
     for i, j in zip(n_assemblies_cum[:-1], n_assemblies_cum[1:]):
         dists[i:j, i:j] = inf_dist
     np.fill_diagonal(dists, 0)
-    return squareform(dists)
+    return n_assemblies_cum, squareform(dists)
 
 
 def cluster_spikes(spike_matrix_dict, method, FigureArgs):
@@ -349,7 +349,7 @@ def cluster_assemblies(assemblies, n_assemblies, criterion, criterion_arg):
     dists = squareform(cond_dists)
     sim_matrix = 1 - dists
 
-    cond_dists = _update_block_diagonal_dists(dists, n_assemblies)
+    n_assemblies_cum, cond_dists = _update_block_diagonal_dists(dists, n_assemblies)
 
     linkage = ward(cond_dists)
 
@@ -360,4 +360,4 @@ def cluster_assemblies(assemblies, n_assemblies, criterion, criterion_arg):
     L.info("Total number of assemblies: %i, Number of clusters: %i" % (np.sum(counts), len(counts)))
 
     plotting = [linkage, silhouettes]
-    return sim_matrix, clusters, plotting
+    return sim_matrix, clusters, n_assemblies_cum, plotting

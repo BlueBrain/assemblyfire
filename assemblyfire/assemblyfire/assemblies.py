@@ -770,11 +770,11 @@ def consensus_over_seeds_hamming(assembly_grp_dict, h5f_name, h5_prefix, fig_pat
 
     # hierarhichal clustering
     if criterion == "maxclust":
-        sim_matrix, clusters, plotting = cluster_assemblies(all_assemblies.as_bool().T, n_assemblies,
-                                                            criterion, np.max(n_assemblies))
+        sim_matrix, clusters, n_assemblies_cum, plotting = cluster_assemblies(all_assemblies.as_bool().T, n_assemblies,
+                                                                              criterion, np.max(n_assemblies))
     elif criterion == "distance":
-        sim_matrix, clusters, plotting = cluster_assemblies(all_assemblies.as_bool().T, n_assemblies,
-                                                            criterion, threshold)
+        sim_matrix, clusters, n_assemblies_cum, plotting = cluster_assemblies(all_assemblies.as_bool().T, n_assemblies,
+                                                                              criterion, threshold)
     else:
         ValueError("Criterion must be 'distance' or 'maxclust'!")
 
@@ -786,7 +786,7 @@ def consensus_over_seeds_hamming(assembly_grp_dict, h5f_name, h5_prefix, fig_pat
 
     # making consensus assemblies from assemblies grouped by clustering
     for cluster in np.unique(clusters):
-        c_idx = np.where(clusters==cluster)[0]
+        c_idx = np.where(clusters == cluster)[0]
         assembly_lst = [all_assemblies.assemblies[i] for i in c_idx]
         cons_assembly = ConsensusAssembly(assembly_lst, index=cluster, label="cluster%i" % cluster)
         cons_assembly.to_h5(h5f_name, prefix=h5_prefix)
