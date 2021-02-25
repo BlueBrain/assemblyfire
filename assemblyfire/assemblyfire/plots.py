@@ -372,7 +372,7 @@ def plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name):
 
     fig = plt.figure(figsize=(10, 9))
     ax = fig.add_subplot(1, 1, 1)
-    i = ax.imshow(sim_mat, cmap="coolwarm",
+    i = ax.imshow(sim_mat, cmap="cividis",
                   aspect="auto", interpolation="none")
     fig.colorbar(i)
     ax.set_xticks(n_assemblies_cum)
