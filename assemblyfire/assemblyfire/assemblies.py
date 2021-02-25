@@ -62,7 +62,7 @@ def __to_h5_1p0__(data, h5, prefix=None):
         if isinstance(assembly, ConsensusAssembly):
             __consensus_to_h5_1p0__(assembly, grp_out, prefix=strings["consensus"], label=str(i))
 
-    grp_out.attrs[strings["indices"]] = np.array([assembly.idx if assembly.idx is not None else (-1, -1)
+    grp_out.attrs[strings["indices"]] = np.array([assembly.idx if assembly.idx is not None else -1
                                                   for assembly in data])
     return prefix
 
@@ -205,6 +205,8 @@ class Assembly(object):
         self.gids = np.array(lst_gids)
         if hasattr(index, "__len__"):
             self.idx = tuple(index)
+        elif index is None:
+            self.idx = -1
         else:
             self.idx = index
 
