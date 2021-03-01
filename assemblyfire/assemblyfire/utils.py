@@ -159,25 +159,19 @@ def load_assemblies_from_h5(h5f_name, prefix="assemblies", load_metadata=False):
         seeds = list(h5f[prefix].keys())
     assembly_grp_dict = {seed: AssemblyGroup.from_h5(h5f_name, seed, prefix=prefix) for seed in seeds}
     if load_metadata:
-        project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix="spikes")
+        project_metadata = {seed: AssemblyProjectMetadata.from_h5(h5f_name, seed, prefix=prefix) for seed in seeds}
         return assembly_grp_dict, project_metadata
     else:
         return assembly_grp_dict
 
 
-def load_consensus_assemblies_from_h5(h5f_name, prefix="consensus", load_metadata=False):
+def load_consensus_assemblies_from_h5(h5f_name, prefix="consensus"):
     """Load consensus (clustered and thresholded )assemblies
     from saved h5 file into dict of ConsensusAssembly objects"""
-    from assemblyfire.assemblies import ConsensusAssembly, AssemblyProjectMetadata
-
+    from assemblyfire.assemblies import ConsensusAssembly
     with h5py.File(h5f_name, "r") as h5f:
         keys = list(h5f[prefix].keys())
-    assembly_grp_dict = {k: ConsensusAssembly.from_h5(h5f_name, k, prefix=prefix) for k in keys}
-    if load_metadata:
-        project_metadata = AssemblyProjectMetadata.from_h5(h5f_name, prefix="spikes")
-        return assembly_grp_dict, project_metadata
-    else:
-        return assembly_grp_dict
+    return {k: ConsensusAssembly.from_h5(h5f_name, k, prefix=prefix) for k in keys}
 
 
 def load_spikes_from_h5(h5f_name, prefix="spikes"):

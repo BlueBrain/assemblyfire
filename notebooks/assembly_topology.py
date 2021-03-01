@@ -31,11 +31,11 @@ def assembly_topology(config_path):
         fig_name = os.path.join(spikes.fig_path, "simplex_counts_%s.png" % seed)
         plot_simplex_counts_seed(simplices, simplex_counts_control[seed], fig_name)
 
-    consensus_assembly_dict = load_consensus_assemblies_from_h5(spikes.h5f_name, prefix=
-        spikes.config["h5_out"]["prefixes"]["consensus_assemblies"], load_metadata=False)
-    simplex_counts, simplex_counts_control = simplex_counts_consensus(consensus_assembly_dict, network, N=1)
-    fig_name = os.path.join(spikes.fig_path, "simplex_counts_consensus.png")
-    plot_simplex_counts_consensus(simplex_counts, simplex_counts_control, fig_name)
+    #consensus_assembly_dict = load_consensus_assemblies_from_h5(spikes.h5f_name, prefix=
+    #    spikes.config["h5_out"]["prefixes"]["consensus_assemblies"])
+    #simplex_counts, simplex_counts_control = simplex_counts_consensus(consensus_assembly_dict, network, N=1)
+    #fig_name = os.path.join(spikes.fig_path, "simplex_counts_consensus.png")
+    #plot_simplex_counts_consensus(simplex_counts, simplex_counts_control, fig_name)
 
 
 if __name__ == "__main__":

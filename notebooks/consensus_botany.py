@@ -17,7 +17,7 @@ def consensus_botany(config_path):
     """Loads in consensus assemblies and plots unions' and cores' depth profile and mtype composition"""
 
     spikes = SpikeMatrixGroup(config_path)  # only used for the config part...
-    consensus_assemblies = load_consensus_assemblies_from_h5(spikes.h5f_name, prefix="consensus", load_metadata=False)
+    consensus_assemblies = load_consensus_assemblies_from_h5(spikes.h5f_name, prefix="consensus")
     network = NetworkAssembly.from_h5(spikes.h5f_name, group_name="full_matrix", prefix="connectivity")
 
     all_gids = network.gids
