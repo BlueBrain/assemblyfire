@@ -284,6 +284,43 @@ def plot_pattern_clusters(clusters, t_bins, stim_times, patterns, fig_name):
     plt.close(fig)
 
 
+def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, fig_name):
+    """plots sequence of time bins color coded by consensus assemblies
+    (+black if the orig cluster didn't become an assembly)"""
+
+    cmap_tmp = plt.cm.get_cmap("tab20", n_clusters)
+    cols = [(0.0, 0.0, 0.0, 0.8)] + [cmap_tmp(i) for i in range(n_clusters)]
+    cmap = colors.ListedColormap(cols)
+    bounds = np.arange(-1.5, n_clusters)
+    norm = colors.BoundaryNorm(bounds, cmap.N)
+
+    t_idx, pattern_matrices, row_idx = _group_by_patterns(clusters, t_bins, stim_times, patterns)
+    clusters = np.reshape(clusters, (1, len(clusters)))
+
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(3, 5, height_ratios=[1, 4, 4])
+    ax = fig.add_subplot(gs[0, :])
+    divider = make_axes_locatable(ax)
+    i_base = ax.imshow(clusters, cmap=cmap, norm=norm, aspect="auto")
+    cax = divider.new_vertical(size="50%", pad=0.1, pack_start=True)
+    fig.add_axes(cax)
+    fig.colorbar(i_base, cax=cax, orientation="horizontal", ticks=np.arange(-1, n_clusters))
+    ax.set_xticks(t_idx); ax.set_xticklabels(patterns)
+    ax.xaxis.tick_top()
+    ax.set_yticks([])
+
+    for i, (name, matrix) in enumerate(pattern_matrices.items()):
+        ax = fig.add_subplot(gs[1+np.floor_divide(i, 5), np.mod(i, 5)-5])
+        ax.imshow(matrix, cmap=cmap, norm=norm, aspect="auto")
+        ax.set_title(name)
+        ax.set_xticks([])
+        ax.set_yticks([0, row_idx[name]-1])
+
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def _gids_to_depth(gids, depths):
     """Converts unique gids to cortical depths"""
     return [depths[gid] for gid in gids]
@@ -770,7 +807,11 @@ def plot_simplex_counts_consensus(simplex_counts, simplex_counts_control, fig_na
     fig = plt.figure(figsize=(20, 8))
     n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
     gs = gridspec.GridSpec(n_rows, 5)
-    for i, (label, simplex_counts_cons) in enumerate(simplex_counts.items()):
+
+    # for i, (label, simplex_counts_cons) in enumerate(simplex_counts.items()):
+    for i in range(n):
+        label = "cluster%i" % i
+        simplex_counts_cons = simplex_counts[label]
         ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
         for simlex_count_inst in simplex_counts_cons:
             ax.plot(simlex_count_inst, color=cmap(i))
