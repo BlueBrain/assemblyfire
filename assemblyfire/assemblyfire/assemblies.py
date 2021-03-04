@@ -753,12 +753,12 @@ class ConsensusAssembly(Assembly):
     '''
 
 
-def consensus_over_seeds_hamming(assembly_grp_dict, h5f_name, h5_prefix, fig_path, criterion="maxclust", threshold=None):
+def consensus_over_seeds_hc(assembly_grp_dict, h5f_name, h5_prefix, fig_path,
+                            distance_metric="jaccard", linkage_method="ward"):
     """
-    Hierarhichal clustering (Ward linkage) of assemblies from different seeds based on Hamming distance
+    Hierarhichal clustering (Ward linkage) of assemblies from different seeds based on Jaccard distance
     :param assembly_grp_dict: dict with seeds as keys and AssemblyGroup object as values
-    :param criterion: criterion for hierarchical clustering (see `clustering.py/cluster_assemblies()`)
-    :param threshold: threshold to cut dendogram if criterion is "distance" (see `clustering.py/cluster_assemblies()`)
+    :param distance_metric, linkage_method: see `clustering.py/cluster_assemblies()`
     :return: assembly_grp_clust: dict with cluster idx as keys and AssemblyGroup object as values
     """
     from assemblyfire.clustering import cluster_assemblies
@@ -776,20 +776,13 @@ def consensus_over_seeds_hamming(assembly_grp_dict, h5f_name, h5_prefix, fig_pat
     all_gids = np.unique(gids)
     all_assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=all_gids, label="all")
 
-    # hierarhichal clustering
-    if criterion == "maxclust":
-        sim_matrix, clusters, plotting = cluster_assemblies(all_assemblies.as_bool().T, n_assemblies,
-                                                                              criterion, np.max(n_assemblies))
-    elif criterion == "distance":
-        sim_matrix, clusters, plotting = cluster_assemblies(all_assemblies.as_bool().T, n_assemblies,
-                                                                              criterion, threshold)
-    else:
-        ValueError("Criterion must be 'distance' or 'maxclust'!")
+    sim_matrix, clusters, plotting = cluster_assemblies(all_assemblies.as_bool().T, n_assemblies,
+                                                        distance_metric, linkage_method, np.max(n_assemblies))
 
     # plotting clustering results
-    fig_name = os.path.join(fig_path, "simmat_assemblies_hamming.png")
+    fig_name = os.path.join(fig_path, "simmat_assemblies_%s.png" % distance_metric)
     plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name)
-    fig_name = os.path.join(fig_path, "Ward_clustering_assemblies.png")
+    fig_name = os.path.join(fig_path, "HC_assemblies_%s_linkage.png" % linkage_method)
     plot_dendogram_silhouettes(clusters, *plotting, fig_name)
 
     # making consensus assemblies from assemblies grouped by clustering

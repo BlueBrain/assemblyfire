@@ -21,7 +21,7 @@ import multiprocessing as mp
 from scipy.optimize import curve_fit
 from scipy.stats.distributions import t
 from scipy.spatial.distance import pdist, cdist, squareform
-from scipy.cluster.hierarchy import ward, fcluster
+from scipy.cluster.hierarchy import linkage, fcluster
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score, silhouette_samples, davies_bouldin_score
 
@@ -48,23 +48,23 @@ def cluster_sim_mat(spike_matrix, min_n_clusts=4, max_n_clusts=20):
     dists[dists < 1e-10] = 0.  # fixing numerical errors
     cond_dists = squareform(dists)  # squareform implements its inverse if the input is a square matrix
 
-    linkage = ward(cond_dists)
+    linkage_matrix = linkage(cond_dists, method="ward")
 
     # determine number of clusters using silhouette scores (?Davies-Bouldin index?)
     silhouette_scores = []
     DB_scores = []
     for n in range(min_n_clusts, max_n_clusts+1):
-        clusters = fcluster(linkage, n, criterion="maxclust")
+        clusters = fcluster(linkage_matrix, n, criterion="maxclust")
         silhouette_scores.append(silhouette_score(dists, clusters))
         DB_scores.append(davies_bouldin_score(dists, clusters))
     n_clust = np.argmax(silhouette_scores) + min_n_clusts
     #n_clust = np.argmin(DB_scores) + min_n_clusts
 
-    clusters = fcluster(linkage, int(n_clust), criterion="maxclust")
+    clusters = fcluster(linkage_matrix, int(n_clust), criterion="maxclust")
     silhouettes = silhouette_samples(dists, clusters)
     clusters = clusters - 1  # to start indexing at 0
 
-    plotting = [linkage, silhouettes]
+    plotting = [linkage_matrix, silhouettes]
     return sim_matrix, clusters, plotting
 
 
@@ -230,7 +230,7 @@ def within_cluster_correlations(spike_matrix, core_cell_idx):
     return assembly_idx
 
 
-def _update_block_diagonal_dists(dists, n_assemblies):
+def _update_block_diagonal_dists(dists, n_assemblies_cum):
     """
     Assemblies from the same seed tend to cluster together, but that's not what we want. - Daniela
     Thus, this function fills block diagonals with "infinite" distance representing infinite distance
@@ -238,8 +238,7 @@ def _update_block_diagonal_dists(dists, n_assemblies):
     which can be passed to hierarhichal clustering in the next step
     """
 
-    inf_dist = np.max(dists) * 10
-    n_assemblies_cum = [0] + np.cumsum(n_assemblies).tolist()
+    inf_dist = np.max(dists) * 5
     for i, j in zip(n_assemblies_cum[:-1], n_assemblies_cum[1:]):
         dists[i:j, i:j] = inf_dist
     np.fill_diagonal(dists, 0)
@@ -335,29 +334,48 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, h5_prefix, Fig
                         FigureArgs.ystuff, FigureArgs.depths, fig_name)
 
 
-def cluster_assemblies(assemblies, n_assemblies, criterion, criterion_arg):
+def _check_seed_separation(clusters, n_assemblies_cum):
+    """..."""
+    for i, j in zip(n_assemblies_cum[:-1], n_assemblies_cum[1:]):
+        _, counts = np.unique(clusters[i:j], return_counts=True)
+        if (counts > 1).any():
+            return False
+    return True
+
+
+def cluster_assemblies(assemblies, n_assemblies, distance_metric, linkage_method, min_n_clusts, max_n_clusts=20):
     """
     Hieararchical (Ward linkage) clustering of hamming similarity matrix of assemblies from different seeds
     :param assemblies: assemblies x gids boolean array representing all assemblies across seeds
     :param n_assemblies: list with number of assemblies per seed
-    :param criterion: criterion for hierarchical clustering
-    :param criterion_arg: if criterion is maxclust the number of clusters to find
-                          if criterion is distance the threshold to cut the dendogram
+    :param distance_metric: distance metrics to use on assemblies (has to be valid in scipy's `pdist()`)
+    :param linkage_method: linkage method to use (has to be valid in scipy's `hierarchy.linakge()`)
+    :param min_n_clusts, max_n_clust: minimum and maximum number of clusters to try
     """
-
-    cond_dists = pdist(assemblies, metric="hamming")
+    cond_dists = pdist(assemblies, metric=distance_metric)
     dists = squareform(cond_dists)
     sim_matrix = 1 - dists
+    n_assemblies_cum = [0] + np.cumsum(n_assemblies).tolist()
+    cond_dists = _update_block_diagonal_dists(dists, n_assemblies_cum)
 
-    cond_dists = _update_block_diagonal_dists(dists, n_assemblies)
+    linkage_matrix = linkage(cond_dists, method=linkage_method)
 
-    linkage = ward(cond_dists)
-
-    clusters = fcluster(linkage, criterion_arg, criterion=criterion)
+    # determine number of clusters using the combination of silhouette scores
+    # and the fact that we don't want assemblies from the same seed to cluster together
+    valid_nclusts = []
+    silhouette_scores = []
+    for n in range(min_n_clusts, max_n_clusts+1):
+        clusters = fcluster(linkage_matrix, n, criterion="maxclust")
+        if _check_seed_separation(clusters, n_assemblies_cum):
+            valid_nclusts.append(n)
+            silhouette_scores.append(silhouette_score(dists, clusters))
+    if len(valid_nclusts):
+        n_clust = valid_nclusts[np.argmax(silhouette_scores)]
+    else:
+        raise RuntimeError("None of the cluster numbers in [%i, %i] fulfill the seed separation criteria"
+                           % (min_n_clusts, max_n_clusts))
+    clusters = fcluster(linkage_matrix, n_clust, criterion="maxclust")
     silhouettes = silhouette_samples(dists, clusters)
-    clusters = clusters - 1  # to start indexing at 0
-    cluster_idx, counts = np.unique(clusters, return_counts=True)
-    L.info("Total number of assemblies: %i, Number of clusters: %i" % (np.sum(counts), len(counts)))
 
-    plotting = [linkage, silhouettes]
-    return sim_matrix, clusters, plotting
+    plotting = [linkage_matrix, silhouettes]
+    return sim_matrix, clusters - 1, plotting

@@ -6,9 +6,10 @@ last modified: András Ecker 02.2021
 """
 
 import os
+import h5py
 import numpy as np
 from assemblyfire.utils import load_assemblies_from_h5, load_consensus_assemblies_from_h5
-from assemblyfire.assemblies import consensus_over_seeds_hamming
+from assemblyfire.assemblies import consensus_over_seeds_hc
 from assemblyfire.topology import NetworkAssembly, simplex_counts_consensus
 from assemblyfire.plots import plot_simplex_counts_consensus, plot_cons_cluster_seqs
 from find_assemblies import load_patterns
@@ -40,7 +41,6 @@ def consensus_assembly_cluster_seq(consensus_assembly_dict, assembly_metadata, d
     t_full = stim_times[-1] + 200
     t_slices = np.arange(0, t_full+30000, 30000)
     for i, (t_start, t_end) in enumerate(zip(t_slices[:-1], t_slices[1:])):
-        print(i)
         t_bins = np.arange(t_start, t_end + 20., 20.)  # bin size = 20 ms from the rest of the use case
         idx = np.where((t_start <= stim_times) & (stim_times < t_end))[0]
 
@@ -62,11 +62,15 @@ def consensus_assembly_cluster_seq(consensus_assembly_dict, assembly_metadata, d
 if __name__ == "__main__":
 
     h5f_name = "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/use_cases/assemblies.h5"
+    # to be able to try different consensus clustering methods
+    h5f = h5py.File(h5f_name, "a")
+    if "consensus" in h5f.keys():
+        del h5f["consensus"]
+    h5f.close()
 
     # load assemblies from file, create consensus assemblies, saving them to h5, and loading again
     assembly_grp_dict, assembly_metadata = load_assemblies_from_h5(h5f_name, prefix="assemblies", load_metadata=True)
-    consensus_over_seeds_hamming(assembly_grp_dict, h5f_name,
-                                 h5_prefix="consensus", fig_path=fig_path)
+    consensus_over_seeds_hc(assembly_grp_dict, h5f_name, h5_prefix="consensus", fig_path=fig_path)
     consensus_assembly_dict = load_consensus_assemblies_from_h5(h5f_name, prefix="consensus")
 
     consensus_assembly_cluster_seq(consensus_assembly_dict, assembly_metadata, data_dir)

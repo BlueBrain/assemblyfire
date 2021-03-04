@@ -64,10 +64,9 @@ def run(config_path):
     assembly_grp_dict = load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies, load_metadata=False)
 
     L.info(" Creating consensus assemblies and saving them to the same file")
-    if config.clustering_method == "hamming":
-        from assemblyfire.assemblies import consensus_over_seeds_hamming
-        consensus_over_seeds_hamming(assembly_grp_dict, config.h5f_name,
-                                     config.h5_prefix_consensus, config.fig_path)
+    if config.clustering_method == "hierarchical":
+        from assemblyfire.assemblies import consensus_over_seeds_hc
+        consensus_over_seeds_hc(assembly_grp_dict, config.h5f_name, config.h5_prefix_consensus, config.fig_path)
     elif config.clustering_method == "greedy":  # TODO: make this run
         from assemblyfire.assemblies import consensus_over_seeds_greedy
         consensus_assemblies, _, _ = consensus_over_seeds_greedy(assembly_grp_dict)

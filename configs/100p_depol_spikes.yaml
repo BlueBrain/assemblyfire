@@ -21,4 +21,4 @@ preprocessing_protocol:
 
 clustering_methods:
     spikes: "density_based"
-    assemblies: "hamming"
+    assemblies: "hierarchical"
