@@ -255,35 +255,6 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
     plt.close(fig)
 
 
-def plot_pattern_clusters(clusters, t_bins, stim_times, patterns, fig_name):
-    """Plots counts of clusters for every pattern"""
-
-    n = len(np.unique(clusters))
-    cmap = plt.cm.get_cmap("tab20", n)
-    cols = [colors.to_hex(cmap(i)) for i in range(n)]
-    _, pattern_matrices, _ = _group_by_patterns(clusters, t_bins, stim_times, patterns)
-
-    fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(2, 5)
-
-    for i, (name, matrix) in enumerate(pattern_matrices.items()):
-        clusts, counts = np.unique(matrix[~np.isnan(matrix)], return_counts=True)
-        heights = np.zeros(n)
-        for j in range(n):
-            if j in clusts:
-                heights[j] = counts[clusts == j]
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
-        x = np.arange(n)
-        ax.bar(x, heights, width=0.5, align="center", color=cols)
-        ax.set_title(name)
-        ax.set_xticks(x)
-        ax.set_xlim([-0.5, n-0.5])
-    sns.despine()
-    fig.tight_layout()
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
-    plt.close(fig)
-
-
 def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, fig_name):
     """plots sequence of time bins color coded by consensus assemblies
     (+black if the orig cluster didn't become an assembly)"""
@@ -316,6 +287,72 @@ def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, f
         ax.set_xticks([])
         ax.set_yticks([0, row_idx[name]-1])
 
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_pattern_clusters(clusters, t_bins, stim_times, patterns, fig_name):
+    """Plots counts of clusters for every pattern"""
+
+    n = len(np.unique(clusters))
+    cmap = plt.cm.get_cmap("tab20", n)
+    cols = [colors.to_hex(cmap(i)) for i in range(n)]
+    _, pattern_matrices, _ = _group_by_patterns(clusters, t_bins, stim_times, patterns)
+
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(2, 5)
+
+    for i, (pattern_name, matrix) in enumerate(pattern_matrices.items()):
+        clusts, counts = np.unique(matrix[~np.isnan(matrix)], return_counts=True)
+        heights = np.zeros(n)
+        for j in range(n):
+            if j in clusts:
+                heights[j] = counts[clusts == j]
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        x = np.arange(n)
+        ax.bar(x, heights, width=0.5, align="center", color=cols)
+        ax.set_title(pattern_name)
+        ax.set_xticks(x)
+        ax.set_xlim([-0.5, n-0.5])
+    sns.despine()
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_pattern_cons_clusters(cons_clusters_dict, t_bins_dict, stim_times_dict, patterns_dict, n_clusters, fig_name):
+    """Plots counts of consensus clusters for every pattern"""
+
+    cmap = plt.cm.get_cmap("tab20", n_clusters)
+    cols = [colors.to_hex(cmap(i)) for i in range(n_clusters)]
+
+    heights_dict = {}
+    patter_names = []
+    keys = list(cons_clusters_dict.keys())
+    for key in keys:
+        _, pattern_matrices, _ = _group_by_patterns(cons_clusters_dict[key], t_bins_dict[key],
+                                                    stim_times_dict[key], patterns_dict[key])
+        for pattern_name, matrix in pattern_matrices.items():
+            if pattern_name not in heights_dict:
+                heights_dict[pattern_name] = np.zeros(n_clusters)
+                patter_names.append(pattern_name)
+            clusts, counts = np.unique(matrix[~np.isnan(matrix)], return_counts=True)
+            for i in range(n_clusters):
+                if i in clusts:
+                    heights_dict[pattern_name][i] += counts[clusts == i]
+
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(2, 5)
+    x = np.arange(n_clusters)
+    for i, pattern_name in enumerate(np.sort(patter_names)):
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        ax.bar(x, heights_dict[pattern_name], width=0.5, align="center", color=cols)
+        ax.set_title(pattern_name)
+        ax.set_xticks(x)
+        ax.set_xlim([-0.5, n_clusters - 0.5])
+        ax.set_yscale("log")
+    sns.despine()
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -459,14 +496,17 @@ def plot_consensus_mtypes(union_gids, union_mtypes, consensus_gids, gids, consen
     """Plots depth profile and mtypes for consensus assemblies"""
 
     n = len(consensus_gids)
-    mtypes_lst = np.unique(mtypes)[::-1]
+    # mtypes_lst = np.unique(mtypes)[::-1]  # commented out for toposample use case...
+    mtypes_lst = np.array(["L6_UTPC", "L6_TPC_L4", "L6_TPC_L1", "L6_IPC", "L6_BPC", "L5_UTPC",
+                           "L5_TTPC2", "L5_TTPC1", "L5_STPC", "L4_SS", "L4_SP", "L4_PC", "L23_PC"])
     mtypes_ypos = np.arange(len(mtypes_lst))
     mtype_hlines = np.array([4.5, 8.5, 11.5])  # this is totally hard coded based on mtypes by layer
     cmap = plt.cm.get_cmap("tab20", n)
     yrange = [ystuff["hlines"][-1], ystuff["hlines"][1]]
 
     fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(2, n+1)
+    # gs = gridspec.GridSpec(2, n+1)  # commented out for toposample use case...
+    gs = gridspec.GridSpec(2, n)
     for i in range(n):
         ax = fig.add_subplot(gs[0, i])
         gid_depths = _gids_to_depth(consensus_gids[i], depths)
@@ -478,7 +518,7 @@ def plot_consensus_mtypes(union_gids, union_mtypes, consensus_gids, gids, consen
                 color="black", histtype="step", label="union")
         for j in range(2, 6):
             ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
-        ax.set_title("cons%s\n(n=%i)" % (i + 1, consensus_gids[i].shape[0]))
+        ax.set_title("cons%s\n(n=%i)" % (i, consensus_gids[i].shape[0]))
         ax.set_xlim(left=5)  # for purely viz. purposes
         ax2 = fig.add_subplot(gs[1, i])
         mtypes_plot = [np.where(consensus_mtypes[i] == mtype)[0].shape[0] for mtype in mtypes_lst]
@@ -507,6 +547,7 @@ def plot_consensus_mtypes(union_gids, union_mtypes, consensus_gids, gids, consen
             sns.despine(ax=ax, left=True, bottom=True)
             sns.despine(ax=ax2, left=True, bottom=True)
 
+    """ commented out for toposample use case
     ax = fig.add_subplot(gs[0, -1])
     gid_depths = _gids_to_depth(gids, depths)
     ax.hist(gid_depths, bins=50, range=yrange, orientation="horizontal",
@@ -528,6 +569,7 @@ def plot_consensus_mtypes(union_gids, union_mtypes, consensus_gids, gids, consen
     ax2.set_yticks([])
     sns.despine(ax=ax, left=True, bottom=True)
     sns.despine(ax=ax2, left=True, bottom=True)
+    """
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
