@@ -6,7 +6,7 @@ Main run function for finding cell assemblies in spiking data
 import logging
 from collections import namedtuple
 
-from assemblyfire.utils import ensure_dir, map_gids_to_depth, get_layer_boundaries
+from assemblyfire.utils import ensure_dir, get_figure_asthetics
 from assemblyfire.spikes import SpikeMatrixGroup
 from assemblyfire.clustering import cluster_spikes, detect_assemblies
 
@@ -26,8 +26,7 @@ def run(config_path):
 
     L.info(" Figures will be saved to: %s" % spikes.fig_path)
     ensure_dir(spikes.fig_path)
-    depths = map_gids_to_depth(spikes.get_blueconfig_path(spikes.seeds[0]), spikes.target)
-    ystuff = get_layer_boundaries(spikes.get_blueconfig_path(spikes.seeds[0]), spikes.target)
+    depths, ystuff = get_figure_asthetics(spikes.load_sim_path().iloc[0], spikes.target)
 
     L.info(" Preprocessed spikes and assemblies will be saved to: %s" % spikes.h5f_name)
     spike_matrix_dict = spikes.get_sign_spike_matrices()
