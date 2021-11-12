@@ -10,5 +10,6 @@ assemblyfire/__pycache__
 *.sh
 *.log
 *.h5
+configs/SBP/
 use_cases/input_data
 use_cases/.ipynb_checkpoints/
