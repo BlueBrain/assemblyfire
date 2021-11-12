@@ -7,7 +7,6 @@ from setuptools import setup, find_packages
 if sys.version_info < (3, 6):
     sys.exit("Sorry, Python < 3.6 is not supported")
 
-
 VERSION = imp.load_source("", "assemblyfire/version.py").__version__
 
 setup(
