@@ -9,7 +9,7 @@ import os
 import logging
 
 from assemblyfire.spikes import SpikeMatrixGroup, single_cell_features_to_h5
-from assemblyfire.utils import map_gids_to_depth, get_layer_boundaries
+from assemblyfire.utils import get_figure_asthetics
 from assemblyfire.plots import plot_single_cell_features
 
 L = logging.getLogger("assemblyfire")
@@ -33,7 +33,6 @@ def run(config_path):
                                prefix=spikes.h5_prefix_spikes)
 
     L.info(" Figures will be saved to: %s" % spikes.fig_path)
-    depths = map_gids_to_depth(spikes.get_blueconfig_path(spikes.seeds[0]), gids_r)
-    ystuff = get_layer_boundaries(spikes.get_blueconfig_path(spikes.seeds[0]))
+    depths, ystuff = get_figure_asthetics(spikes.load_sim_path().iloc[0], spikes.target)
     fig_name = os.path.join(spikes.fig_path, "single_cell_features.png")
     plot_single_cell_features(gids_r, r_spikes, mean_ts, std_ts, ystuff, depths, fig_name)
