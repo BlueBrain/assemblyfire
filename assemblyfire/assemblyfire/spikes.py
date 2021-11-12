@@ -5,7 +5,7 @@ a la (Sasaki et al. 2006 and) Carillo-Reid et al. 2015:
 Bin spikes and threshold activity by population firing rate
 + SpikeMatrixGroup has some extra functionality to calculate
 spike time reliability across seeds
-last modified: Thomas Delemontex, András Ecker 11.2020
+authors: Thomas Delemontex and András Ecker; last update 11.2021
 """
 
 import os
@@ -14,7 +14,9 @@ from tqdm import tqdm
 from copy import deepcopy
 from collections import namedtuple
 from cached_property import cached_property
+import h5py
 import numpy as np
+import pandas as pd
 import multiprocessing as mp
 
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
@@ -22,7 +24,7 @@ SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_
 
 def get_bluepy_simulation(blueconfig_path):
     try:
-        from bluepy.v2 import Simulation
+        from bluepy import Simulation
     except ImportError as e:
         msg = (
             "Assemblyfire requirements are not installed.\n"
@@ -59,10 +61,10 @@ def get_rate_norm(N, bin_size):
 
 
 def shuffle_tbins(spike_times, spiking_gids, t_start, t_end, bin_size):
-    """Creates surrogate dataset a la Sasaki et al. 2006 by randomly offseting every spike
+    """Creates surrogate dataset a la Sasaki et al. 2006 by randomly offsetting every spike
     (thus after discretization see `spike2mat()` they will be in an other time bin)"""
-
-    spike_times += bin_size * np.random.choice([-1, 1], len(spike_times))
+    # Note: in Sasaki et al. 2006 the offset was +/-1 while here it's a bit broader atm.
+    spike_times += bin_size * np.random.choice([-3, -2, -1, 1, 2, 3], len(spike_times))
     spike_matrix, _, _ = spikes2mat(spike_times, spiking_gids,
                                     t_start, t_end, bin_size)
     return spike_matrix
@@ -77,7 +79,6 @@ def _shuffle_tbins_subprocess(inputs):
 def sign_rate_std(spike_times, spiking_gids, t_start, t_end, bin_size, N=100):
     """Generates surrogate datasets, checks the std of rates
     and sets significance threshold to its 95% percentile"""
-
     n = N if mp.cpu_count() - 1 > N else mp.cpu_count() - 1
     pool = mp.Pool(processes=n)
     tbin_stds = pool.map(_shuffle_tbins_subprocess, zip([deepcopy(spike_times) for _ in range(N)],
@@ -99,7 +100,6 @@ def spike_train_convolution(spike_matrix, std):
 
 def spikes_to_h5(h5f_name, spike_matrix_dict, metadata, prefix):
     """Saves spike matrices to HDF5 file"""
-    import h5py
     with h5py.File(h5f_name, "a") as h5f:
         grp = h5f.require_group(prefix)
         for k, v in metadata.items():
@@ -112,8 +112,7 @@ def spikes_to_h5(h5f_name, spike_matrix_dict, metadata, prefix):
 
 
 def single_cell_features_to_h5(h5f_name, gids, r_spikes, mean_ts_in_bin, std_ts_in_bin, prefix):
-    """Saves spike matrices to HDF5 file"""
-    import h5py
+    """Saves single cell features to HDF5 file"""
     with h5py.File(h5f_name, "a") as h5f:
         grp = h5f.require_group(prefix)
         grp.create_dataset("gids", data=gids)
@@ -140,10 +139,6 @@ class SpikeMatrixGroup(object):
         return self.config["root_path"]
 
     @property
-    def patterns_fname(self):
-        return self.config["patterns_fname"]
-
-    @property
     def h5f_name(self):
         return self.config["h5_out"]["file_name"]
 
@@ -159,9 +154,9 @@ class SpikeMatrixGroup(object):
     def root_fig_path(self):
         return self.config["root_fig_path"]
 
-    @cached_property
+    @property
     def fig_path(self):
-        return os.path.join(self.root_fig_path, self._config_path.split('/')[-1][:-5])
+        return os.path.join(self.root_fig_path, os.path.split(self.root_path)[1])
 
     @property
     def target(self):
@@ -210,9 +205,17 @@ class SpikeMatrixGroup(object):
         return self.config["clustering_methods"]["spikes"]
 
     @cached_property
-    def seeds(self):
-        from assemblyfire.utils import get_seeds
-        return get_seeds(self.root_path)
+    def patterns_fname(self):
+        """Finds `patterns_fname` in campaigns set up by custom bbp-workflow (in v5 it was part of the config...)"""
+        patterns_fname = None
+        if os.path.isdir(os.path.join(self.root_path, "input_spikes")):
+            for f_name in os.listdir(os.path.join(self.root_path, "input_spikes")):
+                if f_name[-4:] == ".txt" and "stimulus_stream" in f_name:
+                    patterns_fname = f_name
+        if patterns_fname is not None:
+            return os.path.join(self.root_path, "input_spikes", patterns_fname)
+        else:
+            raise RuntimeError("Couldn't find %s/input_spikes/*stimulus_stream*.txt" % self.root_path)
 
     @cached_property
     def stim_times(self):
@@ -224,14 +227,19 @@ class SpikeMatrixGroup(object):
         from assemblyfire.utils import get_patterns
         return get_patterns(self.patterns_fname)
 
-    def get_blueconfig_path(self, seed):
-        return os.path.join(self.root_path, "stimulusstim_a0", "seed%i" % seed, "BlueConfig")
-        # return os.path.join(self.root_path, "seed%i" % seed, "BlueConfig")  # changed to analyse Sirio's sims
+    def load_sim_path(self):
+        """Loads in simulation paths as pandas (MultiIndex) DataFrame generated by bbp-workflow"""
+        pklf_name = os.path.join(self.root_path, "analyses", "simulations.pkl")
+        sim_paths = pd.read_pickle(pklf_name)
+        level_names = sim_paths.index.names
+        assert len(level_names) == 1 and level_names[0] == "seed", "Only a campaign/DataFrame with single" \
+               "`coord`/index level called `seed` is acceptable by assemblyfire"
+        return sim_paths
 
-    def load_spikes(self, seed, t_start):
+    def load_spikes(self, blueconfig_path, t_start):
         """Loads in spikes from simulations using bluepy"""
         from assemblyfire.utils import get_E_gids, get_spikes
-        sim = get_bluepy_simulation(self.get_blueconfig_path(seed))
+        sim = get_bluepy_simulation(blueconfig_path)
         gids = get_E_gids(sim.circuit, self.target)
         spike_times, spiking_gids = get_spikes(sim, gids, t_start, self.t_end)
         return spike_times, spiking_gids
@@ -241,11 +249,12 @@ class SpikeMatrixGroup(object):
         from assemblyfire.plots import plot_rate
 
         spike_matrix_dict = {}
-        for seed in tqdm(self.seeds, desc="Loading in simulation results"):
+        sim_paths = self.load_sim_path()
+        for seed, blueconfig_path in tqdm(sim_paths.iteritems(), desc="Loading in simulation results"):
             if seed in self.ignore_seeds:
                 pass
             t_start = self.t_start if seed not in self.seeds_exception else self.t_start_exception
-            spike_times, spiking_gids = self.load_spikes(seed, t_start)
+            spike_times, spiking_gids = self.load_spikes(blueconfig_path, t_start)
             spike_matrix, gids, t_bins = spikes2mat(spike_times, spiking_gids,
                                                     t_start, self.t_end, self.bin_size)
             assert (spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1)))
@@ -268,7 +277,7 @@ class SpikeMatrixGroup(object):
             plot_rate(rate/rate_norm, rate_th/rate_norm, t_start, self.t_end, fig_name)
 
         # save spikes to h5
-        metadata = {"root_path": self.root_path, "seeds": self.seeds,
+        metadata = {"root_path": self.root_path, "seeds": np.sort(sim_paths.index.to_numpy()),
                     "stim_times": self.stim_times, "patterns": self.patterns}
         spikes_to_h5(self.h5f_name, spike_matrix_dict, metadata, prefix=self.h5_prefix_spikes)
 
