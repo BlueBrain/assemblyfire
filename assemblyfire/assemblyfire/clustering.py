@@ -36,7 +36,7 @@ def cosine_similarity(X):
 
 
 # hierarchical clustering (using scipy and sklearn)
-def cluster_sim_mat(spike_matrix, min_n_clusts=4, max_n_clusts=20):
+def cluster_sim_mat(spike_matrix, min_n_clusts=5, max_n_clusts=20, n_method="DB"):
     """Hieararchical (Ward linkage) clustering of cosine similarity matrix of significant time bins"""
 
     # cond_dists = pdist(spike_matrix.T, metric="cosine")
@@ -50,15 +50,17 @@ def cluster_sim_mat(spike_matrix, min_n_clusts=4, max_n_clusts=20):
 
     linkage_matrix = linkage(cond_dists, method="ward")
 
-    # determine number of clusters using silhouette scores (?Davies-Bouldin index?)
-    silhouette_scores = []
-    DB_scores = []
+    # determine number of clusters using silhouette scores or Davies-Bouldin index
+    silhouette_scores, DB_scores = [], []
     for n in range(min_n_clusts, max_n_clusts+1):
         clusters = fcluster(linkage_matrix, n, criterion="maxclust")
         silhouette_scores.append(silhouette_score(dists, clusters))
         DB_scores.append(davies_bouldin_score(dists, clusters))
-    n_clust = np.argmax(silhouette_scores) + min_n_clusts
-    #n_clust = np.argmin(DB_scores) + min_n_clusts
+    assert n_method in ["ss", "DB"], "Only silhouette scores and Davies-Bouldin index is supported atm."
+    if n_method == "ss":
+        n_clust = np.argmax(silhouette_scores) + min_n_clusts
+    elif n_method == "DB":
+        n_clust = np.argmin(DB_scores) + min_n_clusts
 
     clusters = fcluster(linkage_matrix, int(n_clust), criterion="maxclust")
     silhouettes = silhouette_samples(dists, clusters)
@@ -79,7 +81,6 @@ def PCA_ncomps(matrix, n_components):
 def calc_rho_delta(dists, ratio_to_keep):
     """Herzog et al. 2020: calculates local density: \rho_i = 1 / (1/N*\sum_{j:d_ij<d_c} d_ij) and
     minimum distance with points with higher density: \delta_i = min_{j:\rho_j>\rho_i} (d_ij)"""
-
     # keep a given % of the neighbours a la Yger et al. 2018
     # (not constant d_c as in the original Rodrigez and Laio 2014 paper)
     n2keep = int(ratio_to_keep * dists.shape[1])
@@ -98,7 +99,6 @@ def calc_rho_delta(dists, ratio_to_keep):
             deltas[i] = np.min(dists[i, idx])
         else:
             deltas[i] = np.max(dists[i, :])
-
     return rhos, deltas
 
 
@@ -109,47 +109,36 @@ def _fn(x, m, yshift):
 
 def fit_gammas(gammas, alpha=0.001):
     """Fits sorted gammas"""
-
     tmp_idx = np.arange(0, len(gammas))
-
     popt, pcov = curve_fit(_fn, tmp_idx, gammas)
-
     dof = len(gammas)-len(popt)
     t_val = t.ppf(1-alpha/2, dof)
     stds = t_val * np.sqrt(np.diagonal(pcov))
-
     return tmp_idx, popt, stds
 
 
 def db_clustering(matrix, ratio_to_keep=0.02):
     """Density based clustering a la Rodriguez and Laio 2014"""
-
     # calc pairwise_distances
     dists = squareform(pdist(matrix, metric="euclidean"))
     np.fill_diagonal(dists, np.max(dists))  # get rid of zero dists in the diagonal
-
     # define density
     rhos, deltas = calc_rho_delta(dists, ratio_to_keep)
     gammas = rhos * deltas
     sort_idx = np.argsort(gammas, kind="mergsort")[::-1]
     sorted_gammas = gammas[sort_idx]
-
     # fit gammas to define threshold
     tmp_idx, popt, stds = fit_gammas(sorted_gammas)
     fit = _fn(tmp_idx, *popt)
     lCI = _fn(tmp_idx, *(popt-stds))
     uCI = _fn(tmp_idx, *(popt+stds))
-
     # find cluster centroids
     centroid_idx = np.where(gammas >= uCI)[0]
-    assert len(centroid_idx) <= 20, "len(centroid_idx)=%i > 20" % les(centroid_idx)
-
+    assert len(centroid_idx) <= 20, "len(centroid_idx)=%i > 20" % len(centroid_idx)
     plotting = [rhos, deltas, tmp_idx, sorted_gammas, fit, lCI, uCI, centroid_idx]
-
     # assign points to centroids
     clusters = np.argmin(dists[:, centroid_idx], axis=1)
     clusters[centroid_idx] = np.arange(len(centroid_idx))
-
     return clusters, plotting
 
 
@@ -187,7 +176,6 @@ def corr_shuffled_spike_matrix_clusters(spike_matrix, sparse_clusters):
     """Random shuffles of each row of the spike matrix independently
     (keeps number of spikes per neuron) in order to create surrogate dataset
     for significance test of correlation"""
-
     for gid in range(spike_matrix.shape[0]):
         np.random.shuffle(spike_matrix[gid])
     return corr_spike_matrix_clusters(spike_matrix, sparse_clusters)
@@ -198,10 +186,9 @@ def _corr_spikes_clusters_subprocess(inputs):
     return corr_shuffled_spike_matrix_clusters(*inputs)
 
 
-def sign_corr_ths(spike_matrix, sparse_clusters, N=1000):
+def sign_corr_ths(spike_matrix, sparse_clusters, N=100):
     """Generates surrogate datasets and calculates correlation coefficients
     then takes 95% percentile of the surrogate datasets as a significance threshold"""
-
     n = N if mp.cpu_count()-1 > N else mp.cpu_count()-1
     pool = mp.Pool(processes=n)
     corrs = pool.map(_corr_spikes_clusters_subprocess, zip([deepcopy(spike_matrix) for _ in range(N)],
@@ -217,7 +204,6 @@ def within_cluster_correlations(spike_matrix, core_cell_idx):
     """Compares within cluster correlations (correlation of core cells)
     against the avg. correlation in the whole dataset
     if the within cluster correlation it's higher the cluster is an assembly"""
-
     corrs = pairwise_correlation_X(spike_matrix)
     np.fill_diagonal(corrs, np.nan)
     mean_corr = np.nanmean(corrs)
@@ -237,7 +223,6 @@ def _update_block_diagonal_dists(dists, n_assemblies_cum):
     between different assemblies from the same seed and return scipy's condensed distance representation
     which can be passed to hierarhichal clustering in the next step
     """
-
     inf_dist = np.max(dists) * 5
     for i, j in zip(n_assemblies_cum[:-1], n_assemblies_cum[1:]):
         dists[i:j, i:j] = inf_dist
@@ -335,7 +320,7 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, h5_prefix, Fig
 
 
 def _check_seed_separation(clusters, n_assemblies_cum):
-    """..."""
+    """TODO"""
     for i, j in zip(n_assemblies_cum[:-1], n_assemblies_cum[1:]):
         _, counts = np.unique(clusters[i:j], return_counts=True)
         if (counts > 1).any():
