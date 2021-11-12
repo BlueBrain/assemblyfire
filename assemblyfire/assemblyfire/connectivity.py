@@ -247,28 +247,21 @@ class ConnectivityMatrix(object):
         return an_obj
 
     @classmethod
-    def from_bluepy(cls, blueconfig_path, target, gids=None):
+    def from_bluepy(cls, blueconfig_path, gids=None):
         """
         BlueConfig based constructor
-        :paramfig_path: path to BlueConfig
-        :param gids: array of gids aka. nodes of the graph, if None - all excitatory gids from the circuit are used
+        :param blueconfig_path: path to BlueConfig
+        :param gids: array of gids AKA. the nodes of the graph, if None - all excitatory gids from the circuit are used
         """
         from scipy import sparse
         from assemblyfire.spikes import get_bluepy_simulation
-        from assemblyfire.utils import get_mtypes
+        from assemblyfire.utils import get_E_gids, get_mtypes, get_figure_asthetics
 
         sim = get_bluepy_simulation(blueconfig_path)
         if gids is None:
-            from assemblyfire.utils import get_E_gids
-            gids = get_E_gids(sim.circuit, target)
-
-        if target == "mc2_Column":  # O1.v5
-            from assemblyfire.utils import get_depths
-            depths = np.asarray(get_depths(sim.circuit, gids))
-        else:  # probably SSCx
-            from assemblyfire.utils import get_depths_SSCx
-            depths = np.asarray(get_depths_SSCx(gids))
-        mtypes = np.asarray(get_mtypes(sim.circuit, gids))
+            gids = get_E_gids(sim.circuit, sim.target)
+        depths, _ = get_figure_asthetics(blueconfig_path, sim.target, gids)
+        mtypes = get_mtypes(sim.circuit, gids)
         conv = pandas.Series(np.arange(len(gids)), index=gids)
         indptr = [0]
         indices = []
@@ -278,9 +271,9 @@ class ConnectivityMatrix(object):
             indptr.append(len(indices))
         data = np.ones_like(indices, dtype=bool)
         adj_mat = sparse.csc_matrix((data, indices, indptr), shape=(len(gids), len(gids)))
-        vertex_props = pandas.DataFrame({"depths": depths,
-                                         "mtypes": mtypes},
-                                         index=gids)
+        vertex_props = pandas.DataFrame({"depths": depths.to_numpy().reshape(-1),
+                                         "mtypes": mtypes.to_numpy().reshape(-1)},
+                                        index=gids)
         return cls(adj_mat, vertex_properties=vertex_props)
 
     def submatrix(self, sub_gids, edge_property=None, sub_gids_post=None):
