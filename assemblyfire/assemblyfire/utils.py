@@ -86,7 +86,6 @@ def get_depths(c, gids):
 
 def get_depths_SSCx(gids):
     """Reads depth values from file saved by Sirio and return bluepy style Series"""
-
     # this is super hard coded ...
     f_name = "/gpfs/bbp.cscs.ch/data/scratch/proj83/home/bolanos/circuits/Bio_M/20200805/hexgrid/depths.txt"
     data = np.genfromtxt(f_name)
@@ -137,8 +136,6 @@ def get_layer_boundaries(circuit_config, target):
                 hlines.append(ys.max())
 
     return {"yticks": yticks, "yticklabels": yticklables, "hlines": hlines}
-
-
 
 
 def get_spikes(sim, gids, t_start, t_end):
