@@ -69,7 +69,7 @@ class NetworkAssembly(ConnectivityMatrix):
         else:
             ValueError("Need to specify 'in' or 'out' degree!")
 
-    def density(self,sub_gids=None):
+    def density(self, sub_gids=None):
         if sub_gids is None:
             m = self.matrix
         else:
@@ -204,6 +204,7 @@ def simplex_counts_assemblies(assembly_grp_dict, circuit):
                                                   circuit.sample_vertices_from_categorical_property(assembly))
                                                   for assembly in assembly_grp.assemblies}
     return simplex_counts, simplex_counts_control
+
 
 def filtered_simplex_counts(weighted_assembly,circuit,method="strength"):
     filtration=weighted_assembly.filtration(method=method)
