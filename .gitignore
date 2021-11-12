@@ -11,3 +11,4 @@ assemblyfire/__pycache__
 *.log
 *.h5
 use_cases/input_data
+use_cases/.ipynb_checkpoints/
