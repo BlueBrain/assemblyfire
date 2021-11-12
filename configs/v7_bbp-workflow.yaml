@@ -1,0 +1,22 @@
+root_path: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/4073e95f-abb1-4b86-8c38-13cf9f00ce0b"
+
+h5_out:
+    file_name: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/4073e95f-abb1-4b86-8c38-13cf9f00ce0b/assemblies.h5"
+    prefixes:
+        spikes: "spikes"
+        assemblies: "assemblies"
+        consensus_assemblies: "consensus"
+        connectivity: "connectivity"
+
+root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures/v7_assemblies"
+
+preprocessing_protocol:
+    target: "hex_O1"
+    t_start: 1500
+    t_end: 62000
+    bin_size: 20
+    threshold_rate: True
+
+clustering_methods:
+    spikes: "hierarchical"
+    assemblies: "hierarchical"
