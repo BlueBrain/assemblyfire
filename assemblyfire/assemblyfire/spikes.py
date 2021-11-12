@@ -35,7 +35,6 @@ def get_bluepy_simulation(blueconfig_path):
 
 def spikes2mat(spike_times, spiking_gids, t_start, t_end, bin_size):
     """Bins time and builds spike matrix"""
-
     gids = np.unique(spiking_gids)
     gid_bins = np.hstack([sorted(gids), np.max(gids) + 1])
     t_bins = np.arange(t_start, t_end + bin_size, bin_size)
@@ -227,7 +226,7 @@ class SpikeMatrixGroup(object):
 
     def get_blueconfig_path(self, seed):
         return os.path.join(self.root_path, "stimulusstim_a0", "seed%i" % seed, "BlueConfig")
-        #return os.path.join(self.root_path, "seed%i" % seed, "BlueConfig")  # changed to analyse Sirio's sims
+        # return os.path.join(self.root_path, "seed%i" % seed, "BlueConfig")  # changed to analyse Sirio's sims
 
     def load_spikes(self, seed, t_start):
         """Loads in spikes from simulations using bluepy"""
