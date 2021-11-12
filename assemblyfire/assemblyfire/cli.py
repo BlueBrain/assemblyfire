@@ -57,3 +57,17 @@ def single_cell(config_path):
     """CLI for `get_single_cell_features.py/run()`"""
     from assemblyfire.get_single_cell_features import run
     run(config_path)
+
+
+@cli.command()
+@click.argument("config_path", required=True)
+@click.argument("prefix", required=True)
+def clean_h5(config_path, prefix):
+    """Removes data under the given `prefix` in the HDF5 file"""
+    import yaml
+    import h5py
+    with open(config_path, "r") as f:
+        config = yaml.load(f, Loader=yaml.SafeLoader)
+    assert prefix in config["h5_out"]["prefixes"], "Prefix name doesn't exist in the config."
+    h5f = h5py.File(config["h5_out"]["file_name"], "a")
+    del h5f[config["h5_out"]["prefixes"][prefix]]
