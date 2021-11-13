@@ -63,7 +63,7 @@ def cluster_sim_mat(spike_matrix, min_n_clusts=5, max_n_clusts=20, n_method="DB"
         n_clust = np.argmin(DB_scores) + min_n_clusts
 
     clusters = fcluster(linkage_matrix, int(n_clust), criterion="maxclust")
-    silhouettes = silhouette_samples(dists, clusters)
+    silhouettes = silhouette_samples(dists, clusters) if n_method == "ss" else None
     clusters = clusters - 1  # to start indexing at 0
 
     plotting = [linkage_matrix, silhouettes]

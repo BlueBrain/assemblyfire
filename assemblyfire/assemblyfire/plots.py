@@ -136,33 +136,38 @@ def plot_dendogram_silhouettes(clusters, linkage, silhouettes, fig_name):
     ct = linkage[-(n_clust-1), 2]
     cmap = plt.cm.get_cmap("tab20", n_clust)
 
-    fig = plt.figure(figsize=(20, 8))
-    ax = fig.add_subplot(2, 1, 1)
+    if silhouettes is None:
+        fig = plt.figure(figsize=(20, 8))
+        ax = fig.add_subplot(1, 1, 1)
+    else:
+        fig = plt.figure(figsize=(20, 8))
+        ax = fig.add_subplot(2, 1, 1)
+        ax2 = fig.add_subplot(2, 1, 2)
+        x_lb = 0
+        xticks, xticklabels = [], []
+        for i in range(n_clust):
+            silhouettes_i = np.sort(silhouettes[clusters == i])
+            x_ub = x_lb + silhouettes_i.shape[0]
+            ax2.fill_between(np.arange(x_lb, x_ub), 0, silhouettes_i,
+                             facecolor=cmap(i), edgecolor=cmap(i))
+            xticks.append(x_lb + 0.5*silhouettes_i.shape[0])
+            xticklabels.append(i)
+            x_lb = x_ub
+        ax2.axhline(np.mean(silhouettes), color="gray", ls="--",
+                    label="avg. silhouettes score: %.2f" % np.mean(silhouettes))
+        ax2.set_xticks(xticks); ax2.set_xticklabels(xticklabels)
+        ax2.set_xlim([0, silhouettes.shape[0]])
+        ax2.set_ylim([np.min(silhouettes), np.max(silhouettes)])
+        ax2.set_yticks([np.min(silhouettes), np.max(silhouettes)])
+        ax2.legend(frameon=False)
+        fig.tight_layout()
+
     set_link_color_palette([colors.to_hex(cmap(i)) for i in range(n_clust)])
     dendrogram(linkage, color_threshold=ct, above_threshold_color="gray",
                no_labels=True, ax=ax)
     ax.axhline(ct, color="red", ls="--", label="threshold: %.2f" % ct)
     ax.legend(frameon=False)
-    ax2 = fig.add_subplot(2, 1, 2)
     sns.despine()
-    x_lb = 0
-    xticks, xticklabels = [], []
-    for i in range(n_clust):
-        silhouettes_i = np.sort(silhouettes[clusters == i])
-        x_ub = x_lb + silhouettes_i.shape[0]
-        ax2.fill_between(np.arange(x_lb, x_ub), 0, silhouettes_i,
-                         facecolor=cmap(i), edgecolor=cmap(i))
-        xticks.append(x_lb + 0.5*silhouettes_i.shape[0])
-        xticklabels.append(i)
-        x_lb = x_ub
-    ax2.axhline(np.mean(silhouettes), color="gray", ls="--",
-                label="avg. silhouettes score: %.2f" % np.mean(silhouettes))
-    ax2.set_xticks(xticks); ax2.set_xticklabels(xticklabels)
-    ax2.set_xlim([0, silhouettes.shape[0]])
-    ax2.set_ylim([np.min(silhouettes), np.max(silhouettes)])
-    ax2.set_yticks([np.min(silhouettes), np.max(silhouettes)])
-    ax2.legend(frameon=False)
-    fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 
