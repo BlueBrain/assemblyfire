@@ -67,27 +67,6 @@ def __to_h5_1p0__(data, h5, prefix=None):
     return prefix
 
 
-def __consensus_to_h5_1p0__(data, h5, prefix=None, label=None):
-    strings = __h5_strings__["1.0"]
-    if prefix is None:
-        prefix = strings["consensus"]
-    if label is None:
-        prefix = prefix + "/" + str(data.label)
-    else:
-        prefix = prefix + "/" + label
-    consensus_metadata = {
-        "label": str(data.label),
-        "index": data.idx,
-        "core_threshold": data._thresh,
-        "core_method": data._core_method,
-        strings["consensus_magic_string"]: True
-    }
-    instantiations = AssemblyGroup(data.instantiations, data.union.gids,
-                                   label=strings["instantiations_label"])
-    __to_h5_1p0__(instantiations, h5, prefix=prefix)
-    __meta_to_h5_1p0__(consensus_metadata, h5, prefix=prefix)
-
-
 def __from_h5_1p0__(h5, group_name, prefix=None):
     strings = __h5_strings__["1.0"]
     if prefix is None:
@@ -122,6 +101,27 @@ def __from_h5_1p0__(h5, group_name, prefix=None):
     return AssemblyGroup(final_assemblies, all_neurons, label=group_name, metadata=metadata)
 
 
+def __consensus_to_h5_1p0__(data, h5, prefix=None, label=None):
+    strings = __h5_strings__["1.0"]
+    if prefix is None:
+        prefix = strings["consensus"]
+    if label is None:
+        prefix = prefix + "/" + str(data.label)
+    else:
+        prefix = prefix + "/" + label
+    consensus_metadata = {
+        "label": str(data.label),
+        "index": data.idx,
+        "core_threshold": data._thresh,
+        "core_method": data._core_method,
+        strings["consensus_magic_string"]: True
+    }
+    instantiations = AssemblyGroup(data.instantiations, data.union.gids,
+                                   label=strings["instantiations_label"])
+    __to_h5_1p0__(instantiations, h5, prefix=prefix)
+    __meta_to_h5_1p0__(consensus_metadata, h5, prefix=prefix)
+
+
 def __consensus_from_h5_1p0__(h5, group_name, prefix=None):
     strings = __h5_strings__["1.0"]
     if prefix is None:
@@ -139,6 +139,16 @@ def __consensus_from_h5_1p0__(h5, group_name, prefix=None):
     return ConsensusAssembly(list(instantiations), **grp_meta)
 
 
+def __meta_to_h5_1p0__(metadata, h5, prefix=None):
+    strings = __h5_strings__["1.0"]
+    if prefix is None:
+        prefix = strings["assembly_group"]
+    grp = h5.require_group(prefix)
+    for k, v in metadata.items():
+        grp.attrs[k] = v
+    return prefix
+
+
 def __meta_from_h5_1p0__(h5, group_name=None, prefix=None):
     strings = __h5_strings__["1.0"]
     if prefix is None:
@@ -150,16 +160,6 @@ def __meta_from_h5_1p0__(h5, group_name=None, prefix=None):
         assert group_name in prefix_grp.keys()
         metadata.update(dict(prefix_grp[group_name].attrs))
     return metadata
-
-
-def __meta_to_h5_1p0__(metadata, h5, prefix=None):
-    strings = __h5_strings__["1.0"]
-    if prefix is None:
-        prefix = strings["assembly_group"]
-    grp = h5.require_group(prefix)
-    for k, v in metadata.items():
-        grp.attrs[k] = v
-    return prefix
 
 
 __h5_writers__ = {
@@ -180,24 +180,6 @@ __cons_writers__ = {
 __cons_readers__ = {
     "1.0": __consensus_from_h5_1p0__
 }
-
-
-class AssemblyProjectMetadata(object):
-    #TODO decide how to structure metadata and write a proper Class
-    @staticmethod
-    def from_h5(fn, group_name=None, prefix=None):
-        import h5py
-        read_func = __meta_readers__[__initialize_h5__(fn, assert_exists=True)]
-        with h5py.File(fn, "r") as h5:
-            meta_dict = read_func(h5, group_name=group_name, prefix=prefix)
-        return meta_dict
-
-    @staticmethod
-    def to_h5(metadata, fn, prefix=None, version=None):
-        import h5py
-        write_func = __meta_writers__[__initialize_h5__(fn, version=version)]
-        with h5py.File(fn, "r+") as h5:
-            return write_func(metadata, h5, prefix=prefix)
 
 
 class Assembly(object):
