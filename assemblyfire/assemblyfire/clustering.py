@@ -23,7 +23,7 @@ from scipy.stats.distributions import t
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.cluster.hierarchy import linkage, fcluster
 from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_score, silhouette_samples, davies_bouldin_score
+from sklearn.metrics import pairwise_distances, silhouette_score, silhouette_samples, davies_bouldin_score
 
 L = logging.getLogger("assemblyfire")
 
@@ -38,10 +38,6 @@ def cosine_similarity(X):
 # hierarchical clustering (using scipy and sklearn)
 def cluster_sim_mat(spike_matrix, min_n_clusts=5, max_n_clusts=20, n_method="DB"):
     """Hieararchical (Ward linkage) clustering of cosine similarity matrix of significant time bins"""
-
-    # cond_dists = pdist(spike_matrix.T, metric="cosine")
-    # dists = squareform(cond_dists)
-    # sim_matrix = 1 - dists
 
     sim_matrix = cosine_similarity(spike_matrix.T)
     dists = 1 - sim_matrix
@@ -145,9 +141,7 @@ def db_clustering(matrix, ratio_to_keep=0.02):
 # core-cells and assemblies related functions (mostly calculating correlations)
 def pairwise_correlation_X(x):
     """Pairwise correlation between rows of a matrix x"""
-    # sklearn.metrics.pairwise_distances can be parallelized (to be *much* faster),
-    # but it doesn't return a symmetric correlation matrix ...
-    corrs = 1 - squareform(pdist(x, metric="correlation"))
+    corrs = 1 - pairwise_distances(x, metric="correlation", n_jobs=-1, force_all_finite=False)
     corrs[np.isnan(corrs)] = 0.
     return corrs
 
@@ -161,7 +155,7 @@ def pairwise_correlation_XY(x, y):
 
 def _convert_clusters(clusters):
     """Convert clusters into a sparse matrix form for `cdist()`"""
-    sparse_clusters = np.zeros((len(np.unique(clusters)), clusters.shape[0]), dtype=np.int)
+    sparse_clusters = np.zeros((len(np.unique(clusters)), clusters.shape[0]), dtype=int)
     for i in np.unique(clusters):
         sparse_clusters[i, clusters == i] = 1
     return sparse_clusters
@@ -173,11 +167,9 @@ def corr_spike_matrix_clusters(spike_matrix, sparse_clusters):
 
 
 def corr_shuffled_spike_matrix_clusters(spike_matrix, sparse_clusters):
-    """Random shuffles of each row of the spike matrix independently
-    (keeps number of spikes per neuron) in order to create surrogate dataset
-    for significance test of correlation"""
-    for gid in range(spike_matrix.shape[0]):
-        np.random.shuffle(spike_matrix[gid])
+    """Random shuffles columns of the spike matrix (keeps number of spikes per neuron)
+    in order to create surrogate dataset for significance test of correlation"""
+    spike_matrix = spike_matrix[:, np.random.permutation(spike_matrix.shape[1])]
     return corr_spike_matrix_clusters(spike_matrix, sparse_clusters)
 
 
@@ -186,7 +178,7 @@ def _corr_spikes_clusters_subprocess(inputs):
     return corr_shuffled_spike_matrix_clusters(*inputs)
 
 
-def sign_corr_ths(spike_matrix, sparse_clusters, N=100):
+def sign_corr_ths(spike_matrix, sparse_clusters, N=1000):
     """Generates surrogate datasets and calculates correlation coefficients
     then takes 95% percentile of the surrogate datasets as a significance threshold"""
     n = N if mp.cpu_count()-1 > N else mp.cpu_count()-1
@@ -214,20 +206,6 @@ def within_cluster_correlations(spike_matrix, core_cell_idx):
         if np.nanmean(corrs[np.ix_(idx, idx)]) > mean_corr:
             assembly_idx.append(i)
     return assembly_idx
-
-
-def _update_block_diagonal_dists(dists, n_assemblies_cum):
-    """
-    Assemblies from the same seed tend to cluster together, but that's not what we want. - Daniela
-    Thus, this function fills block diagonals with "infinite" distance representing infinite distance
-    between different assemblies from the same seed and return scipy's condensed distance representation
-    which can be passed to hierarhichal clustering in the next step
-    """
-    inf_dist = np.max(dists) * 5
-    for i, j in zip(n_assemblies_cum[:-1], n_assemblies_cum[1:]):
-        dists[i:j, i:j] = inf_dist
-    np.fill_diagonal(dists, 0)
-    return squareform(dists)
 
 
 def cluster_spikes(spike_matrix_dict, method, FigureArgs):
@@ -300,17 +278,15 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, h5_prefix, Fig
         sparse_clusters = _convert_clusters(clusters)
         corrs = corr_spike_matrix_clusters(spike_matrix, sparse_clusters)
         corr_ths = sign_corr_ths(spike_matrix, sparse_clusters)
-        core_cell_idx = np.zeros_like(corrs, dtype=np.int)
+        core_cell_idx = np.zeros_like(corrs, dtype=int)
         core_cell_idx[np.where(corrs > corr_ths)] = 1
         # cell assemblies
         assembly_idx = within_cluster_correlations(spike_matrix, core_cell_idx)
 
         # save to h5
         metadata = {"clusters": clusters}
-        assembly_lst = [Assembly(gids[core_cell_idx[:, i] == 1], index=(i, seed))
-                                 for i in assembly_idx]
-        assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=gids,
-                                   label="seed%i" % seed, metadata=metadata)
+        assembly_lst = [Assembly(gids[core_cell_idx[:, i] == 1], index=(i, seed)) for i in assembly_idx]
+        assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=gids, label="seed%i" % seed, metadata=metadata)
         assemblies.to_h5(h5f_name, prefix=h5_prefix)
 
         # plot (only depth profile at this point)
@@ -326,6 +302,20 @@ def _check_seed_separation(clusters, n_assemblies_cum):
         if (counts > 1).any():
             return False
     return True
+
+
+def _update_block_diagonal_dists(dists, n_assemblies_cum):
+    """
+    Assemblies from the same seed tend to cluster together, but that's not what we want. - Daniela
+    Thus, this function fills block diagonals with "infinite" distance representing infinite distance
+    between different assemblies from the same seed and return scipy's condensed distance representation
+    which can be passed to hierarhichal clustering in the next step
+    """
+    inf_dist = np.max(dists) * 5
+    for i, j in zip(n_assemblies_cum[:-1], n_assemblies_cum[1:]):
+        dists[i:j, i:j] = inf_dist
+    np.fill_diagonal(dists, 0)
+    return squareform(dists)
 
 
 def cluster_assemblies(assemblies, n_assemblies, distance_metric, linkage_method, min_n_clusts, max_n_clusts=20):
