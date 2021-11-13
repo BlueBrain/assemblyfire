@@ -9,15 +9,14 @@ authors: Thomas Delemontex and András Ecker; last update 11.2021
 """
 
 import os
-import yaml
 from tqdm import tqdm
 from copy import deepcopy
 from collections import namedtuple
-from cached_property import cached_property
 import h5py
 import numpy as np
-import pandas as pd
 import multiprocessing as mp
+
+from assemblyfire.config import Config
 
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
 
@@ -46,8 +45,14 @@ def spikes2mat(spike_times, spiking_gids, t_start, t_end, bin_size):
 
 def get_ts_in_bin(spike_times, spiking_gids, bin_size):
     """Gets time in bin for all gids"""
-    return {gid: np.mod(spike_times[spiking_gids == gid], bin_size)
-            for gid in np.unique(spiking_gids)}
+    idx_sort = np.argsort(spiking_gids)
+    spiking_gids = spiking_gids[idx_sort]
+    unique_gids, idx_start, counts = np.unique(spiking_gids, return_index=True, return_counts=True)
+    ts = {}
+    spike_times = spike_times[idx_sort]
+    for gid, id_start, count in zip(unique_gids, idx_start, counts):
+        ts[gid] = np.mod(spike_times[id_start:id_start+count], bin_size)
+    return ts
 
 
 def calc_rate(spike_matrix):
@@ -63,8 +68,7 @@ def get_rate_norm(N, bin_size):
 def shuffle_tbins(spike_times, spiking_gids, t_start, t_end, bin_size):
     """Creates surrogate dataset a la Sasaki et al. 2006 by randomly offsetting every spike
     (thus after discretization see `spike2mat()` they will be in an other time bin)"""
-    # Note: in Sasaki et al. 2006 the offset was +/-1 while here it's a bit broader atm.
-    spike_times += bin_size * np.random.choice([-3, -2, -1, 1, 2, 3], len(spike_times))
+    spike_times += bin_size * np.random.choice([-1, 1], len(spike_times))
     spike_matrix, _, _ = spikes2mat(spike_times, spiking_gids,
                                     t_start, t_end, bin_size)
     return spike_matrix
@@ -121,120 +125,8 @@ def single_cell_features_to_h5(h5f_name, gids, r_spikes, mean_ts_in_bin, std_ts_
         grp.create_dataset("std_ts_in_bin", data=std_ts_in_bin)
 
 
-class SpikeMatrixGroup(object):
-    """Class to store config parameters about simulations, binned raster and significant time bins"""
-
-    def __init__(self, config_path):
-        """YAML config file based constructor"""
-        self._config_path = config_path
-        with open(config_path, "r") as f:
-            self._config = yaml.load(f, Loader=yaml.SafeLoader)
-
-    @property
-    def config(self):
-        return self._config
-
-    @property
-    def root_path(self):
-        return self.config["root_path"]
-
-    @property
-    def h5f_name(self):
-        return self.config["h5_out"]["file_name"]
-
-    @property
-    def h5_prefix_spikes(self):
-        return self.config["h5_out"]["prefixes"]["spikes"]
-
-    @property
-    def h5_prefix_assemblies(self):
-        return self.config["h5_out"]["prefixes"]["assemblies"]
-
-    @property
-    def root_fig_path(self):
-        return self.config["root_fig_path"]
-
-    @property
-    def fig_path(self):
-        return os.path.join(self.root_fig_path, os.path.split(self.root_path)[1])
-
-    @property
-    def target(self):
-        return self.config["preprocessing_protocol"]["target"]
-
-    @property
-    def t_start(self):
-        return self.config["preprocessing_protocol"]["t_start"]
-
-    @property
-    def t_start_exception(self):
-        if "t_start_exception" in self.config["preprocessing_protocol"]:
-            return self.config["preprocessing_protocol"]["t_start_exception"]
-        else:
-            return self.t_start
-
-    @property
-    def seeds_exception(self):
-        if "seeds_exception" in self.config["preprocessing_protocol"]:
-            return self.config["preprocessing_protocol"]["seeds_exception"]
-        else:
-            return []
-
-    @property
-    def ignore_seeds(self):
-        if "ignore_seeds" in self.config["preprocessing_protocol"]:
-            return self.config["preprocessing_protocol"]["ignore_seeds"]
-        else:
-            return []
-
-    @property
-    def t_end(self):
-        return self.config["preprocessing_protocol"]["t_end"]
-
-    @property
-    def bin_size(self):
-        return self.config["preprocessing_protocol"]["bin_size"]
-
-    @property
-    def threshold_rate(self):
-        return self.config["preprocessing_protocol"]["threshold_rate"]
-
-    @property
-    def clustering_method(self):
-        assert self.config["clustering_methods"]["spikes"] in ["hierarchical", "density_based"]
-        return self.config["clustering_methods"]["spikes"]
-
-    @cached_property
-    def patterns_fname(self):
-        """Finds `patterns_fname` in campaigns set up by custom bbp-workflow (in v5 it was part of the config...)"""
-        patterns_fname = None
-        if os.path.isdir(os.path.join(self.root_path, "input_spikes")):
-            for f_name in os.listdir(os.path.join(self.root_path, "input_spikes")):
-                if f_name[-4:] == ".txt" and "stimulus_stream" in f_name:
-                    patterns_fname = f_name
-        if patterns_fname is not None:
-            return os.path.join(self.root_path, "input_spikes", patterns_fname)
-        else:
-            raise RuntimeError("Couldn't find %s/input_spikes/*stimulus_stream*.txt" % self.root_path)
-
-    @cached_property
-    def stim_times(self):
-        from assemblyfire.utils import get_stim_times
-        return get_stim_times(self.patterns_fname)
-
-    @cached_property
-    def patterns(self):
-        from assemblyfire.utils import get_patterns
-        return get_patterns(self.patterns_fname)
-
-    def load_sim_path(self):
-        """Loads in simulation paths as pandas (MultiIndex) DataFrame generated by bbp-workflow"""
-        pklf_name = os.path.join(self.root_path, "analyses", "simulations.pkl")
-        sim_paths = pd.read_pickle(pklf_name)
-        level_names = sim_paths.index.names
-        assert len(level_names) == 1 and level_names[0] == "seed", "Only a campaign/DataFrame with single" \
-               "`coord`/index level called `seed` is acceptable by assemblyfire"
-        return sim_paths
+class SpikeMatrixGroup(Config):
+    """Class that bins rasters and finds significant time bins"""
 
     def load_spikes(self, blueconfig_path, t_start):
         """Loads in spikes from simulations using bluepy"""
@@ -246,10 +138,11 @@ class SpikeMatrixGroup(object):
 
     def get_sign_spike_matrices(self):
         """Bin spikes and threshold activity by population firing rate to get significant time bins"""
+        from assemblyfire.utils import get_sim_path, get_stimulus_stream
         from assemblyfire.plots import plot_rate
 
         spike_matrix_dict = {}
-        sim_paths = self.load_sim_path()
+        sim_paths = get_sim_path(self.root_path)
         for seed, blueconfig_path in tqdm(sim_paths.iteritems(), desc="Loading in simulation results"):
             if seed in self.ignore_seeds:
                 pass
@@ -277,21 +170,26 @@ class SpikeMatrixGroup(object):
             plot_rate(rate/rate_norm, rate_th/rate_norm, t_start, self.t_end, fig_name)
 
         # save spikes to h5
-        metadata = {"root_path": self.root_path, "seeds": np.sort(sim_paths.index.to_numpy()),
-                    "stim_times": self.stim_times, "patterns": self.patterns}
-        spikes_to_h5(self.h5f_name, spike_matrix_dict, metadata, prefix=self.h5_prefix_spikes)
+        stim_times, patterns = get_stimulus_stream(self.patterns_fname, self.t_start, self.t_end)
+        project_metadata = {"root_path": self.root_path, "seeds": np.sort(sim_paths.index.to_numpy()),
+                            "stim_times": stim_times, "patterns": patterns.tolist()}
+        spikes_to_h5(self.h5f_name, spike_matrix_dict, project_metadata, prefix=self.h5_prefix_spikes)
 
-        return spike_matrix_dict
+        return spike_matrix_dict, project_metadata
 
     def get_mean_std_ts_in_bin(self):
         """Gets mean and std of spike times within the bins for all gids across seeds"""
+        from assemblyfire.utils import get_sim_path
 
         # load in spikes and get times in bin per seed
         indiv_gids = []
         ts_in_bin = {}
-        for seed in tqdm(self.seeds, desc="Loading in simulation results"):
+        sim_paths = get_sim_path(self.root_path)
+        for seed, blueconfig_path in tqdm(sim_paths.iteritems(), desc="Loading in simulation results"):
+            if seed in self.ignore_seeds:
+                pass
             t_start = self.t_start if seed not in self.seeds_exception else self.t_start_exception
-            spike_times, spiking_gids = self.load_spikes(seed, t_start)
+            spike_times, spiking_gids = self.load_spikes(blueconfig_path, t_start)
             indiv_gids.extend(np.unique(spiking_gids).tolist())
             ts_in_bin[seed] = get_ts_in_bin(spike_times, spiking_gids, self.bin_size)
 
@@ -308,10 +206,9 @@ class SpikeMatrixGroup(object):
             std_ts.append(np.std(ts_in_bin_gid))
         return all_gids, np.asarray(mean_ts), np.asarray(std_ts)
 
-    def convolve_spike_matrix(self, seed):
+    def convolve_spike_matrix(self, blueconfig_path, t_start):
         """Bins spikes and convolves it with a 1D Gaussian kernel row-by-row"""
-        t_start = self.t_start if seed not in self.seeds_exception else self.t_start_exception
-        spike_times, spiking_gids = self.load_spikes(seed, t_start)
+        spike_times, spiking_gids = self.load_spikes(blueconfig_path, t_start)
         # bin size = 1 ms and kernel's std = 0.5 ms from Nolte et al. 2019
         spike_matrix, gids, _ = spikes2mat(spike_times, spiking_gids,
                                            t_start, self.t_end, bin_size=1)
@@ -321,12 +218,16 @@ class SpikeMatrixGroup(object):
     def get_spike_time_reliability(self):
         """Convolution based spike time reliability (`r_spike`) measure from Schreiber et al. 2003"""
         from scipy.spatial.distance import pdist
+        from assemblyfire.utils import get_sim_path
 
         # one can't simply np.dstack() them because it's not guaranteed that all gids spike in all trials
-        gid_dict = {}
-        convolved_spike_matrix_dict = {}
-        for seed in tqdm(self.seeds, desc="Loading in simulation results"):
-            convolved_spike_matrix, gids = self.convolve_spike_matrix(seed)
+        gid_dict, convolved_spike_matrix_dict = {}, {}
+        sim_paths = get_sim_path(self.root_path)
+        for seed, blueconfig_path in tqdm(sim_paths.iteritems(), desc="Loading in simulation results"):
+            if seed in self.ignore_seeds:
+                pass
+            t_start = self.t_start if seed not in self.seeds_exception else self.t_start_exception
+            convolved_spike_matrix, gids = self.convolve_spike_matrix(blueconfig_path, t_start)
             gid_dict[seed] = gids
             convolved_spike_matrix_dict[seed] = convolved_spike_matrix
         # build #gids matrices from trials and calculate pairwise correlation between rows

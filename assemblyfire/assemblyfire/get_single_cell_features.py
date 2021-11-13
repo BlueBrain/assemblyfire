@@ -2,14 +2,14 @@
 """
 Main run function for finding getting single cell features
 (spike time reliability and mean+/-std of spike times within time bins)
-last modified: András Ecker 11.2020
+last modified: András Ecker 11.2021
 """
 
 import os
 import logging
 
 from assemblyfire.spikes import SpikeMatrixGroup, single_cell_features_to_h5
-from assemblyfire.utils import get_figure_asthetics
+from assemblyfire.utils import get_sim_path, get_figure_asthetics
 from assemblyfire.plots import plot_single_cell_features
 
 L = logging.getLogger("assemblyfire")
@@ -30,9 +30,9 @@ def run(config_path):
     gids_r, r_spikes = spikes.get_spike_time_reliability()
     assert (gids_spikes == gids_r).all()
     single_cell_features_to_h5(spikes.h5f_name, gids_r, r_spikes, mean_ts, std_ts,
-                               prefix=spikes.h5_prefix_spikes)
+                               prefix=spikes.h5_prefix_single_cell)
 
     L.info(" Figures will be saved to: %s" % spikes.fig_path)
-    depths, ystuff = get_figure_asthetics(spikes.load_sim_path().iloc[0], spikes.target)
+    depths, ystuff = get_figure_asthetics(get_sim_path(spikes.root_path).iloc[0], spikes.target)
     fig_name = os.path.join(spikes.fig_path, "single_cell_features.png")
     plot_single_cell_features(gids_r, r_spikes, mean_ts, std_ts, ystuff, depths, fig_name)

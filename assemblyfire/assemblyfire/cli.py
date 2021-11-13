@@ -64,10 +64,8 @@ def single_cell(config_path):
 @click.argument("prefix", required=True)
 def clean_h5(config_path, prefix):
     """Removes data under the given `prefix` in the HDF5 file"""
-    import yaml
     import h5py
-    with open(config_path, "r") as f:
-        config = yaml.load(f, Loader=yaml.SafeLoader)
-    assert prefix in config["h5_out"]["prefixes"], "Prefix name doesn't exist in the config."
-    h5f = h5py.File(config["h5_out"]["file_name"], "a")
-    del h5f[config["h5_out"]["prefixes"][prefix]]
+    from assemblyfire.config import Config
+    config = Config(config_path)
+    h5f = h5py.File(config.h5f_name, "a")
+    del h5f[prefix]
