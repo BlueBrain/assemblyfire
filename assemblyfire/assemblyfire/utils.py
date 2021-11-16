@@ -97,7 +97,7 @@ def get_depths_SSCx(gids):
 
 def _guess_circuit_version(target):
     """The version of the circuit: O1.v5 AKA Markram et al. 2015 or SSCx (v7) determines how to get depth values
-    as it's simply y coordinate in v5, while it has to be derived from the stream lines of the atlas based SSCx.
+    as it's simply y coordinate in v5, while it has to be derived from the stream lines of the atlas-based SSCx.
     This helper function tries to guess the circuit version from the usual target names we used in those
     circuit versions... which is not ideal. TODO: hardcode in config or come up with a better approach"""
     if "_Column" in target:  # probably v5 circuit
@@ -125,7 +125,7 @@ def get_figure_asthetics(circuit_config, target, gids=None):
     for layer in range(2, 7):
         gids = _get_layer_E_gids(c, layer, target)
         yticklables.append("L%i\n(%i)" % (layer, len(gids)))
-        ys = depths.loc[gids]
+        ys = depths.loc[gids].to_numpy()
         yticks.append(ys.mean())
         if c_version == "v5":
             if layer == 2:
@@ -198,7 +198,7 @@ def load_spikes_from_h5(h5f_name, prefix="spikes"):
     return spike_matrix_dict, project_metadata
 
 
-def load_single_cell_features_from_h5(h5f_name, prefix="spikes"):
+def load_single_cell_features_from_h5(h5f_name, prefix="single_cell"):
     """Load spike matrices over seeds from saved h5 file"""
     h5f = h5py.File(h5f_name, "r")
     project_metadata = _read_h5_metadata(h5f, prefix=prefix)

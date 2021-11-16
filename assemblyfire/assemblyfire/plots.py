@@ -338,16 +338,20 @@ def plot_pattern_cons_clusters(cons_clusters_dict, t_bins_dict, stim_times_dict,
     plt.close(fig)
 
 
+def _guess_circuit_version(hlines):
+    """The version of the circuit: O1.v5 AKA Markram et al. 2015 or SSCx (v7) determines how to get depth values
+    as it's simply y coordinate in v5, while it has to be derived from the stream lines of the atlas-based SSCx.
+    The layer boundaries are ill-defined in the atlas-based v7 version and thus only the top and bottom are saved in
+    `utils.get_figure_asthetics()`. This helper function guesses the version from the saved `hlines`"""
+    return "v5" if len(hlines) > 2 else "v7"
+
+
 def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_name):
     """Plots depth profile of all assemblies"""
     cmap = plt.cm.get_cmap("tab20", core_cell_idx.shape[1])
     n = len(assembly_idx)
-    if len(ystuff["hlines"]) > 2:
-        yrange = [ystuff["hlines"][-1], ystuff["hlines"][1]]
-        v5 = True
-    else:
-        yrange = [ystuff["hlines"][0], ystuff["hlines"][1]]
-        v5 = False
+    yrange = [ystuff["hlines"][-1], ystuff["hlines"][0]]
+    c_version = _guess_circuit_version(ystuff["hlines"])
 
     fig = plt.figure(figsize=(20, 8))
     n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
@@ -358,17 +362,15 @@ def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_na
         ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)-5])
         ax.hist(assembly_depths, bins=50, range=yrange, orientation="horizontal",
                 color=cmap(assembly_id), edgecolor=cmap(assembly_id))
-        if v5:
+        if c_version == "v5":
             for i in range(2, 6):
                 ax.axhline(ystuff["hlines"][i], color="gray", ls="--")
         ax.set_title("Assembly %i (n=%i)" % (assembly_id, len(assembly_depths)))
         ax.set_xticks([])
-        ax.set_yticks(ystuff["yticks"][1:])
+        ax.set_yticks(ystuff["yticks"])
         ax.set_ylim(yrange)
-        ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"][1:]])
+        ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"]])
         sns.despine(bottom=True, offset=5)
-        if not v5:
-            plt.gca().invert_yaxis()
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -425,36 +427,37 @@ def plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name):
     plt.close(fig)
 
 
-def plot_single_cell_features(gids, r_spikes, mean_ts, std_ts, ystuff, depths, fig_name):
+def plot_single_cell_features(gids, r_spikes, mean_ts, std_ts, ystuff, depths, bin_size, fig_name):
     """Plots spike time reliability and mean+/-std(spike time) in bin"""
-    yrange = [ystuff["hlines"][-1], ystuff["hlines"][1]]
     gid_depths = depths.loc[gids].to_numpy()
     r_spikes[r_spikes == 0] = np.nan
+    yrange = [ystuff["hlines"][-1], ystuff["hlines"][0]]
+    c_version = _guess_circuit_version(ystuff["hlines"])
 
     fig = plt.figure(figsize=(9, 8))
     ax = fig.add_subplot(1, 2, 1)
     sns.despine(ax=ax, offset=5)
     ax.scatter(r_spikes, gid_depths,
                color="black", alpha=0.5, marker='.', s=5, edgecolor="none")
-    for i in range(2, 6):
-        ax.axhline(ystuff["hlines"][i], color="gray", ls="--")
     ax.set_xlabel("r_spike")
     ax.set_xlim([0, np.nanmax(r_spikes)])
-    ax.set_yticks(ystuff["yticks"][1:])
+    ax.set_yticks(ystuff["yticks"])
     ax.set_ylim(yrange)
-    ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"][1:]])
+    ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"]])
     ax2 = fig.add_subplot(1, 2, 2)
     sns.despine(ax=ax2, left=True, offset=5)
     ax2.errorbar(mean_ts, gid_depths, xerr=std_ts, color="black",
                  fmt="none", alpha=0.5, lw=0.1, errorevery=10)
     ax2.scatter(mean_ts, gid_depths,
                color="black", alpha=0.5, marker='.', s=5, edgecolor="none")
-    for i in range(2, 6):
-        ax2.axhline(ystuff["hlines"][i], color="gray", ls="--")
     ax2.set_xlabel("Spike time in bin (ms)")
-    ax2.set_xlim([0, 10])
+    ax2.set_xlim([0, bin_size])
     ax2.set_ylim(yrange)
     ax2.set_yticks([])
+    if c_version == "v5":
+        for i in range(1, 5):
+            ax.axhline(ystuff["hlines"][i], color="gray", ls="--")
+            ax2.axhline(ystuff["hlines"][i], color="gray", ls="--")
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -499,8 +502,8 @@ def plot_consensus_mtypes(union_gids, union_mtypes, consensus_gids, gids, consen
 
         if i == 0:
             ax.set_xticks([])
-            ax.set_yticks(ystuff["yticks"][1:])
-            ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"][1:]])
+            ax.set_yticks(ystuff["yticks"])
+            ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"]])
             ax.legend(frameon=False)
             ax2.set_xticks([])
             ax2.set_yticks(mtypes_ypos)
@@ -624,7 +627,8 @@ def plot_consensus_t_in_bin(consensus_gids, all_gids, consenus_mean_ts, consenus
     """Plots time in bin for consensus assemblies"""
     n = len(consenus_mean_ts)
     cmap = plt.cm.get_cmap("tab20", n)
-    yrange = [ystuff["hlines"][-1], ystuff["hlines"][1]]
+    yrange = [ystuff["hlines"][-1], ystuff["hlines"][0]]
+    c_version = _guess_circuit_version(ystuff["hlines"])
 
     fig = plt.figure(figsize=(20, 8))
     gs = gridspec.GridSpec(1, n+1)
@@ -637,14 +641,15 @@ def plot_consensus_t_in_bin(consensus_gids, all_gids, consenus_mean_ts, consenus
                     fmt="none", alpha=0.5, lw=0.1, errorevery=errorevery)
         ax.scatter(consenus_mean_ts[i], gid_depths,
                    color=color, alpha=0.5, marker='.', s=5, edgecolor="none")
-        for j in range(2, 6):
-            ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
+        if c_version == "v5":
+            for j in range(1, 5):
+                ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
         ax.set_xlim([0, 10])
         ax.set_title("cons%s\n(n=%i)" % (i + 1, consensus_gids[i].shape[0]))
         ax.set_ylim(yrange)
         if i == 0:
-            ax.set_yticks(ystuff["yticks"][1:])
-            ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"][1:]])
+            ax.set_yticks(ystuff["yticks"])
+            ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"]])
             sns.despine(ax=ax, offset=5)
         else:
             ax.set_yticks([])
