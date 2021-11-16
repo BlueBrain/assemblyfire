@@ -137,7 +137,7 @@ def plot_dendogram_silhouettes(clusters, linkage, silhouettes, fig_name):
     cmap = plt.cm.get_cmap("tab20", n_clust)
 
     if silhouettes is None:
-        fig = plt.figure(figsize=(20, 8))
+        fig = plt.figure(figsize=(20, 5))
         ax = fig.add_subplot(1, 1, 1)
     else:
         fig = plt.figure(figsize=(20, 8))
@@ -354,7 +354,7 @@ def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_na
     gs = gridspec.GridSpec(n_rows, 5)
     for i, assembly_id in enumerate(assembly_idx):
         gids = row_map[np.where(core_cell_idx[:, assembly_id] == 1)[0]]
-        assembly_depths = depths.loc[gids]
+        assembly_depths = depths.loc[gids].to_numpy()
         ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)-5])
         ax.hist(assembly_depths, bins=50, range=yrange, orientation="horizontal",
                 color=cmap(assembly_id), edgecolor=cmap(assembly_id))
@@ -428,7 +428,7 @@ def plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name):
 def plot_single_cell_features(gids, r_spikes, mean_ts, std_ts, ystuff, depths, fig_name):
     """Plots spike time reliability and mean+/-std(spike time) in bin"""
     yrange = [ystuff["hlines"][-1], ystuff["hlines"][1]]
-    gid_depths = depths.loc[gids]
+    gid_depths = depths.loc[gids].to_numpy()
     r_spikes[r_spikes == 0] = np.nan
 
     fig = plt.figure(figsize=(9, 8))
@@ -517,7 +517,7 @@ def plot_consensus_mtypes(union_gids, union_mtypes, consensus_gids, gids, consen
 
     """ commented out for toposample use case
     ax = fig.add_subplot(gs[0, -1])
-    gid_depths = depths.loc[gids]
+    gid_depths = depths.loc[gids].to_numpy()
     ax.hist(gid_depths, bins=50, range=yrange, orientation="horizontal",
             color="gray", edgecolor="gray")
     for j in range(2, 6):
