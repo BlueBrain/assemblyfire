@@ -14,7 +14,6 @@ last modified: András Ecker 02.2021
 
 import os
 import logging
-from copy import deepcopy
 from tqdm import tqdm
 import numpy as np
 import multiprocessing as mp
@@ -169,8 +168,8 @@ def corr_spike_matrix_clusters(spike_matrix, sparse_clusters):
 def corr_shuffled_spike_matrix_clusters(spike_matrix, sparse_clusters):
     """Random shuffles columns of the spike matrix (keeps number of spikes per neuron)
     in order to create surrogate dataset for significance test of correlation"""
-    spike_matrix = spike_matrix[:, np.random.permutation(spike_matrix.shape[1])]
-    return corr_spike_matrix_clusters(spike_matrix, sparse_clusters)
+    spike_matrix_rnd = spike_matrix[:, np.random.permutation(spike_matrix.shape[1])]
+    return corr_spike_matrix_clusters(spike_matrix_rnd, sparse_clusters)
 
 
 def _corr_spikes_clusters_subprocess(inputs):
@@ -183,7 +182,7 @@ def sign_corr_ths(spike_matrix, sparse_clusters, N=1000):
     then takes 95% percentile of the surrogate datasets as a significance threshold"""
     n = N if mp.cpu_count()-1 > N else mp.cpu_count()-1
     pool = mp.Pool(processes=n)
-    corrs = pool.map(_corr_spikes_clusters_subprocess, zip([deepcopy(spike_matrix) for _ in range(N)],
+    corrs = pool.map(_corr_spikes_clusters_subprocess, zip([spike_matrix for _ in range(N)],
                                                            [sparse_clusters for _ in range(N)]))
     pool.terminate()
     corrs = np.dstack(corrs)  # shape: ngids x nclusters x N
