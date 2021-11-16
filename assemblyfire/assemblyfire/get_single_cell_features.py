@@ -35,4 +35,4 @@ def run(config_path):
     L.info(" Figures will be saved to: %s" % spikes.fig_path)
     depths, ystuff = get_figure_asthetics(get_sim_path(spikes.root_path).iloc[0], spikes.target)
     fig_name = os.path.join(spikes.fig_path, "single_cell_features.png")
-    plot_single_cell_features(gids_r, r_spikes, mean_ts, std_ts, ystuff, depths, fig_name)
+    plot_single_cell_features(gids_r, r_spikes, mean_ts, std_ts, ystuff, depths, spikes.bin_size, fig_name)
