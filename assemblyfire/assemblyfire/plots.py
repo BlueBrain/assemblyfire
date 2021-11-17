@@ -352,6 +352,7 @@ def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_na
     n = len(assembly_idx)
     yrange = [ystuff["hlines"][-1], ystuff["hlines"][0]]
     c_version = _guess_circuit_version(ystuff["hlines"])
+    yrange_hist = [yrange[-1], yrange[0]] if c_version == "v7" else yrange
 
     fig = plt.figure(figsize=(20, 8))
     n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
@@ -360,10 +361,10 @@ def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_na
         gids = row_map[np.where(core_cell_idx[:, assembly_id] == 1)[0]]
         assembly_depths = depths.loc[gids].to_numpy()
         ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)-5])
-        ax.hist(assembly_depths, bins=50, range=yrange, orientation="horizontal",
+        ax.hist(assembly_depths, bins=50, range=yrange_hist, orientation="horizontal",
                 color=cmap(assembly_id), edgecolor=cmap(assembly_id))
         if c_version == "v5":
-            for i in range(2, 6):
+            for i in range(1, 5):
                 ax.axhline(ystuff["hlines"][i], color="gray", ls="--")
         ax.set_title("Assembly %i (n=%i)" % (assembly_id, len(assembly_depths)))
         ax.set_xticks([])
