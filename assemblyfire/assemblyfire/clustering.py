@@ -51,7 +51,7 @@ def cluster_sim_mat(spike_matrix, min_n_clusts=5, max_n_clusts=20, n_method="DB"
         clusters = fcluster(linkage_matrix, n, criterion="maxclust")
         silhouette_scores.append(silhouette_score(dists, clusters))
         DB_scores.append(davies_bouldin_score(dists, clusters))
-    assert n_method in ["ss", "DB"], "Only silhouette scores and Davies-Bouldin index is supported atm."
+    assert n_method in ["ss", "DB"], "Only silhouette scores and Davies-Bouldin index are supported atm."
     if n_method == "ss":
         n_clust = np.argmax(silhouette_scores) + min_n_clusts
     elif n_method == "DB":
@@ -59,10 +59,9 @@ def cluster_sim_mat(spike_matrix, min_n_clusts=5, max_n_clusts=20, n_method="DB"
 
     clusters = fcluster(linkage_matrix, int(n_clust), criterion="maxclust")
     silhouettes = silhouette_samples(dists, clusters) if n_method == "ss" else None
-    clusters = clusters - 1  # to start indexing at 0
 
     plotting = [linkage_matrix, silhouettes]
-    return sim_matrix, clusters, plotting
+    return sim_matrix, clusters - 1, plotting
 
 
 # density based clustering (built from core numpy and scipy functions)
@@ -230,7 +229,7 @@ def cluster_spikes(spike_matrix_dict, method, FigureArgs):
 
             fig_name = os.path.join(FigureArgs.fig_path, "similarity_matrix_seed%i.png" % seed)
             plot_sim_matrix(sim_matrix, t_bins, FigureArgs.stim_times, FigureArgs.patterns, fig_name)
-            fig_name = os.path.join(FigureArgs.fig_path, "Ward_clustering_seed%i.png" % seed)
+            fig_name = os.path.join(FigureArgs.fig_path, "ward_clustering_seed%i.png" % seed)
             plot_dendogram_silhouettes(clusters, *plotting, fig_name)
 
         elif method == "density_based":
@@ -317,39 +316,53 @@ def _update_block_diagonal_dists(dists, n_assemblies_cum):
     return squareform(dists)
 
 
-def cluster_assemblies(assemblies, n_assemblies, distance_metric, linkage_method, min_n_clusts, max_n_clusts=20):
+def cluster_assemblies(assemblies, n_assemblies, distance_metric, linkage_method,
+                       update_block_diagonals=False, n_method="min"):
     """
     Hieararchical (Ward linkage) clustering of hamming similarity matrix of assemblies from different seeds
     :param assemblies: assemblies x gids boolean array representing all assemblies across seeds
     :param n_assemblies: list with number of assemblies per seed
     :param distance_metric: distance metrics to use on assemblies (has to be valid in scipy's `pdist()`)
     :param linkage_method: linkage method to use (has to be valid in scipy's `hierarchy.linakge()`)
-    :param min_n_clusts, max_n_clust: minimum and maximum number of clusters to try
+    :param update_block_diagonals: see `_update_block_diagonal_dists()` above
+    :param n_method: method to determine optimal cluster number
     """
     cond_dists = pdist(assemblies, metric=distance_metric)
     dists = squareform(cond_dists)
     sim_matrix = 1 - dists
+    # update block diagonals of the distance matrix to prevent assemblies from the same seed to cluster together
     n_assemblies_cum = [0] + np.cumsum(n_assemblies).tolist()
-    cond_dists = _update_block_diagonal_dists(dists, n_assemblies_cum)
+    if update_block_diagonals:
+        cond_dists = _update_block_diagonal_dists(dists, n_assemblies_cum)
+    # determine n_cluster range: min: max nr. of assemblies in one seed (if it was lower they would cluster together)
+    # max: max nr. of assemblies or hard coded 20
+    min_n_clusts = np.max(n_assemblies)
+    max_n_clusts = 20 if n_assemblies_cum[-1] >= 20 else n_assemblies_cum[-1]
 
     linkage_matrix = linkage(cond_dists, method=linkage_method)
 
-    # determine number of clusters using the combination of silhouette scores
+    # determine number of clusters using the combination of silhouette scores or Davies-Bouldin index
     # and the fact that we don't want assemblies from the same seed to cluster together
-    valid_nclusts = []
-    silhouette_scores = []
+    valid_nclusts, silhouette_scores, DB_scores = [], [], []
     for n in range(min_n_clusts, max_n_clusts+1):
         clusters = fcluster(linkage_matrix, n, criterion="maxclust")
         if _check_seed_separation(clusters, n_assemblies_cum):
             valid_nclusts.append(n)
             silhouette_scores.append(silhouette_score(dists, clusters))
+            DB_scores.append(davies_bouldin_score(dists, clusters))
     if len(valid_nclusts):
-        n_clust = valid_nclusts[np.argmax(silhouette_scores)]
+        assert n_method in ["min", "ss", "DB"], "Only silhouette scores and Davies-Bouldin index are supported atm."
+        if n_method == "min":
+            n_clust = valid_nclusts[0]
+        elif n_method == "ss":
+            n_clust = valid_nclusts[np.argmax(silhouette_scores)]
+        elif n_method == "DB":
+            n_clust = valid_nclusts[np.argmin(DB_scores)]
     else:
         raise RuntimeError("None of the cluster numbers in [%i, %i] fulfill the seed separation criteria"
                            % (min_n_clusts, max_n_clusts))
     clusters = fcluster(linkage_matrix, n_clust, criterion="maxclust")
-    silhouettes = silhouette_samples(dists, clusters)
+    silhouettes = silhouette_samples(dists, clusters) if n_method == "ss" else None
 
     plotting = [linkage_matrix, silhouettes]
     return sim_matrix, clusters - 1, plotting
