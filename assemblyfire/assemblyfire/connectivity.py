@@ -74,7 +74,7 @@ class _MatrixNodeIndexer(object):
             sample_gids.extend(np.random.choice(all_gids[idx], counts[i], replace=False).tolist())
         return sample_gids
 
-    def random_categorical(self,ref):
+    def random_categorical(self, ref):
         return self._parent.subpopulation(self.random_categorical_gids(ref))
 
 
