@@ -36,6 +36,6 @@ Examples
 .. code-block::
 
   assemblyfire -v find-assemblies configs/v7_bbp-workflow.yaml
-  assemblyfire -v consensus configs/v7_bbp-workflow.yaml  # not tested for v7 yet...
+  assemblyfire -v consensus configs/v7_bbp-workflow.yaml
   assemblyfire -v conn-mat configs/v7_bbp-workflow.yaml
   assemblyfire -v single-cell configs/v7_bbp-workflow.yaml

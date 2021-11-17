@@ -738,7 +738,7 @@ class ConsensusAssembly(Assembly):
 def consensus_over_seeds_hc(assembly_grp_dict, h5f_name, h5_prefix, fig_path,
                             distance_metric="jaccard", linkage_method="ward"):
     """
-    Hierarhichal clustering (Ward linkage) of assemblies from different seeds based on Jaccard distance
+    Hierarhichal clustering of assemblies from different seeds based on specified distance metric
     :param assembly_grp_dict: dict with seeds as keys and AssemblyGroup object as values
     :param distance_metric, linkage_method: see `clustering.py/cluster_assemblies()`
     :return: assembly_grp_clust: dict with cluster idx as keys and AssemblyGroup object as values
@@ -759,12 +759,11 @@ def consensus_over_seeds_hc(assembly_grp_dict, h5f_name, h5_prefix, fig_path,
     all_assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=all_gids, label="all")
 
     sim_matrix, clusters, plotting = cluster_assemblies(all_assemblies.as_bool().T, n_assemblies,
-                                                        distance_metric, linkage_method, np.max(n_assemblies))
-
+                                                        distance_metric, linkage_method)
     # plotting clustering results
     fig_name = os.path.join(fig_path, "simmat_assemblies_%s.png" % distance_metric)
     plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name)
-    fig_name = os.path.join(fig_path, "HC_assemblies_%s_linkage.png" % linkage_method)
+    fig_name = os.path.join(fig_path, "%s_clustering_assemblies.png" % linkage_method)
     plot_dendogram_silhouettes(clusters, *plotting, fig_name)
 
     # making consensus assemblies from assemblies grouped by clustering
