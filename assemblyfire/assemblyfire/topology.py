@@ -9,7 +9,7 @@ import numpy as np
 from tqdm import tqdm
 
 from assemblyfire.connectivity import ConnectivityMatrix
-from assemblyfire.assemblies import WeightedAssembly, AssemblyGroup
+# from assemblyfire.assemblies import WeightedAssembly, AssemblyGroup
 
 
 def closeness_connected_components(matrix, directed=False, return_sum=True):
@@ -53,7 +53,7 @@ class NetworkAssembly(ConnectivityMatrix):
     A class derived from ConnectivityMatrix with additional information on networks metrics
     of the subgraph associated to an assembly within the connectivity matrix of the circuit.
     """
-    def __extract_gids__(self,sub_gids):
+    def __extract_gids__(self, sub_gids):
         return self.__extract_vertex_ids__(sub_gids)
 
     def degree(self, sub_gids=None, kind="in"):
@@ -163,8 +163,7 @@ def in_degree_assemblies(assembly_grp_dict, circuit):
     in_degrees = {}
     in_degrees_control = {seed: {} for seed in list(assembly_grp_dict.keys())}
     for seed, assembly_grp in assembly_grp_dict.items():
-        in_degrees[seed] = {assembly.idx: circuit.degree(assembly, kind="in")
-                            for assembly in assembly_grp.assemblies}
+        in_degrees[seed] = {assembly.idx: circuit.degree(assembly, kind="in") for assembly in assembly_grp.assemblies}
         in_degrees_control[seed]["n"] = {assembly.idx: circuit.degree(
                                          circuit.sample_vertices_n_neurons(assembly), kind="in")
                                          for assembly in assembly_grp.assemblies}
@@ -206,12 +205,12 @@ def simplex_counts_assemblies(assembly_grp_dict, circuit):
     return simplex_counts, simplex_counts_control
 
 
-def filtered_simplex_counts(weighted_assembly,circuit,method="strength"):
-    filtration=weighted_assembly.filtration(method=method)
-    simplex_counts=[]
+def filtered_simplex_counts(weighted_assembly, circuit, method="strength"):
+    filtration = weighted_assembly.filtration(method=method)
+    simplex_counts = []
     for i in range(len(filtration.assemblies)):
         simplex_counts.append(circuit.simplex_counts(filtration.assemblies[i]))
-    return  simplex_counts
+    return simplex_counts
 
 
 # TODO: maybe this should be moved to the ConsensusAssembly class
@@ -278,6 +277,22 @@ def simplex_counts_dict(ref_assemblies_dict, circuit, N, sub_assemblies_dict=Non
     return simplex_count, simplex_count_control
 
 
+def simplex_counts_consensus(consensus_assemblies_dict, circuit, n_ctrls=1):
+    """ Computes the simplices of consensus assemblies and a random control of the size of the average of instantiations
+    Cannot be done in the same style as the above ones, but the principle is the same"""
+    simplex_count = {}
+    simplex_count_control = {k: [] for k in list(consensus_assemblies_dict.keys())}
+    for k, consensus_assembly in tqdm(consensus_assemblies_dict.items(), desc="Counting simplices"):
+        # Simplex count of instantiations within one cluster (under one key)
+        simplex_count[k] = [circuit.simplex_counts(inst.gids) for inst in consensus_assembly.instantiations]
+        # Comparison with random control of average size of the instantiations
+        mean_size = int(np.mean([len(inst.gids) for inst in consensus_assembly.instantiations]))
+        for _ in range(n_ctrls):
+            sample_gids = np.random.choice(circuit.gids, mean_size, replace=False)
+            simplex_count_control[k].append(circuit.simplex_counts(sample_gids))
+    return simplex_count, simplex_count_control
+
+
 def simplex_counts_union(consensus_assemblies_dict, circuit, N):
     """Computes the simplex counts of the union of the consensus assemblies vs. N random controls"""
     ref_assemblies_dict = {k: consensus_assembly.union for k, consensus_assembly
@@ -320,20 +335,4 @@ def simplex_counts_core_vs_intersection(consensus_assemblies_dict, circuit):
         simplex_count_core[k] = [circuit.simplex_counts(consensus_assembly)]
         simplex_count_intersection[k] = [circuit.simplex_counts(intersection_gids_dict[k])]
     return simplex_count_core, simplex_count_intersection
-
-
-def simplex_counts_consensus(consensus_assemblies_dict, circuit, N):
-    """ Computes the simplices of consensus assemblies and a random control of the size of the average of instantiations
-    Cannot be done in the same style as the above ones, but the principle is the same"""
-    simplex_count = {}
-    simplex_count_control = {k: [] for k in list(consensus_assemblies_dict.keys())}
-    for k, consensus_assembly in tqdm(consensus_assemblies_dict.items(), desc="Counting simplices"):
-        # Simplex count of instantiations within one cluster (under one key)
-        simplex_count[k] = [circuit.simplex_counts(inst.gids) for inst in consensus_assembly.instantiations]
-        # Comparison with random control of average size of the instantiations
-        mean_size = int(np.mean([len(inst.gids) for inst in consensus_assembly.instantiations]))
-        for _ in range(N):
-            sample_gids = np.random.choice(circuit.gids, mean_size, replace=False)
-            simplex_count_control[k].append(circuit.simplex_counts(sample_gids))
-    return simplex_count, simplex_count_control
 
