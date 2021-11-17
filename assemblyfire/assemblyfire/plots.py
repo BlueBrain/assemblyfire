@@ -377,57 +377,6 @@ def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_na
     plt.close(fig)
 
 
-def plot_in_degrees(in_degrees, in_degrees_control, fig_name):
-    """Plots in degrees for assemblies (within one seed) and random controls"""
-    assembly_labels = list(in_degrees.keys())
-    n = len(assembly_labels)
-    cmap = plt.cm.get_cmap("tab20", np.max(assembly_labels)+1)
-
-    fig = plt.figure(figsize=(20, 8))
-    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
-    gs = gridspec.GridSpec(n_rows, 5)
-    for i, assembly_label in enumerate(assembly_labels):
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
-        max_in_degree = np.max(in_degrees[assembly_label])
-        ax.hist(in_degrees[assembly_label], bins=50, range=(0, max_in_degree),
-                color=cmap(assembly_label), edgecolor=cmap(assembly_label), label="assembly")
-        ax.hist(in_degrees_control["n"][assembly_label], bins=50, range=(0, max_in_degree),
-                color="black", histtype="step", linestyle="dashed", label="ctrl. n neurons")
-        ax.hist(in_degrees_control["depths"][assembly_label], bins=50, range=(0, max_in_degree),
-                color="black", histtype="step", linestyle="dashdot", label="ctrl. depth profile")
-        ax.hist(in_degrees_control["mtypes"][assembly_label], bins=50, range=(0, max_in_degree),
-                color="black", histtype="step", label="ctrl. mtype comp.")
-        ax.set_title("Assembly %i" % assembly_label)
-        ax.set_xlim([0, max_in_degree])
-        ax.set_yticks([])
-        sns.despine(ax=ax, left=True, offset=5)
-        if i == 0:
-            ax.legend(frameon=False)
-    fig.add_subplot(1, 1, 1, frameon=False)
-    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
-    plt.xlabel("In degree")
-    fig.tight_layout()
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight", transparent=True)
-    plt.close(fig)
-
-
-def plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name):
-    """Plots similarity matrix of assemblies"""
-    sim_mat = deepcopy(sim_matrix)
-    np.fill_diagonal(sim_mat, np.nan)
-    n_assemblies_cum = [0] + np.cumsum(n_assemblies).tolist()
-
-    fig = plt.figure(figsize=(10, 9))
-    ax = fig.add_subplot(1, 1, 1)
-    i = ax.imshow(sim_mat, cmap="cividis", aspect="auto", interpolation="none",
-                  extent=(0, sim_mat.shape[1], sim_mat.shape[0], 0))
-    fig.colorbar(i)
-    ax.set_xticks(n_assemblies_cum)
-    ax.set_yticks(n_assemblies_cum)
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
-    plt.close(fig)
-
-
 def plot_single_cell_features(gids, r_spikes, mean_ts, std_ts, ystuff, depths, bin_size, fig_name):
     """Plots spike time reliability and mean+/-std(spike time) in bin"""
     gid_depths = depths.loc[gids].to_numpy()
@@ -464,43 +413,121 @@ def plot_single_cell_features(gids, r_spikes, mean_ts, std_ts, ystuff, depths, b
     plt.close(fig)
 
 
+def plot_in_degrees(in_degrees, in_degrees_control, fig_name):
+    """Plots in degrees for assemblies (within one seed) and random controls"""
+    assembly_labels = list(in_degrees.keys())
+    n = len(assembly_labels)
+    cmap = plt.cm.get_cmap("tab20", np.max(assembly_labels)+1)
+
+    fig = plt.figure(figsize=(20, 8))
+    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
+    gs = gridspec.GridSpec(n_rows, 5)
+    for i, assembly_label in enumerate(assembly_labels):
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        max_in_degree = np.max(in_degrees[assembly_label])
+        ax.hist(in_degrees[assembly_label], bins=50, range=(0, max_in_degree),
+                color=cmap(assembly_label[0]), edgecolor=cmap(assembly_label[0]), label="assembly")
+        ax.hist(in_degrees_control["n"][assembly_label], bins=50, range=(0, max_in_degree),
+                color="black", histtype="step", linestyle="dashed", label="ctrl. n neurons")
+        ax.hist(in_degrees_control["depths"][assembly_label], bins=50, range=(0, max_in_degree),
+                color="black", histtype="step", linestyle="dashdot", label="ctrl. depth profile")
+        ax.hist(in_degrees_control["mtypes"][assembly_label], bins=50, range=(0, max_in_degree),
+                color="black", histtype="step", label="ctrl. mtype comp.")
+        ax.set_title("Assembly %i" % assembly_label[0])
+        ax.set_xlim([0, max_in_degree])
+        ax.set_yticks([])
+        sns.despine(ax=ax, left=True, offset=5)
+        if i == 0:
+            ax.legend(frameon=False)
+    fig.add_subplot(1, 1, 1, frameon=False)
+    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    plt.xlabel("In degree")
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight", transparent=True)
+    plt.close(fig)
+
+
+def plot_simplex_counts_seed(simplex_counts, simplex_counts_control, fig_name):
+    """Plots simplex counts for assemblies (within one seed) and random controls"""
+    assembly_labels = list(simplex_counts.keys())
+    n = len(assembly_labels)
+    cmap = plt.cm.get_cmap("tab20", np.max(assembly_labels)+1)
+
+    fig = plt.figure(figsize=(20, 8))
+    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
+    gs = gridspec.GridSpec(n_rows, 5)
+    for i, assembly_label in enumerate(assembly_labels):
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        ax.plot(simplex_counts[assembly_label], color=cmap(assembly_label[0]), lw=3, label="assembly")
+        ax.plot(simplex_counts_control["n"][assembly_label], color="black", lw=1, ls="--", label="ctrl. n neurons")
+        ax.plot(simplex_counts_control["depths"][assembly_label], color="black", lw=1, ls="-.",
+                label="ctrl. depth profile")
+        ax.plot(simplex_counts_control["mtypes"][assembly_label], color="black", lw=1, label="ctrl. mtype comp.")
+        ax.set_title("Assembly %i" % assembly_label[0])
+        ax.set_yticks([])
+        ax.set_xlim([0, 5])  # TODO not hard code this
+        sns.despine(ax=ax, left=True, offset=5)
+        if i == 0:
+            ax.legend(frameon=False)
+    fig.add_subplot(1, 1, 1, frameon=False)
+    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    plt.xlabel("Simplex dimension")
+    fig.tight_layout()
+    fig.savefig(fig_name, bbox_inches="tight", transparent=True)
+    plt.close(fig)
+
+
+def plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name):
+    """Plots similarity matrix of assemblies"""
+    sim_mat = deepcopy(sim_matrix)
+    np.fill_diagonal(sim_mat, np.nan)
+    n_assemblies_cum = [0] + np.cumsum(n_assemblies).tolist()
+
+    fig = plt.figure(figsize=(10, 9))
+    ax = fig.add_subplot(1, 1, 1)
+    i = ax.imshow(sim_mat, cmap="cividis", aspect="auto", interpolation="none",
+                  extent=(0, sim_mat.shape[1], sim_mat.shape[0], 0))
+    fig.colorbar(i)
+    ax.set_xticks(n_assemblies_cum)
+    ax.set_yticks(n_assemblies_cum)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_consensus_mtypes(union_gids, union_mtypes, consensus_gids, gids, consensus_mtypes, mtypes,
                           ystuff, depths, fig_name):
     """Plots depth profile and mtypes for consensus assemblies"""
     n = len(consensus_gids)
-    mtypes_lst = np.unique(mtypes)[::-1]  # commented out for toposample use case...
-    mtypes_lst = np.array(["L6_UTPC", "L6_TPC_L4", "L6_TPC_L1", "L6_IPC", "L6_BPC", "L5_UTPC",
-                           "L5_TTPC2", "L5_TTPC1", "L5_STPC", "L4_SS", "L4_SP", "L4_PC", "L23_PC"])
-    mtypes_ypos = np.arange(len(mtypes_lst))
-    mtype_hlines = np.array([4.5, 8.5, 11.5])  # this is totally hard coded based on mtypes by layer
     cmap = plt.cm.get_cmap("tab20", n)
-    yrange = [ystuff["hlines"][-1], ystuff["hlines"][1]]
+    mtypes_lst = np.unique(mtypes)[::-1]  # commented out for toposample use case...
+    mtypes_ypos = np.arange(len(mtypes_lst))
+    yrange = [ystuff["hlines"][-1], ystuff["hlines"][0]]
+    c_version = _guess_circuit_version(ystuff["hlines"])
+    yrange_hist = [yrange[-1], yrange[0]] if c_version == "v7" else yrange
 
     fig = plt.figure(figsize=(20, 8))
-    # gs = gridspec.GridSpec(2, n+1)  # commented out for toposample use case...
-    gs = gridspec.GridSpec(2, n)
+    gs = gridspec.GridSpec(2, n+1)
     for i in range(n):
         ax = fig.add_subplot(gs[0, i])
-        gid_depths = depths.loc[consensus_gids[i]]
+        gid_depths = depths.loc[consensus_gids[i]].to_numpy()
         color = colors.to_hex(cmap(i))
-        ax.hist(gid_depths, bins=50, range=yrange, orientation="horizontal",
+        ax.hist(gid_depths, bins=50, range=yrange_hist, orientation="horizontal",
                 color=color, edgecolor=color, label="core")
-        union_depths = depths.loc[union_gids[i]]
-        ax.hist(union_depths, bins=50, range=yrange, orientation="horizontal",
+        union_depths = depths.loc[union_gids[i]].to_numpy()
+        ax.hist(union_depths, bins=50, range=yrange_hist, orientation="horizontal",
                 color="black", histtype="step", label="union")
-        for j in range(2, 6):
-            ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
+        if c_version == "v5":
+            for j in range(1, 5):
+                ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
         ax.set_title("cons%s\n(n=%i)" % (i, consensus_gids[i].shape[0]))
         ax.set_xlim(left=5)  # for purely viz. purposes
+        ax.set_ylim(yrange)
         ax2 = fig.add_subplot(gs[1, i])
         mtypes_plot = [np.where(consensus_mtypes[i] == mtype)[0].shape[0] for mtype in mtypes_lst]
         ax2.barh(mtypes_ypos, mtypes_plot, color=color, edgecolor=color)
         mtypes_plot = [np.where(union_mtypes[i] == mtype)[0].shape[0] for mtype in mtypes_lst]
         ax2.barh(mtypes_ypos, mtypes_plot, color="none", edgecolor="black")
         ax2.set_xlim(left=5)
-        for hl in mtype_hlines:
-            ax2.axhline(hl, color="gray", ls="--")
-
         if i == 0:
             ax.set_xticks([])
             ax.set_yticks(ystuff["yticks"])
@@ -519,13 +546,13 @@ def plot_consensus_mtypes(union_gids, union_mtypes, consensus_gids, gids, consen
             sns.despine(ax=ax, left=True, bottom=True)
             sns.despine(ax=ax2, left=True, bottom=True)
 
-    """ commented out for toposample use case
     ax = fig.add_subplot(gs[0, -1])
     gid_depths = depths.loc[gids].to_numpy()
-    ax.hist(gid_depths, bins=50, range=yrange, orientation="horizontal",
+    ax.hist(gid_depths, bins=50, range=yrange_hist, orientation="horizontal",
             color="gray", edgecolor="gray")
-    for j in range(2, 6):
-        ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
+    if c_version == "v5":
+        for i in range(1, 5):
+            ax.axhline(ystuff["hlines"][i], color="gray", ls="--")
     ax.set_title("all_gids\n(n=%i)" % gids.shape[0])
     ax.set_xlim(left=5)
     ax.set_xticks([])
@@ -534,14 +561,11 @@ def plot_consensus_mtypes(union_gids, union_mtypes, consensus_gids, gids, consen
     ax2 = fig.add_subplot(gs[1, -1])
     mtypes_plot = [np.where(mtypes == mtype)[0].shape[0] for mtype in mtypes_lst]
     ax2.barh(mtypes_ypos, mtypes_plot, color="gray", edgecolor="gray")
-    for hl in mtype_hlines:
-        ax2.axhline(hl, color="gray", ls="--")
     ax2.set_xlim(left=5)
     ax2.set_xticks([])
     ax2.set_yticks([])
     sns.despine(ax=ax, left=True, bottom=True)
     sns.despine(ax=ax2, left=True, bottom=True)
-    """
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -576,55 +600,47 @@ def plot_consensus_in_degree(consensus_in_degrees, control_in_degrees_depth, con
     plt.close(fig)
 
 
-def plot_consensus_r_spike(consenus_r_spikes, r_spikes, fig_name):
+def plot_consensus_r_spike(consenus_r_spikes, union_r_spikes, r_spikes, fig_name):
     """Plots spike time reliability for consensus assemblies"""
     n = len(consenus_r_spikes)
-    cmap = plt.cm.get_cmap("tab20", n)
-    max_len = np.max([assembly.shape[0] for assembly in consenus_r_spikes])
-    widths = [assembly.shape[0]/max_len for assembly in consenus_r_spikes]
-
-    fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(1, 2, width_ratios=[7, 1])
-    ax = fig.add_subplot(gs[0])
-    parts = ax.violinplot(consenus_r_spikes, showextrema=False, widths=widths)
-    for i, pc in enumerate(parts["bodies"]):
-        pc.set_facecolor(colors.to_hex(cmap(i)))
-        pc.set_edgecolor("black")
-        pc.set_alpha(1)
-    idx = np.arange(1, n+1)
-    for i, consenus_rs in zip(idx, consenus_r_spikes):
-        quartile1, median, quartile3 = np.percentile(consenus_rs, [25, 50, 75])
-        ax.vlines(i, quartile1, quartile3, color='k', linestyle='-', lw=5)
-        ax.scatter(i, median, marker='o', color='white', s=30, edgecolor="none", zorder=3)
-    ax.set_ylabel("r_spike")
-    ax.set_xticks(idx)
-    ax.set_xticklabels(["cons%s\n(n=%i)" % (i, consenus_r_spikes[i].shape[0])
-                        for i in range(0, n)])
-    ax.set_ylim([0, np.nanmax(r_spikes)])
-    sns.despine(ax=ax, bottom=True, offset=5, trim=True)
-
     n_all = r_spikes.shape[0]
     r_spikes = r_spikes[~np.isnan(r_spikes)]
-    ax2 = fig.add_subplot(gs[1])
-    sns.despine(ax=ax2, left=True, bottom=True)
-    parts = ax2.violinplot(r_spikes, showextrema=False, widths=[1])
-    parts["bodies"][0].set_facecolor("gray")
-    parts["bodies"][0].set_edgecolor("black")
-    parts["bodies"][0].set_alpha(0.8)
-    quartile1, median, quartile3 = np.percentile(r_spikes, [25, 50, 75])
-    ax2.vlines(1, quartile1, quartile3, color='k', linestyle='-', lw=5)
-    ax2.scatter(1, median, marker='o', color='white', s=30, edgecolor="none", zorder=3)
-    ax2.set_xticks([1])
-    ax2.set_xticklabels(["all_gids\n(n=%i)" % n_all])
-    ax2.set_ylim([0, np.nanmax(consenus_r_spikes[-1])])
+    yrange = [np.min(r_spikes), np.percentile(r_spikes, 99.9)]
+    cmap = plt.cm.get_cmap("tab20", n)
+
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(1, n+1)
+    for i in range(n):
+        ax = fig.add_subplot(gs[i])
+        color = colors.to_hex(cmap(i))
+        ax.hist(consenus_r_spikes[i], bins=50, range=yrange, orientation="horizontal",
+                color=color, edgecolor=color, label="core")
+        ax.hist(union_r_spikes[i], bins=50, range=yrange, orientation="horizontal",
+                color="black", histtype="step", label="union")
+        ax.set_title("cons%s\n(n=%i)" % (i, consenus_r_spikes[i].shape[0]))
+        ax.set_ylim(yrange)
+        ax.set_xscale("log")
+        if i == 0:
+            ax.set_ylabel("r_spike")
+            sns.despine(ax=ax, offset=5, trim=True)
+            ax.legend(frameon=False)
+        else:
+            ax.set_yticks([])
+            sns.despine(ax=ax, left=True, offset=5, trim=True)
+    ax2 = fig.add_subplot(gs[-1])
+    ax2.hist(r_spikes, bins=50, range=yrange, orientation="horizontal", color="gray", edgecolor="gray")
+    ax2.set_title("all_gids\n(n=%i)" % n_all)
+    ax2.set_ylim(yrange)
     ax2.set_yticks([])
+    ax2.set_xscale("log")
+    sns.despine(ax=ax2, left=True, offset=5, trim=True)
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 
 
-def plot_consensus_t_in_bin(consensus_gids, all_gids, consenus_mean_ts, consenus_std_ts,
-                            mean_ts, std_ts, ystuff, depths, fig_name):
+def plot_consensus_t_in_bin(consensus_gids, all_gids, consenus_mean_ts, consenus_std_ts, mean_ts, std_ts,
+                            ystuff, depths, bin_size, fig_name):
     """Plots time in bin for consensus assemblies"""
     n = len(consenus_mean_ts)
     cmap = plt.cm.get_cmap("tab20", n)
@@ -635,7 +651,7 @@ def plot_consensus_t_in_bin(consensus_gids, all_gids, consenus_mean_ts, consenus
     gs = gridspec.GridSpec(1, n+1)
     for i in range(n):
         ax = fig.add_subplot(gs[i])
-        gid_depths = depths.loc[consensus_gids[i]]
+        gid_depths = depths.loc[consensus_gids[i]].to_numpy()
         color = colors.to_hex(cmap(i))
         errorevery = 10 if consensus_gids[i].shape[0] > 2000 else 1
         ax.errorbar(consenus_mean_ts[i], gid_depths, xerr=consenus_std_ts[i], color=color,
@@ -645,7 +661,7 @@ def plot_consensus_t_in_bin(consensus_gids, all_gids, consenus_mean_ts, consenus
         if c_version == "v5":
             for j in range(1, 5):
                 ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
-        ax.set_xlim([0, 10])
+        ax.set_xlim([0, bin_size])
         ax.set_title("cons%s\n(n=%i)" % (i + 1, consensus_gids[i].shape[0]))
         ax.set_ylim(yrange)
         if i == 0:
@@ -657,14 +673,15 @@ def plot_consensus_t_in_bin(consensus_gids, all_gids, consenus_mean_ts, consenus
             sns.despine(ax=ax, left=True, offset=5)
 
     ax = fig.add_subplot(gs[-1])
-    gid_depths = depths.loc[all_gids]
+    gid_depths = depths.loc[all_gids].to_numpy()
     ax.errorbar(mean_ts, gid_depths, xerr=std_ts, color="black",
                 fmt="none", alpha=0.5, lw=0.1, errorevery=10)
     ax.scatter(mean_ts, gid_depths,
                color="black", alpha=0.5, marker='.', s=5, edgecolor="none")
-    for j in range(2, 6):
-        ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
-    ax.set_xlim([0, 10])
+    if c_version == "v5":
+        for j in range(1, 5):
+            ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
+    ax.set_xlim([0, bin_size])
     ax.set_title("all_gids\n(n=%i)" % all_gids.shape[0])
     ax.set_ylim(yrange)
     ax.set_yticks([])
@@ -700,7 +717,7 @@ def plot_coreness_r_spike(r_spikes, coreness, fig_name):
     plt.close(fig)
 
 
-def plot_coreness_t_in_bin(mean_ts, std_ts, coreness, fig_name):
+def plot_coreness_t_in_bin(mean_ts, std_ts, coreness, bin_size, fig_name):
     """Plots corenss vs. spike time in bin"""
     n = len(coreness)
     cmap = plt.cm.get_cmap("tab20", n)
@@ -719,41 +736,11 @@ def plot_coreness_t_in_bin(mean_ts, std_ts, coreness, fig_name):
         ax.axvline(4., color="gray", ls="--")
         ax.set_xticks([0, 4, 5])
         ax.set_xlim([0, 5.1])
-        ax.set_yticks([0, 5, 10])
-        ax.set_ylim([0, 10])
+        ax.set_yticks([0, bin_size/2, bin_size])
+        ax.set_ylim([0, bin_size])
         sns.despine(ax=ax, offset=True, trim=True)
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
-    plt.close(fig)
-
-
-def plot_simplex_counts_seed(simplex_counts, simplex_counts_control, fig_name):
-    """Plots simplex counts for assemblies (within one seed) and random controls"""
-    assembly_labels = list(simplex_counts.keys())
-    n = len(assembly_labels)
-    cmap = plt.cm.get_cmap("tab20", np.max(assembly_labels)+1)
-
-    fig = plt.figure(figsize=(20, 8))
-    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
-    gs = gridspec.GridSpec(n_rows, 5)
-    for i, assembly_label in enumerate(assembly_labels):
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
-        ax.plot(simplex_counts[assembly_label], color=cmap(assembly_label), lw=3, label="assembly")
-        ax.plot(simplex_counts_control["n"][assembly_label], color="black", lw=1, ls="--", label="ctrl. n neurons")
-        ax.plot(simplex_counts_control["depths"][assembly_label], color="black", lw=1, ls="-.",
-                label="ctrl. depth profile")
-        ax.plot(simplex_counts_control["mtypes"][assembly_label], color="black", lw=1, label="ctrl. mtype comp.")
-        ax.set_title("Assembly %i" % assembly_label)
-        ax.set_yticks([])
-        ax.set_xlim([0, 5])  # TODO not hard code this
-        sns.despine(ax=ax, left=True, offset=5)
-        if i == 0:
-            ax.legend(frameon=False)
-    fig.add_subplot(1, 1, 1, frameon=False)
-    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
-    plt.xlabel("Simplex dimension")
-    fig.tight_layout()
-    fig.savefig(fig_name, bbox_inches="tight", transparent=True)
     plt.close(fig)
 
 
