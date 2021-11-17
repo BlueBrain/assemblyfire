@@ -108,11 +108,10 @@ def _guess_circuit_version(target):
         raise RuntimeError("Couldn't figure out circuit version from target name: %s" % target)
 
 
-def get_figure_asthetics(circuit_config, target, gids=None):
+def get_figure_asthetics(circuit_config, target):
     """Gets gid depths, layer boundaries and cell numbers for figure asthetics"""
     c = _get_bluepy_circuit(circuit_config)
-    if gids is None:
-        gids = get_E_gids(c, target)
+    gids = get_E_gids(c, target)
     c_version = _guess_circuit_version(target)
     # get depths
     assert c_version in ["v5", "v7"], "Circuit version %s is not supported yet..." % c_version
