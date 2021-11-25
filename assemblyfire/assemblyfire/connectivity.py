@@ -2,14 +2,14 @@
 """
 Class to get, save and load connection matrix and sample submatrices from it
 authors: Michael Reimann, András Ecker
-last modified: 12.2020
+last modified: 11.2021
 """
 
 import h5py
 from tqdm import tqdm
-from scipy import sparse
 import numpy as np
-import pandas
+import pandas as pd
+from scipy import sparse
 
 
 class _MatrixNodeIndexer(object):
@@ -48,17 +48,18 @@ class _MatrixNodeIndexer(object):
 
         ref_values = self._prop[ref_gids]
         hist, bin_edges = np.histogram(ref_values.values, bins=n_bins)
+        bin_edges[-1] += (bin_edges[-1] - bin_edges[-2]) / 1E9
         value_bins = np.digitize(self._prop.values, bins=bin_edges)
         assert len(hist == len(value_bins[1:-1]))  # `digitize` returns values below and above the spec. bin_edges
         sample_gids = []
         for i in range(n_bins):
-            idx = np.where(value_bins == i+1)[0]
+            idx = np.where(value_bins == i + 1)[0]
             assert idx.shape[0] >= hist[i], "Not enough neurons at this depths to sample from"
             sample_gids.extend(np.random.choice(all_gids[idx], hist[i], replace=False).tolist())
         return sample_gids
 
     def random_numerical(self, ref, n_bins=50):
-        return self._parent.subpopulation(self.random_numerical_gids(ref,n_bins))
+        return self._parent.subpopulation(self.random_numerical_gids(ref, n_bins))
 
     def random_categorical_gids(self, ref):
         all_gids = self._prop.index.values
@@ -68,9 +69,9 @@ class _MatrixNodeIndexer(object):
         ref_values = self._prop[ref_gids].values
         value_lst, counts = np.unique(ref_values, return_counts=True)
         sample_gids = []
-        for i, mtype in enumerate(value_lst):
-            idx = np.where(self._prop == mtype)[0]
-            assert idx.shape[0] >= counts[i], "Not enough %s to sample from" % mtype
+        for i, value in enumerate(value_lst):
+            idx = np.where(self._prop == value)[0]
+            assert idx.shape[0] >= counts[i], "Not enough %s to sample from" % value
             sample_gids.extend(np.random.choice(all_gids[idx], counts[i], replace=False).tolist())
         return sample_gids
 
@@ -112,45 +113,57 @@ class _MatrixEdgeIndexer(object):
         raise NotImplementedError()
 
 
+def read_h5(fn, group_name="full_matrix", prefix="connectivity"):
+    full_prefix = prefix + "/" + group_name
+    edges = pd.read_hdf(fn, full_prefix + "/edges")
+    vertex_properties = pd.read_hdf(fn, full_prefix + "/vertex_properties")
+
+    with h5py.File(fn, 'r') as h5:
+        data_grp = h5[full_prefix]
+        shape = tuple(data_grp.attrs["NEUROTOP_SHAPE"])
+        default_edge_property = data_grp.attrs["NEUROTOP_DEFAULT_EDGE"]
+    return edges, vertex_properties, shape, default_edge_property
+
+
 class ConnectivityMatrix(object):
     """Small utility class to hold a connections matrix and generate submatrices"""
     def __init__(self, *args, vertex_labels=None, vertex_properties=None,
-                 edge_properties=None, default_edge_property='data', shape=None):
+                 edge_properties=None, default_edge_property="data", shape=None):
         """Not too intuitive init - please see `from_bluepy()` below"""
-        """Initialization 1: By adjacency matrix"""
+        # Initialization 1: By adjacency matrix
         if isinstance(args[0], np.ndarray) or isinstance(args[0], sparse.spmatrix):
             m = args[0]
             assert m.ndim == 2
             m = sparse.coo_matrix(m)
-            self._edges = pandas.DataFrame({
-                'row': m.row,
-                'col': m.col,
-                'data': m.data
+            self._edges = pd.DataFrame({
+                "row": m.row,
+                "col": m.col,
+                "data": m.data
             })
             if shape is None:
                 shape = m.shape
-        """Initialization 2: By edge-specific DataFrames"""
-        if isinstance(args[0], pandas.DataFrame):
-            assert 'row' in args[0] and 'col' in args[0]
+        # Initialization 2: By edge-specific DataFrames
+        if isinstance(args[0], pd.DataFrame):
+            assert "row" in args[0] and "col" in args[0]
             self._edges = args[0]
             if shape is None:
-                shape = (np.max(self._edges['row']), np.max(self._edges['col']))
+                shape = (np.max(self._edges["row"]), np.max(self._edges["col"]))
 
         # In the future: implement the ability to represent connectivity from population A to B.
         # For now only connectivity within one and the same population
         assert shape[0] == shape[1]
         self._shape = shape
 
-        """Initialize vertex property DataFrame"""
+        # Initialize vertex property DataFrame
         if vertex_properties is None:
             if vertex_labels is None:
                 vertex_labels = np.arange(shape[0])
-            self._vertex_properties = pandas.DataFrame({}, index=vertex_labels)
+            self._vertex_properties = pd.DataFrame({}, index=vertex_labels)
         elif isinstance(vertex_properties, dict):
             if vertex_labels is None:
                 vertex_labels = np.arange(shape[0])
-            self._vertex_properties = pandas.DataFrame(vertex_properties, index=vertex_labels)
-        elif isinstance(vertex_properties, pandas.DataFrame):
+            self._vertex_properties = pd.DataFrame(vertex_properties, index=vertex_labels)
+        elif isinstance(vertex_properties, pd.DataFrame):
             if vertex_labels is not None:
                 raise ValueError("""Cannot specify vertex labels separately
                                  when instantiating vertex_properties explicitly""")
@@ -159,16 +172,10 @@ class ConnectivityMatrix(object):
             raise ValueError("""When specifying vertex properties it must be a DataFrame or dict""")
         assert len(self._vertex_properties) == shape[0]
 
-        """Adding additional edge properties"""
+        # Adding additional edge properties
         if edge_properties is not None:
             for prop_name, prop_mat in edge_properties.items():
-                if isinstance(prop_mat, np.ndarray) or isinstance(prop_mat, sparse.spmatrix):
-                    prop_mat = sparse.coo_matrix(prop_mat)
-                    assert np.all(prop_mat.row == self._edges['row']) and np.all(prop_mat.col == self._edges['col'])
-                    self._edges[prop_name] = prop_mat.data
-                else:
-                    assert len(prop_mat) == len(self._edges)
-                    self._edges[prop_name] = prop_mat
+                self.add_edge_property(prop_name, prop_mat)
 
         self._default_edge = default_edge_property
 
@@ -189,23 +196,32 @@ class ConnectivityMatrix(object):
         assert new_label not in self._vertex_properties, "Property {0} already exists!".format(new_label)
         self._vertex_properties[new_label] = new_values
 
-    def __make_lookup__(self):
-        return pandas.Series(np.arange(self._shape[0]), index=self._vertex_properties.index)
+    def add_edge_property(self, new_label, new_values):
+        if (isinstance(new_values, np.ndarray) and new_values.ndim == 2) or isinstance(new_values, sparse.spmatrix):
+            new_values = sparse.coo_matrix(new_values)
+            assert np.all(new_values.row == self._edges["row"]) and np.all(new_values.col == self._edges["col"])
+            self._edges[new_label] = new_values.data
+        else:
+            assert len(new_values) == len(self._edges)
+            self._edges[new_label] = new_values
 
-    def matrix_(self, edge_property=None):
-        if edge_property is None:
-            edge_property = self._default_edge
-        return sparse.coo_matrix((self._edges[edge_property], (self._edges['row'], self._edges['col'])),
-                                 shape=self._shape)
+    def __make_lookup__(self):
+        return pd.Series(np.arange(self._shape[0]), index=self._vertex_properties.index)
 
     @property
     def edge_properties(self):
-        # TODO: Maybe exclude 'row' and 'col'?
+        # TODO: Maybe exclude "row" and "col"?
         return self._edges.columns.values
 
     @property
     def vertex_properties(self):
         return self._vertex_properties.columns.values
+
+    def matrix_(self, edge_property=None):
+        if edge_property is None:
+            edge_property = self._default_edge
+        return sparse.coo_matrix((self._edges[edge_property], (self._edges["row"], self._edges["col"])),
+                                 shape=self._shape)
 
     @property
     def matrix(self):
@@ -277,13 +293,7 @@ class ConnectivityMatrix(object):
         return cls(adj_mat, vertex_properties=vertex_props)
 
     def submatrix(self, sub_gids, edge_property=None, sub_gids_post=None):
-        """
-        Return a submatrix specified by `sub_gids`
-        :param sub_gids: Subpopulation to get the submatrix for. Can be either a list of gids, or an Assembly object
-        :param sub_gids_post: (optiona) if specified, defines the postsynaptic population. Else pre- equals postsynaptic
-        population
-        :return: the adjacency submatrix of the specified population(s).
-        """
+        """Return a submatrix specified by `sub_gids`"""
         m = self.matrix_(edge_property=edge_property).tocsc()
         if sub_gids_post is not None:
             return m[np.ix_(self._lookup[self.__extract_vertex_ids__(sub_gids)],
@@ -306,11 +316,11 @@ class ConnectivityMatrix(object):
         assert np.all(np.in1d(subpop_ids, self._vertex_properties.index.values))
 
         tmp_submat = self.submatrix(subpop_ids).tocoo()
-        out_edges = {'row': tmp_submat.row, 'col': tmp_submat.col}
+        out_edges = {"row": tmp_submat.row, "col": tmp_submat.col}
         for edge_prop in self.edge_properties:
-            if edge_prop not in ['row', 'col']:
+            if edge_prop not in ["row", "col"]:
                 out_edges[edge_prop] = self.submatrix(subpop_ids, edge_property=edge_prop).data
-        out_edges = pandas.DataFrame(out_edges)
+        out_edges = pd.DataFrame(out_edges)
         out_vertices = self._vertex_properties.loc[subpop_ids]
         return ConnectivityMatrix(out_edges, vertex_properties=out_vertices, shape=(len(subpop_ids), len(subpop_ids)),
                                   default_edge_property=self._default_edge)
@@ -325,151 +335,31 @@ class ConnectivityMatrix(object):
             out_edges = self._edges[subedge_indices]
         else:
             out_edges = self._edges.iloc[subedge_indices]
-        return ConnectivityMatrix(out_edges, vertex_properties=self._vertex_properties,
-                                  shape=self._shape,
+        return ConnectivityMatrix(out_edges, vertex_properties=self._vertex_properties, shape=self._shape,
                                   default_edge_property=self._default_edge)
-        
-    def sample_vertices_n_neurons(self, ref_gids, sub_gids=None):
-        """
-        Return n gids sampled at random where n is the number of neurons in `ref_gids`
-        :param ref_gids: Subpopulation to use as reference for sampling.
-            Can be either a list of gids, or an Assembly object. Or an int, in that case it specifies the number
-            of vertices to sample.
-        :param sub_gids: (optional) if specified, subpopulation to sample from
-            Can be either a list of gids, or an Assembly object as above
-        """
-        if sub_gids is not None:
-            sub_gids = self.__extract_vertex_ids__(sub_gids)
-            assert np.isin(sub_gids, self._vertex_properties.index.values).all(), "Sub gids are not part of the connectivity matrix"
+
+    def random_n_gids(self, ref):
+        """Randomly samples `ref` number of neurons if `ref` is and int,
+        otherwise the same number of neurons as in `ref`"""
+        all_gids = self._vertex_properties.index.values
+        if hasattr(ref, "__len__"):
+            assert np.isin(self.__extract_vertex_ids__(ref),
+                           all_gids).all(), "Reference gids are not part of the connectivity matrix"
+            n_samples = len(ref)
+        elif isinstance(ref, int):  # Just specify the number
+            n_samples = ref
         else:
-            sub_gids = self._vertex_properties.index.values
-        if hasattr(ref_gids, "__len__"):
-            N = len(ref_gids)
-            assert np.isin(self.__extract_vertex_ids__(ref_gids),
-                           sub_gids).all(), "Reference gids are not part of sub gids"
-        elif isinstance(ref_gids, int):  # Just specify the number
-            N = ref_gids
-        else:
-            raise ValueError()
+            raise ValueError("random_n_gids() has to be called with an int or something that has len()")
+        return np.random.choice(all_gids, n_samples, replace=False)
 
-        return np.random.choice(sub_gids, N, replace=False)
-        
-    def sample_matrix_n_neurons(self, ref_gids, sub_gids=None):
-        idx = self._lookup[self.sample_vertices_n_neurons(ref_gids, sub_gids)]
-        return self.matrix.tocsc()[np.ix_(idx, idx)]
-
-    def dense_sample_n_neurons(self, ref_gids, sub_gids=None):
-        return self.sample_matrix_n_neurons(ref_gids, sub_gids).todense()
-
-    def sample_population_n_neurons(self, ref_gids, sub_gids=None):
-        return self.subpopulation(self.sample_vertices_n_neurons(ref_gids, sub_gids))
-
-    def sample_n_neurons(self, ref_gids, sub_gids=None):
-        return np.array(self.dense_sample_n_neurons(ref_gids, sub_gids))
-
-    def sample_vertices_from_numerical_property(self, ref_gids, property_name='depths', sub_gids=None, n_bins=50):
-        """
-        Return gids with the same (binned) depth profile as `ref_gids`
-        :param ref_gids: Subpopulation to use as reference for sampling.
-            Can be either a list of gids, or an Assembly object
-        :param sub_gids: (optional) if specified, subpopulation to sample from
-            Can be either a list of gids, or an Assembly object as above
-        :param n_bins: number of bins to be used to bin depth values
-        """
-        print("DEPRECATED! Use the .index(property_name).random_numerical functionality instead!")
-        ref_gids = self.__extract_vertex_ids__(ref_gids)
-        if sub_gids is not None:
-            sub_gids = self.__extract_vertex_ids__(sub_gids)
-            assert np.isin(sub_gids, self._vertex_properties.index.values).all(), "Sub gids are not part of the connectivity matrix"
-            assert np.isin(ref_gids, sub_gids).all(), "Reference gids are not part of sub gids"
-            depths = self._vertex_properties[property_name][sorted(sub_gids)]
-        else:
-            sub_gids = self._vertex_properties.index.values
-            assert np.isin(ref_gids, sub_gids).all(), "Reference gids are not part of the connectivity matrix"
-            depths = self._vertex_properties[property_name]
-
-        ref_depths = depths[ref_gids]
-        hist, bin_edges = np.histogram(ref_depths.values, bins=n_bins)
-        depths_bins = np.digitize(depths.values, bins=bin_edges)
-        assert len(hist == len(depths_bins[1:-1]))  # `digitize` returns values below and above the spec. bin_edges
-        sample_gids = []
-        for i in range(n_bins):
-            idx = np.where(depths_bins == i+1)[0]
-            assert idx.shape[0] >= hist[i], "Not enough neurons at this depths to sample from"
-            sample_gids.extend(np.random.choice(sub_gids[idx], hist[i], replace=False).tolist())
-        return sample_gids
-
-    def sample_matrix_from_numerical_property(self, ref_gids, property_name='depths', sub_gids=None, n_bins=50):
-        idx = self._lookup[self.sample_vertices_from_numerical_property(ref_gids, sub_gids=sub_gids,
-                                                                        property_name=property_name, n_bins=n_bins)]
-        return self.matrix[np.ix_(idx, idx)]
-
-    def dense_sample_from_numerical_property(self, ref_gids, property_name='depths', sub_gids=None, n_bins=50):
-        return self.sample_matrix_from_numerical_property(ref_gids, sub_gids=sub_gids,
-                                                          property_name=property_name, n_bins=n_bins).todense()
-
-    def sample_from_numerical_property(self, ref_gids, property_name='depths', sub_gids=None, n_bins=50):
-        return np.array(self.dense_sample_from_numerical_property(ref_gids, sub_gids=sub_gids,
-                                                                  property_name=property_name, n_bins=n_bins))
-
-    def sample_vertices_from_categorical_property(self, ref_gids, property_name='mtypes', sub_gids=None):
-        """
-        Return gids with the same mtype composition as `ref_gids`
-        :param ref_gids: Subpopulation to use as reference for sampling.
-            Can be either a list of gids, or an Assembly object
-        :param sub_gids: (optional) if specified, subpopulation to sample from
-            Can be either a list of gids, or an Assembly object as above
-        """
-        print("DEPRECATED! Use the .index(property_name).random_categorical functionality instead!")
-        ref_gids = self.__extract_vertex_ids__(ref_gids)
-        if sub_gids is not None:
-            sub_gids = self.__extract_vertex_ids__(sub_gids)
-            assert np.isin(sub_gids, self._vertex_properties.index.values).all(), "Sub gids are not part of the connectivity matrix"
-            assert np.isin(ref_gids, sub_gids).all(), "Reference gids are not part of sub gids"
-            mtypes = self._vertex_properties[property_name][sub_gids]
-        else:
-            sub_gids = self._vertex_properties.index.values
-            assert np.isin(ref_gids, sub_gids).all(), "Reference gids are not part of the connectivity matrix"
-            mtypes = self._vertex_properties[property_name]
-
-        ref_mtypes = mtypes[ref_gids].values
-        mtypes_lst, counts = np.unique(ref_mtypes, return_counts=True)
-        sample_gids = []
-        for i, mtype in enumerate(mtypes_lst):
-            idx = np.where(mtypes == mtype)[0]
-            assert idx.shape[0] >= counts[i], "Not enough %s to sample from" % mtype
-            sample_gids.extend(np.random.choice(sub_gids[idx], counts[i], replace=False).tolist())
-        return sample_gids
-
-    def sample_matrix_from_categorical_property(self, ref_gids, property_name='mtypes', sub_gids=None):
-        idx = self._lookup[self.sample_vertices_from_categorical_property(ref_gids, property_name=property_name,
-                                                                          sub_gids=sub_gids)]
-        return self.matrix[np.ix_(idx, idx)]
-
-    def dense_sample_from_categorical_property(self, ref_gids, property_name='mtypes', sub_gids=None):
-        return self.sample_matrix_from_categorical_property(ref_gids, property_name=property_name,
-                                                            sub_gids=sub_gids).todense()
-
-    def sample_from_categorical_property(self, ref_gids, property_name='mtypes', sub_gids=None):
-        return np.array(self.dense_sample_from_categorical_property(ref_gids, property_name=property_name,
-                                                                    sub_gids=sub_gids))
+    def random_n(self, ref):
+        return self.subpopulation(self.random_n_gids(ref))
 
     @classmethod
-    def from_h5(cls, fn, group_name=None, prefix=None):
-        if prefix is None:
-            prefix = "connectivity"
-        if group_name is None:
-            group_name = "full_matrix"
-        full_prefix = prefix + "/" + group_name
-        vertex_properties = pandas.read_hdf(fn, full_prefix + "/vertex_properties")
-        edges = pandas.read_hdf(fn, full_prefix + "/edges")
-
-        with h5py.File(fn, 'r') as h5:
-            data_grp = h5[full_prefix]
-            shape = tuple(data_grp.attrs["NEUROTOP_SHAPE"])
-            def_edge = data_grp.attrs["NEUROTOP_DEFAULT_EDGE"]
-        return cls(edges, vertex_properties=vertex_properties, default_edge_property=def_edge,
-                   shape=shape)
+    def from_h5(cls, fn, group_name="full_matrix", prefix="connectivity"):
+        edges, vertex_properties, shape, default_edge_property = read_h5(fn, group_name, prefix)
+        return cls(edges, vertex_properties=vertex_properties,
+                   default_edge_property=default_edge_property, shape=shape)
 
     def to_h5(self, fn, group_name=None, prefix=None):
         if prefix is None:
