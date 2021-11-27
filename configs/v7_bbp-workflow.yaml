@@ -1,6 +1,5 @@
 root_path: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/4073e95f-abb1-4b86-8c38-13cf9f00ce0b"
 
-
 patterns_fname: "input_spikes/stimulus_stream__start2000__end61501__rate2__seed12.txt"
 
 h5_out:
