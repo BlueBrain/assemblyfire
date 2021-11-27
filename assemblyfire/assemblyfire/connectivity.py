@@ -7,9 +7,13 @@ last modified: 11.2021
 
 import h5py
 from tqdm import tqdm
+from tqdm.contrib import tzip
 import numpy as np
 import pandas as pd
 from scipy import sparse
+
+
+REPORT_TO_SONATA = {"gmax_AMPA": "conductance", "rho": "rho0_GB"}
 
 
 class _MatrixNodeIndexer(object):
@@ -123,6 +127,88 @@ def read_h5(fn, group_name="full_matrix", prefix="connectivity"):
         shape = tuple(data_grp.attrs["NEUROTOP_SHAPE"])
         default_edge_property = data_grp.attrs["NEUROTOP_DEFAULT_EDGE"]
     return edges, vertex_properties, shape, default_edge_property
+
+
+def il_groupby(df, group="local_syn_idx", by="pre_gid"):
+    """Fast, pure numpy, in line implementation of `df.groupby(by)[group].apply(list)` (assumes that `by` is sorted)"""
+    groupby = df[[group, by]].to_numpy()
+    un_by, un_idx = np.unique(groupby[:, 1], return_index=True)
+    return un_by, np.split(groupby[:, 0], un_idx[1:])
+
+
+def from_report(sim, report_cfg, aggregation_fns=["sum", "mean"], precalculated={}, chunksize=1e4):
+    """Creates weighted connectivity matrix from synapse report (written by Neurodamus, read by libsonata)
+    TODO: parallelize the processing of chunks if memory permits..."""
+
+    report = sim.report(report_cfg["report_name"])
+    report_gids = report.gids
+    # get exact time points from report (and the column indices for local to global synapse id mapping)
+    data = report.get_gid(report_gids[0], t_start=report_cfg["t_start"],
+                          t_end=report_cfg["t_end"], t_step=report_cfg["t_step"])
+
+    if "gids" in precalculated and "edges" in precalculated:
+        gids = precalculated["gids"]
+        edges = precalculated["edges"]
+    else:
+        NotImplementedError()
+        # TODO: write this properly for conntility
+        # conn_mat = from_bluepy(sim)  # not sure of the syntax here...
+        # edges = conn_mat._edges
+        # gids = conn_mat._vertex_properties.index.to_numpy()
+    if "syn_df" in precalculated:
+        syn_df = precalculated["syn_df"]
+    else:
+        NotImplementedError()
+        # TODO: write this properly for conntility
+        # from map_syn_idx import create_syn_idx_df
+        # syn_df = create_syn_idx_df(sim.circuit.config["connectome"], data.columns, pklf_name=None)
+    if not np.isin(gids, report_gids, assume_unique=True).all():
+        # these will be used later for getting the initial (and hopefully non-evolving) values with bluepy
+        c = sim.circuit
+        from bluepy.enums import Synapse
+        sonata_rep_name = REPORT_TO_SONATA[report_cfg["report_name"]]
+
+    # initialize array for storing the connectome at different time points
+    report_t = data.index.to_numpy()
+    extra_columns = ["%s_t=%i" % (fn, t) for fn in aggregation_fns for t in report_t]
+    weighted_edges = np.zeros((edges.shape[0], len(extra_columns)), dtype=np.float32)
+
+    i = 0
+    n_ts = len(report_t)
+    post_matrix_idx = edges["col"].unique()
+    idx = np.arange(0, len(post_matrix_idx), chunksize, dtype=int)
+    idx = np.append(idx, len(post_matrix_idx))
+    for start_id, end_id in tzip(idx[:-1], idx[1:], desc="Loading chunks of gids from report"):
+        post_matrix_idx_chunk = post_matrix_idx[start_id:end_id]
+        post_gids = gids[post_matrix_idx_chunk]
+        post_chunk_df = syn_df.loc[syn_df["post_gid"].isin(post_gids)]
+        post_rep_gids = post_gids[np.isin(post_gids, report_gids, assume_unique=True)]
+        data = report.get(gids=post_rep_gids, t_start=report_cfg["t_start"],
+                          t_end=report_cfg["t_end"], t_step=report_cfg["t_step"])
+        for post_matrix_id, post_gid in tzip(post_matrix_idx_chunk, post_gids, desc="Iterating over (post) gids",
+                                             miniters=chunksize/100, leave=False):
+            if post_gid in report_gids:
+                post_df = post_chunk_df.loc[post_chunk_df["post_gid"] == post_gid]
+                pre_gids, local_syn_idx = il_groupby(post_df)
+                # assert (pre_gids.astype(int) == gids[edges[edges["col"] == post_matrix_id]["row"].values]).all()
+                post_data = data[post_gid]  # first level indexing of report (post gid)
+                for syn_idx in local_syn_idx:
+                    conn_data = post_data[syn_idx]  # second level indexing of report (local syn idx)
+                    for j, fn in enumerate(aggregation_fns):
+                        weighted_edges[i, j*n_ts:(j+1)*n_ts] = getattr(conn_data, fn)(axis=1)
+                    i += 1
+            else:
+                pre_gids = gids[edges[edges["col"] == post_matrix_id]["row"].values]
+                nonrep_syn_df = c.connectome.pathway_synapses(pre_gids, post_gid, [sonata_rep_name, Synapse.PRE_GID])
+                pre_gids_bluepy, conns_data = il_groupby(nonrep_syn_df, group=sonata_rep_name, by=Synapse.PRE_GID)
+                # assert (pre_gids_bluepy.astype(int) == pre_gids).all()
+                for conn_data in conns_data:
+                    for j, fn in enumerate(aggregation_fns):
+                        weighted_edges[i, j*n_ts:(j+1)*n_ts] = getattr(conn_data, fn)()
+                    i += 1
+    weighted_edges = pd.concat([edges, pd.DataFrame(data=weighted_edges, columns=extra_columns)], axis=1)
+    weighted_edges.to_hdf("/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/"
+                          "simulations/4073e95f-abb1-4b86-8c38-13cf9f00ce0b/weighted_edges.h5")
 
 
 class ConnectivityMatrix(object):
@@ -278,7 +364,7 @@ class ConnectivityMatrix(object):
             gids = get_E_gids(sim.circuit, sim.target)
         depths, _ = get_figure_asthetics(blueconfig_path, sim.target, gids)
         mtypes = get_mtypes(sim.circuit, gids)
-        conv = pandas.Series(np.arange(len(gids)), index=gids)
+        conv = pd.Series(np.arange(len(gids)), index=gids)
         indptr = [0]
         indices = []
         for gid in tqdm(gids, desc="Building connectivity matrix", miniters=len(gids) / 100):
@@ -287,9 +373,9 @@ class ConnectivityMatrix(object):
             indptr.append(len(indices))
         data = np.ones_like(indices, dtype=bool)
         adj_mat = sparse.csc_matrix((data, indices, indptr), shape=(len(gids), len(gids)))
-        vertex_props = pandas.DataFrame({"depths": depths.to_numpy().reshape(-1),
-                                         "mtypes": mtypes.to_numpy().reshape(-1)},
-                                        index=gids)
+        vertex_props = pd.DataFrame({"depths": depths.to_numpy().reshape(-1),
+                                     "mtypes": mtypes.to_numpy().reshape(-1)},
+                                    index=gids)
         return cls(adj_mat, vertex_properties=vertex_props)
 
     def submatrix(self, sub_gids, edge_property=None, sub_gids_post=None):
@@ -375,4 +461,16 @@ class ConnectivityMatrix(object):
             data_grp.attrs["NEUROTOP_SHAPE"] = self._shape
             data_grp.attrs["NEUROTOP_DEFAULT_EDGE"] = self._default_edge
             data_grp.attrs["NEUROTOP_CLASS"] = "ConnectivityMatrix"
+
+
+if __name__ == "__main__":
+    from bluepy import Simulation
+    sim = Simulation("/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/"
+                     "simulations/LayerWiseEShotNoise_PyramidPatterns/BlueConfig")
+    edges, vertex_properties, _, _ = read_h5("/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/"
+                                             "simulations/4073e95f-abb1-4b86-8c38-13cf9f00ce0b/assemblies.h5")
+    syn_df = pd.read_pickle("/gpfs/bbp.cscs.ch/project/proj96/circuits/plastic_v1/syn_idx.pkl")
+    precalculated = {"gids": vertex_properties.index.to_numpy(), "edges": edges, "syn_df": syn_df}
+    report_cfg = {"report_name": "gmax_AMPA", "t_start": 1500, "t_end": 62000, "t_step": 2000}
+    from_report(sim, report_cfg, precalculated=precalculated)
 
