@@ -11,9 +11,10 @@ from tqdm.contrib import tzip
 import numpy as np
 import pandas as pd
 from scipy import sparse
+import multiprocessing as mp
 
 
-REPORT_TO_SONATA = {"gmax_AMPA": "conductance", "rho": "rho0_GB"}
+REPORT_TO_SONATA = {"rho": "rho0_GB", "gmax_AMPA": "conductance", "U_SE": "u_syn"}
 
 
 class _MatrixNodeIndexer(object):
@@ -132,29 +133,93 @@ def read_h5(fn, group_name="full_matrix", prefix="connectivity"):
 def il_groupby(df, group="local_syn_idx", by="pre_gid"):
     """Fast, pure numpy, in line implementation of `df.groupby(by)[group].apply(list)` (assumes that `by` is sorted)"""
     groupby = df[[group, by]].to_numpy()
-    un_by, un_idx = np.unique(groupby[:, 1], return_index=True)
-    return un_by, np.split(groupby[:, 0], un_idx[1:])
+    _, un_idx = np.unique(groupby[:, 1], return_index=True)
+    return np.split(groupby[:, 0], un_idx[1:])
 
 
-def from_report(sim, report_cfg, aggregation_fns=["sum", "mean"], precalculated={}, chunksize=1e4):
-    """Creates weighted connectivity matrix from synapse report (written by Neurodamus, read by libsonata)
-    TODO: parallelize the processing of chunks if memory permits..."""
+def get_nonreported_values(c, gids, non_reported_gids, sonata_rep_name, static_edges, aggregation_fns, report_t):
+    """Adds initial values of connection (read by bluepy) to all time points of weighted connectivity edges"""
+    from libsonata import EdgeStorage
+    from bluepy.enums import Synapse
+    # get (global) afferent synaps idx (from 0-based sonata nodes)
+    edges = EdgeStorage(c.config["connectome"])
+    edge_pop = edges.open_population(list(edges.population_names)[0])
+    syn_idx = edge_pop.afferent_edges(non_reported_gids - 1).flatten()
+    # get synapse properties (and filter the ones that come from the simulated target)
+    syn_df = c.connectome.synapse_properties(syn_idx, [Synapse.PRE_GID, Synapse.POST_GID, sonata_rep_name])
+    syn_df = syn_df.rename(columns={Synapse.PRE_GID: "pre_gid", Synapse.POST_GID: "post_gid"})
+    syn_df = syn_df.loc[syn_df["pre_gid"].isin(gids)]
+
+    extra_columns = ["%s_t=%i" % (fn, t) for fn in aggregation_fns for t in report_t]
+    weighted_edges = np.zeros((static_edges.shape[0], len(extra_columns)), dtype=np.float32)
+    i, n_ts = 0, len(report_t)
+    for post_gid in tqdm(non_reported_gids, desc="Getting non-reported gids", miniters=len(non_reported_gids)/100):
+        post_df = syn_df.loc[syn_df["post_gid"] == post_gid]
+        conns_data = il_groupby(post_df, group=sonata_rep_name)
+        for conn_data in conns_data:
+            for j, fn in enumerate(aggregation_fns):
+                weighted_edges[i, j * n_ts:(j + 1) * n_ts] = getattr(conn_data, fn)()
+            i += 1
+    return pd.concat([static_edges, pd.DataFrame(data=weighted_edges, index=static_edges.index,
+                                                 columns=extra_columns)], axis=1)
+
+
+def read_report(post_gids, post_matrix_idx, edges, syn_df, data, aggregation_fns):
+    """Reads synapse report and creates weighted connectivity edges"""
+    assert (edges["col"].unique() == post_matrix_idx).all()
+    report_t = data.index.to_numpy()
+    extra_columns = ["%s_t=%i" % (fn, t) for fn in aggregation_fns for t in report_t]
+    weighted_edges = np.zeros((edges.shape[0], len(extra_columns)), dtype=np.float32)
+    i, n_ts = 0, len(report_t)
+    for post_matrix_id, post_gid in zip(post_matrix_idx, post_gids):
+        post_df = syn_df.loc[syn_df["post_gid"] == post_gid]
+        local_syn_idx = il_groupby(post_df)
+        post_data = data[post_gid]  # first level indexing of report (post gid)
+        for syn_idx in local_syn_idx:
+            conn_data = post_data[syn_idx]  # second level indexing of report (local syn idx)
+            for j, fn in enumerate(aggregation_fns):
+                weighted_edges[i, j * n_ts:(j + 1) * n_ts] = getattr(conn_data, fn)(axis=1)
+            i += 1
+    return pd.concat([edges, pd.DataFrame(data=weighted_edges, index=edges.index, columns=extra_columns)], axis=1)
+
+
+def _read_report_subprocess(inputs):
+    """Subprocess used by multiprocessing pool for processing report in parallel"""
+    return read_report(*inputs)
+
+
+def from_report(sim, report_cfg, aggregation_fns=["sum", "mean"], precalculated={}, chunksize=2e4, n_jobs=-1):
+    """Creates weighted connectivity matrix from synapse report (written by Neurodamus, read by libsonata)"""
 
     report = sim.report(report_cfg["report_name"])
     report_gids = report.gids
     # get exact time points from report (and the column indices for local to global synapse id mapping)
     data = report.get_gid(report_gids[0], t_start=report_cfg["t_start"],
                           t_end=report_cfg["t_end"], t_step=report_cfg["t_step"])
-
+    report_t = data.index.to_numpy()
+    # get "base" non-weighted conenctivity matrix (in sparse format)
     if "gids" in precalculated and "edges" in precalculated:
         gids = precalculated["gids"]
         edges = precalculated["edges"]
     else:
         NotImplementedError()
         # TODO: write this properly for conntility
-        # conn_mat = from_bluepy(sim)  # not sure of the syntax here...
-        # edges = conn_mat._edges
-        # gids = conn_mat._vertex_properties.index.to_numpy()
+        # conn_mat = from_bluepy(sim)  # not sure of the syntax here if it's a class method...
+        # edges = conn_mat.edges
+        # gids = conn_mat.gids
+    # check if there are non-reported synapses and process those first (get static value with libsonata and bluepy)
+    if not np.isin(gids, report_gids, assume_unique=True).all():
+        non_rep_idx = np.isin(gids, report_gids, assume_unique=True, invert=True)
+        post_matrix_idx = edges["col"].unique()
+        static_edges = edges.loc[edges["col"].isin(post_matrix_idx[non_rep_idx])]
+        w_stat_edges = get_nonreported_values(sim.circuit, gids, gids[non_rep_idx],
+                                              REPORT_TO_SONATA[report_cfg["report_name"]], static_edges,
+                                              aggregation_fns, report_t)
+        edges.drop(index=static_edges.index, inplace=True)
+        merge_with_stat = True
+    else:
+        merge_with_stat = False
+    # get mapping between the matrices pre-post and the reports post+local_syn_id format
     if "syn_df" in precalculated:
         syn_df = precalculated["syn_df"]
     else:
@@ -162,53 +227,38 @@ def from_report(sim, report_cfg, aggregation_fns=["sum", "mean"], precalculated=
         # TODO: write this properly for conntility
         # from map_syn_idx import create_syn_idx_df
         # syn_df = create_syn_idx_df(sim.circuit.config["connectome"], data.columns, pklf_name=None)
-    if not np.isin(gids, report_gids, assume_unique=True).all():
-        # these will be used later for getting the initial (and hopefully non-evolving) values with bluepy
-        c = sim.circuit
-        from bluepy.enums import Synapse
-        sonata_rep_name = REPORT_TO_SONATA[report_cfg["report_name"]]
 
-    # initialize array for storing the connectome at different time points
-    report_t = data.index.to_numpy()
-    extra_columns = ["%s_t=%i" % (fn, t) for fn in aggregation_fns for t in report_t]
-    weighted_edges = np.zeros((edges.shape[0], len(extra_columns)), dtype=np.float32)
-
-    i = 0
-    n_ts = len(report_t)
+    n_jobs = mp.cpu_count() - 1 if n_jobs == -1 else n_jobs
+    # divide edges into chunks based on post gids
     post_matrix_idx = edges["col"].unique()
-    idx = np.arange(0, len(post_matrix_idx), chunksize, dtype=int)
-    idx = np.append(idx, len(post_matrix_idx))
-    for start_id, end_id in tzip(idx[:-1], idx[1:], desc="Loading chunks of gids from report"):
-        post_matrix_idx_chunk = post_matrix_idx[start_id:end_id]
-        post_gids = gids[post_matrix_idx_chunk]
-        post_chunk_df = syn_df.loc[syn_df["post_gid"].isin(post_gids)]
-        post_rep_gids = post_gids[np.isin(post_gids, report_gids, assume_unique=True)]
-        data = report.get(gids=post_rep_gids, t_start=report_cfg["t_start"],
+    chunk_idx = np.arange(0, len(post_matrix_idx), chunksize, dtype=int)
+    chunk_idx = np.append(chunk_idx, len(post_matrix_idx))
+    all_weighted_edges = [w_stat_edges] if merge_with_stat else []
+    for start_chunk_id, end_chunk_id in tzip(chunk_idx[:-1], chunk_idx[1:], desc="Loading chunks of gids from report"):
+        post_matrix_idx_chunk = post_matrix_idx[start_chunk_id:end_chunk_id]
+        post_gids_chunk = gids[post_matrix_idx_chunk]
+        data = report.get(gids=post_gids_chunk, t_start=report_cfg["t_start"],
                           t_end=report_cfg["t_end"], t_step=report_cfg["t_step"])
-        for post_matrix_id, post_gid in tzip(post_matrix_idx_chunk, post_gids, desc="Iterating over (post) gids",
-                                             miniters=chunksize/100, leave=False):
-            if post_gid in report_gids:
-                post_df = post_chunk_df.loc[post_chunk_df["post_gid"] == post_gid]
-                pre_gids, local_syn_idx = il_groupby(post_df)
-                # assert (pre_gids.astype(int) == gids[edges[edges["col"] == post_matrix_id]["row"].values]).all()
-                post_data = data[post_gid]  # first level indexing of report (post gid)
-                for syn_idx in local_syn_idx:
-                    conn_data = post_data[syn_idx]  # second level indexing of report (local syn idx)
-                    for j, fn in enumerate(aggregation_fns):
-                        weighted_edges[i, j*n_ts:(j+1)*n_ts] = getattr(conn_data, fn)(axis=1)
-                    i += 1
-            else:
-                pre_gids = gids[edges[edges["col"] == post_matrix_id]["row"].values]
-                nonrep_syn_df = c.connectome.pathway_synapses(pre_gids, post_gid, [sonata_rep_name, Synapse.PRE_GID])
-                pre_gids_bluepy, conns_data = il_groupby(nonrep_syn_df, group=sonata_rep_name, by=Synapse.PRE_GID)
-                # assert (pre_gids_bluepy.astype(int) == pre_gids).all()
-                for conn_data in conns_data:
-                    for j, fn in enumerate(aggregation_fns):
-                        weighted_edges[i, j*n_ts:(j+1)*n_ts] = getattr(conn_data, fn)()
-                    i += 1
-    weighted_edges = pd.concat([edges, pd.DataFrame(data=weighted_edges, columns=extra_columns)], axis=1)
+        # split datasets (further) for parallel execution
+        idx = np.linspace(0, len(post_matrix_idx_chunk), n_jobs, dtype=int)
+        pmidx_chunks, pgid_chunks = [], []
+        for start_id, end_id in zip(idx[:-1], idx[1:]):
+            pmidx_chunks.append(post_matrix_idx_chunk[start_id:end_id])
+            pgid_chunks.append(post_gids_chunk[start_id:end_id])
+        edge_chunks = [edges.loc[edges["col"].isin(matrix_idx)] for matrix_idx in pmidx_chunks]
+        syn_df_chunks = [syn_df.loc[syn_df["post_gid"].isin(post_gids)] for post_gids in pgid_chunks]
+        data_chunks = [data[post_gids] for post_gids in pgid_chunks]
+        # process report in parallel and merge results
+        pool = mp.Pool(processes=n_jobs)
+        edges_tmp = pool.map(_read_report_subprocess, zip(pgid_chunks, pmidx_chunks, edge_chunks, syn_df_chunks,
+                                                          data_chunks, [aggregation_fns for _ in range(n_jobs)]))
+        pool.terminate()
+        all_weighted_edges.append(pd.concat(edges_tmp, axis=0))
+    weighted_edges = pd.concat(all_weighted_edges, axis=0)
+
     weighted_edges.to_hdf("/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/"
-                          "simulations/4073e95f-abb1-4b86-8c38-13cf9f00ce0b/weighted_edges.h5")
+                          "simulations/4073e95f-abb1-4b86-8c38-13cf9f00ce0b/weighted_edges_parallel.h5",
+                          key="connectivity/full_matrix/edges")
 
 
 class ConnectivityMatrix(object):
@@ -293,6 +343,10 @@ class ConnectivityMatrix(object):
 
     def __make_lookup__(self):
         return pd.Series(np.arange(self._shape[0]), index=self._vertex_properties.index)
+
+    @property
+    def edges(self):
+        return self._edges
 
     @property
     def edge_properties(self):
