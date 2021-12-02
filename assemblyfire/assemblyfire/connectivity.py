@@ -5,9 +5,9 @@ authors: Michael Reimann, András Ecker
 last modified: 11.2021
 """
 
+import os
 import h5py
 from tqdm import tqdm
-from tqdm.contrib import tzip
 import numpy as np
 import pandas as pd
 from scipy import sparse
@@ -130,7 +130,7 @@ def read_h5(fn, group_name="full_matrix", prefix="connectivity"):
     return edges, vertex_properties, shape, default_edge_property
 
 
-def il_groupby(df, group="local_syn_idx", by="pre_gid"):
+def _il_groupby(df, group="local_syn_idx", by="pre_gid"):
     """Fast, pure numpy, in line implementation of `df.groupby(by)[group].apply(list)` (assumes that `by` is sorted)"""
     groupby = df[[group, by]].to_numpy()
     _, un_idx = np.unique(groupby[:, 1], return_index=True)
@@ -151,51 +151,74 @@ def get_nonreported_values(c, gids, non_reported_gids, sonata_rep_name, static_e
     syn_df = syn_df.loc[syn_df["pre_gid"].isin(gids)]
 
     extra_columns = ["%s_t=%i" % (fn, t) for fn in aggregation_fns for t in report_t]
-    weighted_edges = np.zeros((static_edges.shape[0], len(extra_columns)), dtype=np.float32)
+    weighted_edges = -1 * np.ones((static_edges.shape[0], len(extra_columns)), dtype=np.float32)
     i, n_ts = 0, len(report_t)
-    for post_gid in tqdm(non_reported_gids, desc="Getting non-reported gids", miniters=len(non_reported_gids)/100):
+    # for post_gid in tqdm(non_reported_gids, desc="Getting non-reported gids", miniters=len(non_reported_gids)/100):
+    for post_gid in non_reported_gids:
         post_df = syn_df.loc[syn_df["post_gid"] == post_gid]
-        conns_data = il_groupby(post_df, group=sonata_rep_name)
+        conns_data = _il_groupby(post_df, group=sonata_rep_name)
         for conn_data in conns_data:
             for j, fn in enumerate(aggregation_fns):
                 weighted_edges[i, j * n_ts:(j + 1) * n_ts] = getattr(conn_data, fn)()
             i += 1
     return pd.concat([static_edges, pd.DataFrame(data=weighted_edges, index=static_edges.index,
-                                                 columns=extra_columns)], axis=1)
+                                                 columns=extra_columns)], axis=1, copy=False)
 
 
-def read_report(post_gids, post_matrix_idx, edges, syn_df, data, aggregation_fns):
+def report_to_edges(post_gids, edges, syn_df, data, aggregation_fns):
     """Reads synapse report and creates weighted connectivity edges"""
-    assert (edges["col"].unique() == post_matrix_idx).all()
     report_t = data.index.to_numpy()
     extra_columns = ["%s_t=%i" % (fn, t) for fn in aggregation_fns for t in report_t]
-    weighted_edges = np.zeros((edges.shape[0], len(extra_columns)), dtype=np.float32)
+    weighted_edges = -1 * np.ones((edges.shape[0], len(extra_columns)), dtype=np.float32)
     i, n_ts = 0, len(report_t)
-    for post_matrix_id, post_gid in zip(post_matrix_idx, post_gids):
+    for post_gid in post_gids:
         post_df = syn_df.loc[syn_df["post_gid"] == post_gid]
-        local_syn_idx = il_groupby(post_df)
+        local_syn_idx = _il_groupby(post_df)
         post_data = data[post_gid]  # first level indexing of report (post gid)
         for syn_idx in local_syn_idx:
             conn_data = post_data[syn_idx]  # second level indexing of report (local syn idx)
             for j, fn in enumerate(aggregation_fns):
                 weighted_edges[i, j * n_ts:(j + 1) * n_ts] = getattr(conn_data, fn)(axis=1)
             i += 1
-    return pd.concat([edges, pd.DataFrame(data=weighted_edges, index=edges.index, columns=extra_columns)], axis=1)
+    return pd.concat([edges, pd.DataFrame(data=weighted_edges, index=edges.index, columns=extra_columns)],
+                     axis=1, copy=False)
 
 
-def _read_report_subprocess(inputs):
+def _report_to_edges_subprocess(inputs):
     """Subprocess used by multiprocessing pool for processing report in parallel"""
-    return read_report(*inputs)
+    return report_to_edges(*inputs)
 
 
-def from_report(sim, report_cfg, aggregation_fns=["sum", "mean"], precalculated={}, chunksize=2e4, n_jobs=-1):
+def _il_get(report, report_cfg, gids):
+    """Fast, pure libsonata, in line implementation of report.get(`gids`)"""
+    view = report.get(node_ids=(gids-1).tolist(), tstart=report_cfg["t_start"], tstop=report_cfg["t_end"],
+                      tstride=round(report_cfg["t_step"]/report.times[-1]))
+    col_idx = pd.MultiIndex.from_tuples(view.ids, names=["post_gid", "local_syn_id"])
+    col_idx = col_idx.set_levels(col_idx.levels[0]+1, level=0)  # get back gids from node_ids
+    return pd.DataFrame(data=view.data, index=pd.Index(view.times, name="time"),
+                        columns=col_idx)
+
+
+def _chunk_data(data, syn_df_chunks):
+    """Chunks data for parallel processing. First re-orders `data` to match the ascending (post) gid ordering
+    of the ordering of the synapse id DataFrame, and then indexes it simply with `iloc` to have the same sizes
+    as the previously chunked synapse id DataFrame (stored in the `syn_df_chunks` list)"""
+    chunk_idx = np.cumsum([0] + [syn_df_chunk.shape[0] for syn_df_chunk in syn_df_chunks])
+    assert chunk_idx[-1] == data.shape[1], "Synapse id mapper's shape doesn't equal to report's shape," \
+                                           "which will break the slicing of data with iloc"
+    data.sort_index(axis=1, level=0, sort_remaining=False, inplace=True)
+    return [data.iloc[:, start_id:end_id] for start_id, end_id in zip(chunk_idx[:-1], chunk_idx[1:])]
+
+
+def from_report(sim, report_cfg, aggregation_fns=["sum", "mean"], precalculated={}, n_jobs=-1):
     """Creates weighted connectivity matrix from synapse report (written by Neurodamus, read by libsonata)"""
-
-    report = sim.report(report_cfg["report_name"])
-    report_gids = report.gids
-    # get exact time points from report (and the column indices for local to global synapse id mapping)
-    data = report.get_gid(report_gids[0], t_start=report_cfg["t_start"],
-                          t_end=report_cfg["t_end"], t_step=report_cfg["t_step"])
+    from libsonata import ElementReportReader
+    h5f_name = os.path.join(sim.config["Run_Default"]["OutputRoot"], "%s.h5" % report_cfg["report_name"])
+    report = ElementReportReader(h5f_name)
+    report = report[list(report.get_population_names())[0]]
+    report_gids = np.asarray(report.get_node_ids()) + 1
+    # get exact time points from report (and try out custom loading early in the function)
+    data = _il_get(report, report_cfg, np.array([report_gids[0]]))
     report_t = data.index.to_numpy()
     # get "base" non-weighted conenctivity matrix (in sparse format)
     if "gids" in precalculated and "edges" in precalculated:
@@ -208,17 +231,16 @@ def from_report(sim, report_cfg, aggregation_fns=["sum", "mean"], precalculated=
         # edges = conn_mat.edges
         # gids = conn_mat.gids
     # check if there are non-reported synapses and process those first (get static value with libsonata and bluepy)
+    merge_with_stat = False
     if not np.isin(gids, report_gids, assume_unique=True).all():
         non_rep_idx = np.isin(gids, report_gids, assume_unique=True, invert=True)
         post_matrix_idx = edges["col"].unique()
         static_edges = edges.loc[edges["col"].isin(post_matrix_idx[non_rep_idx])]
-        w_stat_edges = get_nonreported_values(sim.circuit, gids, gids[non_rep_idx],
-                                              REPORT_TO_SONATA[report_cfg["report_name"]], static_edges,
-                                              aggregation_fns, report_t)
+        weighted_stat_edges = get_nonreported_values(sim.circuit, gids, gids[non_rep_idx],
+                                                     REPORT_TO_SONATA[report_cfg["report_name"]], static_edges,
+                                                     aggregation_fns, report_t)
         edges.drop(index=static_edges.index, inplace=True)
         merge_with_stat = True
-    else:
-        merge_with_stat = False
     # get mapping between the matrices pre-post and the reports post+local_syn_id format
     if "syn_df" in precalculated:
         syn_df = precalculated["syn_df"]
@@ -226,38 +248,34 @@ def from_report(sim, report_cfg, aggregation_fns=["sum", "mean"], precalculated=
         NotImplementedError()
         # TODO: write this properly for conntility
         # from map_syn_idx import create_syn_idx_df
+        # report_cfg_tmp = {"t_start": report_cfg["t_start"], "t_end":report_cfg["t_start"] + report.times[-1],
+        #                   "t_step": report.times[-1]}
+        # data = _il_get(report, report_cfg_tmp, report_gids)
         # syn_df = create_syn_idx_df(sim.circuit.config["connectome"], data.columns, pklf_name=None)
-
-    n_jobs = mp.cpu_count() - 1 if n_jobs == -1 else n_jobs
-    # divide edges into chunks based on post gids
+    # finally load that report...
     post_matrix_idx = edges["col"].unique()
-    chunk_idx = np.arange(0, len(post_matrix_idx), chunksize, dtype=int)
-    chunk_idx = np.append(chunk_idx, len(post_matrix_idx))
-    all_weighted_edges = [w_stat_edges] if merge_with_stat else []
-    for start_chunk_id, end_chunk_id in tzip(chunk_idx[:-1], chunk_idx[1:], desc="Loading chunks of gids from report"):
-        post_matrix_idx_chunk = post_matrix_idx[start_chunk_id:end_chunk_id]
-        post_gids_chunk = gids[post_matrix_idx_chunk]
-        data = report.get(gids=post_gids_chunk, t_start=report_cfg["t_start"],
-                          t_end=report_cfg["t_end"], t_step=report_cfg["t_step"])
-        # split datasets (further) for parallel execution
-        idx = np.linspace(0, len(post_matrix_idx_chunk), n_jobs, dtype=int)
-        pmidx_chunks, pgid_chunks = [], []
-        for start_id, end_id in zip(idx[:-1], idx[1:]):
-            pmidx_chunks.append(post_matrix_idx_chunk[start_id:end_id])
-            pgid_chunks.append(post_gids_chunk[start_id:end_id])
-        edge_chunks = [edges.loc[edges["col"].isin(matrix_idx)] for matrix_idx in pmidx_chunks]
-        syn_df_chunks = [syn_df.loc[syn_df["post_gid"].isin(post_gids)] for post_gids in pgid_chunks]
-        data_chunks = [data[post_gids] for post_gids in pgid_chunks]
-        # process report in parallel and merge results
-        pool = mp.Pool(processes=n_jobs)
-        edges_tmp = pool.map(_read_report_subprocess, zip(pgid_chunks, pmidx_chunks, edge_chunks, syn_df_chunks,
-                                                          data_chunks, [aggregation_fns for _ in range(n_jobs)]))
-        pool.terminate()
-        all_weighted_edges.append(pd.concat(edges_tmp, axis=0))
-    weighted_edges = pd.concat(all_weighted_edges, axis=0)
-
+    post_gids = gids[post_matrix_idx]
+    data = _il_get(report, report_cfg, post_gids)
+    # divide edges into chunks (based on post gids) for parallel processing
+    n_jobs = mp.cpu_count() - 1 if n_jobs == -1 else n_jobs
+    chunk_idx = np.linspace(0, len(post_matrix_idx), n_jobs, dtype=int)
+    pmidx_chunks, pgid_chunks = [], []
+    for start_id, end_id in zip(chunk_idx[:-1], chunk_idx[1:]):
+        pmidx_chunks.append(post_matrix_idx[start_id:end_id])
+        pgid_chunks.append(post_gids[start_id:end_id])
+    edge_chunks = [edges.loc[edges["col"].isin(post_matrix_idx)] for post_matrix_idx in pmidx_chunks]
+    syn_df_chunks = [syn_df.loc[syn_df["post_gid"].isin(post_gids)] for post_gids in pgid_chunks]
+    data_chunks = _chunk_data(data, syn_df_chunks)
+    # process report in parallel and merge results
+    pool = mp.Pool(processes=n_jobs)
+    weighted_edges = pool.map(_report_to_edges_subprocess, zip(pgid_chunks, edge_chunks, syn_df_chunks, data_chunks,
+                                                               [aggregation_fns for _ in range(n_jobs)]))
+    pool.terminate()
+    if merge_with_stat:
+        weighted_edges.append(weighted_stat_edges)
+    weighted_edges = pd.concat(weighted_edges, axis=0, copy=False)
     weighted_edges.to_hdf("/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/"
-                          "simulations/4073e95f-abb1-4b86-8c38-13cf9f00ce0b/weighted_edges_parallel.h5",
+                          "simulations/LayerWiseEShotNoise_PyramidPatterns/weighted_edges.h5",
                           key="connectivity/full_matrix/edges")
 
 
@@ -525,6 +543,6 @@ if __name__ == "__main__":
                                              "simulations/4073e95f-abb1-4b86-8c38-13cf9f00ce0b/assemblies.h5")
     syn_df = pd.read_pickle("/gpfs/bbp.cscs.ch/project/proj96/circuits/plastic_v1/syn_idx.pkl")
     precalculated = {"gids": vertex_properties.index.to_numpy(), "edges": edges, "syn_df": syn_df}
-    report_cfg = {"report_name": "gmax_AMPA", "t_start": 1500, "t_end": 62000, "t_step": 2000}
+    report_cfg = {"report_name": "gmax_AMPA", "t_start": 1500, "t_end": 62000, "t_step": 5000}
     from_report(sim, report_cfg, precalculated=precalculated)
 
