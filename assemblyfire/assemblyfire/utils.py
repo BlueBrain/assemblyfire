@@ -9,12 +9,13 @@ import h5py
 from collections import namedtuple
 import numpy as np
 import pandas as pd
+from libsonata import EdgeStorage
 
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
 SingleCellFeatures = namedtuple("SingleCellFeatures", ["gids", "r_spikes", "mean_ts", "std_ts"])
 
 
-def _get_bluepy_circuit(circuitconfig_path):
+def get_bluepy_circuit(circuitconfig_path):
     try:
         from bluepy import Circuit
     except ImportError as e:
@@ -110,7 +111,7 @@ def _guess_circuit_version(target):
 
 def get_figure_asthetics(circuit_config, target):
     """Gets gid depths, layer boundaries and cell numbers for figure asthetics"""
-    c = _get_bluepy_circuit(circuit_config)
+    c = get_bluepy_circuit(circuit_config)
     gids = get_E_gids(c, target)
     c_version = _guess_circuit_version(target)
     # get depths
@@ -148,6 +149,21 @@ def get_spikes(sim, gids, t_start, t_end):
     else:
         spikes = sim.spikes.get(gids, t_start=t_start, t_end=t_end)
     return np.asarray(spikes.index), np.asarray(spikes.values)
+
+
+def get_syn_idx(c, pre_gids, post_gids):
+    """Fast (pure libsonata) syn IDs between `pre_gids` and `post_gids`"""
+    edge_fname = c.config["connectome"]
+    edges = EdgeStorage(edge_fname)
+    edge_pop = edges.open_population(list(edges.population_names)[0])
+    # sonata nodes are 0 based (and the functions expect lists of ints)
+    efferents = edge_pop.efferent_edges((pre_gids.astype(int) - 1).tolist()).flatten()
+    afferents = edge_pop.afferent_edges((post_gids.astype(int) - 1).tolist()).flatten()
+    return np.intersect1d(efferents, afferents, assume_unique=True)
+
+
+def get_syn_properties(c, syn_idx, properties=["rho0_GB"]):
+    return c.connectome.synapse_properties(syn_idx, properties)
 
 
 def _read_h5_metadata(h5f, group_name=None, prefix=None):

@@ -17,6 +17,7 @@ import seaborn as sns
 
 
 sns.set(style="ticks", context="notebook")
+RED, BLUE = "#e32b14", "#3271b8"
 
 
 def plot_rate(rate, rate_th, t_start, t_end, fig_name):
@@ -447,7 +448,7 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name):
     plt.close(fig)
 
 
-def plot_simplex_counts_seed(simplex_counts, simplex_counts_control, fig_name):
+def plot_simplex_counts(simplex_counts, simplex_counts_control, fig_name):
     """Plots simplex counts for assemblies (within one seed) and random controls"""
     assembly_labels = list(simplex_counts.keys())
     n = len(assembly_labels)
@@ -475,6 +476,27 @@ def plot_simplex_counts_seed(simplex_counts, simplex_counts_control, fig_name):
     fig.tight_layout()
     fig.savefig(fig_name, bbox_inches="tight", transparent=True)
     plt.close(fig)
+
+
+def plot_efficacy(efficacies, fig_name):
+    """Plots efficacies (depressed and potentiated) for synapses within assemblies (within one seed)"""
+    plt.rcParams["patch.edgecolor"] = "black"
+    assembly_labels = list(efficacies.keys())
+    n = len(assembly_labels)
+
+    fig = plt.figure(figsize=(20, 8))
+    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
+    gs = gridspec.GridSpec(n_rows, 5)
+    for i, assembly_label in enumerate(assembly_labels):
+        sizes = np.array([efficacies[assembly_label][0], efficacies[assembly_label][1]])
+        ratios = 100 * sizes / np.sum(sizes)
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        ax.pie(sizes, labels=["%.2f%%" % ratio for ratio in ratios], colors=[BLUE, RED])
+        ax.set_title("Assembly %i\n(nsyns=%.2fM)" % (assembly_label[0], (sizes[0]+sizes[1]) / 1e6))
+    fig.tight_layout()
+    fig.savefig(fig_name, bbox_inches="tight", transparent=True)
+    plt.close(fig)
+    plt.rcParams["patch.edgecolor"] = "white"
 
 
 def plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name):
