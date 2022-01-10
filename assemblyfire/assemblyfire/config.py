@@ -110,10 +110,18 @@ class Config(object):
 
     @property
     def spike_clustering_method(self):
-        assert self.config["clustering_methods"]["spikes"] in ["hierarchical", "density_based"]
-        return self.config["clustering_methods"]["spikes"]
+        assert self.config["clustering"]["spikes"]["method"] in ["hierarchical", "density_based"]
+        return self.config["clustering"]["spikes"]["method"]
+
+    @property
+    def overwrite_seeds(self):
+        if "overwrite_n_clusters" in self.config["clustering"]["spikes"]:
+            return self.config["clustering"]["spikes"]["overwrite_n_clusters"]
+        else:
+            return {}
 
     @property
     def assembly_clustering_method(self):
-        assert self.config["clustering_methods"]["assemblies"] in ["hierarchical", "greedy"]
-        return self.config["clustering_methods"]["assemblies"]
+        assert self.config["clustering"]["assemblies"]["method"] in ["hierarchical", "greedy"]
+        return self.config["clustering"]["assemblies"]["method"]
+

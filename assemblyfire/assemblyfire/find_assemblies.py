@@ -32,7 +32,7 @@ def run(config_path):
     L.info(" Preprocessed spikes and assemblies will be saved to: %s" % spikes.h5f_name)
     spike_matrix_dict, project_metadata = spikes.get_sign_spike_matrices()
     L.info(" Cluster time bins via %s clustering..." % spikes.spike_clustering_method)
-    clusters_dict = cluster_spikes(spike_matrix_dict, method=spikes.spike_clustering_method,
+    clusters_dict = cluster_spikes(spike_matrix_dict, spikes.spike_clustering_method, spikes.overwrite_seeds,
                                    FigureArgs=FigureArgs(project_metadata["stim_times"], project_metadata["patterns"],
                                                          depths, None, spikes.fig_path))
     L.info(" Detecting assemblies within clustered time bins and saving them to file...")

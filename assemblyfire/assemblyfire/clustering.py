@@ -206,13 +206,15 @@ def within_cluster_correlations(spike_matrix, core_cell_idx):
     return assembly_idx
 
 
-def cluster_spikes(spike_matrix_dict, method, FigureArgs):
+def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
     """
     Cluster spikes either via hierarchical clustering (Ward's linkage)
     of the cosine similarity matrix of significant time bins (see Perez-Ortega et al. 2020), or
     density based clustering of spike matrix projected to PCA space (see Herzog et al. 2020)
     :param spike_matrix_dict: dict with seed as key and SpikeMatrixResult (see `spikes.py`) as value
     :param method: str - clustering method (read from yaml config file)
+    :param overwrite_seeds: dict with seeds as keys and values as desired number of clusters
+                           (instead of the optimal cluster number determined with the current heuristics in place)
     :param FigureArgs: plotting related arguments (see `cli.py`)
     :return: dict with seed as key and clustered (significant) time bins as value
     """
@@ -225,7 +227,11 @@ def cluster_spikes(spike_matrix_dict, method, FigureArgs):
 
         if method == "hierarchical":
             from assemblyfire.plots import plot_sim_matrix, plot_dendogram_silhouettes
-            sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix)
+            if seed not in overwrite_seeds:
+                sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix)
+            else:
+                sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix, min_n_clusts=overwrite_seeds[seed],
+                                                                 max_n_clusts=overwrite_seeds[seed]+1)
 
             fig_name = os.path.join(FigureArgs.fig_path, "similarity_matrix_seed%i.png" % seed)
             plot_sim_matrix(sim_matrix, t_bins, FigureArgs.stim_times, FigureArgs.patterns, fig_name)
@@ -235,6 +241,7 @@ def cluster_spikes(spike_matrix_dict, method, FigureArgs):
         elif method == "density_based":
             from assemblyfire.plots import plot_transformed, plot_components, plot_rhos_deltas
             pca_transformed, pca_components = PCA_ncomps(spike_matrix.T, 12)
+            # TODO: add overwrite_seeds here as well
             clusters, plotting = db_clustering(pca_transformed)
 
             fig_name = os.path.join(FigureArgs.fig_path, "PCA_transformed_seed%i.png" % seed)
