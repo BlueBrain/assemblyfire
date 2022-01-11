@@ -1,4 +1,4 @@
-root_path: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/4073e95f-abb1-4b86-8c38-13cf9f00ce0b"
+root_path: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/e0fbb0c8-07a4-49e0-be7d-822b2b2148fb"
 
 patterns_fname: "input_spikes/stimulus_stream__start2000__end61501__rate2__seed12.txt"
 
@@ -20,6 +20,9 @@ preprocessing_protocol:
     bin_size: 20
     threshold_rate: True
 
-clustering_methods:
-    spikes: "hierarchical"
-    assemblies: "hierarchical"
+clustering:
+    spikes:
+        method: "hierarchical"
+        overwrite_n_clusters: {100: 12}
+    assemblies:
+        method: "hierarchical"
