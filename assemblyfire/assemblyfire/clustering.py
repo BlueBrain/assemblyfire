@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Functions to run either hierarchical clustering (via Ward's linkage)
 of the cosine similarity matrix of significant time bins
@@ -9,7 +8,7 @@ of spike matrix projected to PCA space a la Herzog et al. 2020.
 Then "core-cells" and cell assemblies are detected with correlation
 based methods from (Montijn et al. 2016 and) Herzog et al. 2020
 Assemblies are clustered into consensus assemblies via hierarchical clustering
-last modified: András Ecker 02.2021
+last modified: András Ecker 01.2022
 """
 
 import os
@@ -231,7 +230,7 @@ def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
                 sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix)
             else:
                 sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix, min_n_clusts=overwrite_seeds[seed],
-                                                                 max_n_clusts=overwrite_seeds[seed]+1)
+                                                                 max_n_clusts=overwrite_seeds[seed])
 
             fig_name = os.path.join(FigureArgs.fig_path, "similarity_matrix_seed%i.png" % seed)
             plot_sim_matrix(sim_matrix, t_bins, FigureArgs.stim_times, FigureArgs.patterns, fig_name)
