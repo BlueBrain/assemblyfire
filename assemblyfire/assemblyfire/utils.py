@@ -147,7 +147,7 @@ def get_spikes(sim, gids, t_start, t_end):
         spikes = sim.spikes.get(t_start=t_start, t_end=t_end)
     else:
         spikes = sim.spikes.get(gids, t_start=t_start, t_end=t_end)
-    return spikes.index.to_numpy(), spikes.to_numpy
+    return spikes.index.to_numpy(), spikes.to_numpy()
 
 
 def get_syn_idx(c, pre_gids, post_gids):
