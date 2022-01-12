@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
 """
 Config file class
-authors: Thomas Delemontex and András Ecker; last update 11.2021
+authors: Thomas Delemontex and András Ecker; last update 01.2022
 """
 
 import os
@@ -76,29 +75,15 @@ class Config(object):
         return self.config["preprocessing_protocol"]["t_start"]
 
     @property
-    def t_start_exception(self):
-        if "t_start_exception" in self.config["preprocessing_protocol"]:
-            return self.config["preprocessing_protocol"]["t_start_exception"]
-        else:
-            return self.t_start
-
-    @property
-    def seeds_exception(self):
-        if "seeds_exception" in self.config["preprocessing_protocol"]:
-            return self.config["preprocessing_protocol"]["seeds_exception"]
-        else:
-            return []
-
-    @property
-    def ignore_seeds(self):
-        if "ignore_seeds" in self.config["preprocessing_protocol"]:
-            return self.config["preprocessing_protocol"]["ignore_seeds"]
-        else:
-            return []
-
-    @property
     def t_end(self):
         return self.config["preprocessing_protocol"]["t_end"]
+
+    @property
+    def t_chunks(self):
+        if "t_chunks" in self.config["preprocessing_protocol"]:
+            return self.config["preprocessing_protocol"]["t_chunks"]
+        else:
+            return None
 
     @property
     def bin_size(self):
@@ -107,6 +92,13 @@ class Config(object):
     @property
     def threshold_rate(self):
         return self.config["preprocessing_protocol"]["threshold_rate"]
+
+    @property
+    def ignore_seeds(self):
+        if "ignore_seeds" in self.config["preprocessing_protocol"]:
+            return self.config["preprocessing_protocol"]["ignore_seeds"]
+        else:
+            return []
 
     @property
     def spike_clustering_method(self):

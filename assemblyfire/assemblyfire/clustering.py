@@ -214,15 +214,18 @@ def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
     :param method: str - clustering method (read from yaml config file)
     :param overwrite_seeds: dict with seeds as keys and values as desired number of clusters
                            (instead of the optimal cluster number determined with the current heuristics in place)
-    :param FigureArgs: plotting related arguments (see `cli.py`)
+    :param FigureArgs: plotting related arguments (see `find_assemblies.py`)
     :return: dict with seed as key and clustered (significant) time bins as value
     """
     from assemblyfire.plots import plot_cluster_seqs, plot_pattern_clusters
 
     clusters_dict = {}
+    ts, stim_times, patterns, fig_path = FigureArgs.t, FigureArgs.stim_times, FigureArgs.patterns, FigureArgs.fig_path
     for seed, SpikeMatrixResult in tqdm(spike_matrix_dict.items(), desc="Clustering"):
-        spike_matrix = SpikeMatrixResult.spike_matrix
-        t_bins = SpikeMatrixResult.t_bins
+        spike_matrix, t_bins = SpikeMatrixResult.spike_matrix, SpikeMatrixResult.t_bins
+        if len(ts) != 2:
+            idx = np.where((ts[seed] <= stim_times) & (stim_times < ts[seed+1]))  # "seed" meaning temporal chunk here
+            stim_times, patterns = stim_times[idx], patterns[idx]
 
         if method == "hierarchical":
             from assemblyfire.plots import plot_sim_matrix, plot_dendogram_silhouettes
@@ -231,31 +234,28 @@ def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
             else:
                 sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix, min_n_clusts=overwrite_seeds[seed],
                                                                  max_n_clusts=overwrite_seeds[seed])
-
-            fig_name = os.path.join(FigureArgs.fig_path, "similarity_matrix_seed%i.png" % seed)
-            plot_sim_matrix(sim_matrix, t_bins, FigureArgs.stim_times, FigureArgs.patterns, fig_name)
-            fig_name = os.path.join(FigureArgs.fig_path, "ward_clustering_seed%i.png" % seed)
+            fig_name = os.path.join(fig_path, "similarity_matrix_seed%i.png" % seed)
+            plot_sim_matrix(sim_matrix, t_bins, stim_times, patterns, fig_name)
+            fig_name = os.path.join(fig_path, "ward_clustering_seed%i.png" % seed)
             plot_dendogram_silhouettes(clusters, *plotting, fig_name)
-
         elif method == "density_based":
             from assemblyfire.plots import plot_transformed, plot_components, plot_rhos_deltas
             pca_transformed, pca_components = PCA_ncomps(spike_matrix.T, 12)
             # TODO: add overwrite_seeds here as well
             clusters, plotting = db_clustering(pca_transformed)
 
-            fig_name = os.path.join(FigureArgs.fig_path, "PCA_transformed_seed%i.png" % seed)
-            plot_transformed(pca_transformed, t_bins, FigureArgs.stim_times, FigureArgs.patterns, fig_name)
-            fig_name = os.path.join(FigureArgs.fig_path, "PCA_components_seed%i.png" % seed)
+            fig_name = os.path.join(fig_path, "PCA_transformed_seed%i.png" % seed)
+            plot_transformed(pca_transformed, t_bins, stim_times, patterns, fig_name)
+            fig_name = os.path.join(fig_path, "PCA_components_seed%i.png" % seed)
             plot_components(pca_components, SpikeMatrixResult.gids, FigureArgs.depths, fig_name)
-            fig_name = os.path.join(FigureArgs.fig_path, "rho_delta_seed%i.png" % seed)
+            fig_name = os.path.join(fig_path, "rho_delta_seed%i.png" % seed)
             plot_rhos_deltas(*plotting, fig_name)
 
         clusters_dict[seed] = clusters
-        fig_name = os.path.join(FigureArgs.fig_path, "cluster_seq_seed%i.png" % seed)
-        plot_cluster_seqs(clusters, t_bins, FigureArgs.stim_times, FigureArgs.patterns, fig_name)
-        fig_name = os.path.join(FigureArgs.fig_path, "clusters_patterns_seed%i.png" % seed)
-        plot_pattern_clusters(clusters, t_bins, FigureArgs.stim_times, FigureArgs.patterns, fig_name)
-
+        fig_name = os.path.join(fig_path, "cluster_seq_seed%i.png" % seed)
+        plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name)
+        fig_name = os.path.join(fig_path, "clusters_patterns_seed%i.png" % seed)
+        plot_pattern_clusters(clusters, t_bins, stim_times, patterns, fig_name)
     return clusters_dict
 
 

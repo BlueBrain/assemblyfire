@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
 """
 Main run function for finding cell assemblies in spiking data
-last modified: András Ecker 11.2021
+last modified: András Ecker 01.2022
 """
 
 import logging
@@ -12,7 +11,7 @@ from assemblyfire.spikes import SpikeMatrixGroup
 from assemblyfire.clustering import cluster_spikes, detect_assemblies
 
 L = logging.getLogger("assemblyfire")
-FigureArgs = namedtuple("FigureArgs", ["stim_times", "patterns", "depths", "ystuff", "fig_path"])
+FigureArgs = namedtuple("FigureArgs", ["t", "stim_times", "patterns", "depths", "ystuff", "fig_path"])
 
 
 def run(config_path):
@@ -33,8 +32,8 @@ def run(config_path):
     spike_matrix_dict, project_metadata = spikes.get_sign_spike_matrices()
     L.info(" Cluster time bins via %s clustering..." % spikes.spike_clustering_method)
     clusters_dict = cluster_spikes(spike_matrix_dict, spikes.spike_clustering_method, spikes.overwrite_seeds,
-                                   FigureArgs=FigureArgs(project_metadata["stim_times"], project_metadata["patterns"],
-                                                         depths, None, spikes.fig_path))
+                                   FigureArgs=FigureArgs(project_metadata["t"], project_metadata["stim_times"],
+                                                         project_metadata["patterns"], depths, None, spikes.fig_path))
     L.info(" Detecting assemblies within clustered time bins and saving them to file...")
     detect_assemblies(spike_matrix_dict, clusters_dict, spikes.h5f_name, spikes.h5_prefix_assemblies,
-                      FigureArgs=FigureArgs(None, None, depths, ystuff, spikes.fig_path))
+                      FigureArgs=FigureArgs(None, None, None, depths, ystuff, spikes.fig_path))
