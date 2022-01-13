@@ -47,7 +47,7 @@ def closeness_connected_components(matrix, directed=False, return_sum=True):
     else:
         return all_c
 
-
+'''TODO: fix this...
 class NetworkAssembly(ConnectivityMatrix):
     """
     A class derived from ConnectivityMatrix with additional information on networks metrics
@@ -146,6 +146,7 @@ class NetworkAssembly(ConnectivityMatrix):
 
     # TODO: Filtered simplex counts with different weights on vertices (coreness, intersection)
     #  or on edges (strength of connection).
+'''
 
 
 def in_degree_assemblies(assembly_grp_dict, circuit):
