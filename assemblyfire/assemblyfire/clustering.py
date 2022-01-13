@@ -219,13 +219,15 @@ def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
     """
     from assemblyfire.plots import plot_cluster_seqs, plot_pattern_clusters
 
+    fig_path = FigureArgs.fig_path
+    ts, stim_times, patterns,  = FigureArgs.t, FigureArgs.stim_times, np.asarray(FigureArgs.patterns)
     clusters_dict = {}
-    ts, stim_times, patterns, fig_path = FigureArgs.t, FigureArgs.stim_times, FigureArgs.patterns, FigureArgs.fig_path
     for seed, SpikeMatrixResult in tqdm(spike_matrix_dict.items(), desc="Clustering"):
         spike_matrix, t_bins = SpikeMatrixResult.spike_matrix, SpikeMatrixResult.t_bins
-        if len(ts) != 2:
-            idx = np.where((ts[seed] <= stim_times) & (stim_times < ts[seed+1]))  # "seed" meaning temporal chunk here
-            stim_times, patterns = stim_times[idx], np.asarray(patterns)[idx]
+        if len(ts) > 2:  # if t is chunked the chunk bounds are saved and "seeds" represent chunks
+            idx = np.where((ts[seed] <= stim_times) & (stim_times < ts[seed + 1]))[0]
+        else:
+            idx = np.arange(len(stim_times))  # just to not break the code...
 
         if method == "hierarchical":
             from assemblyfire.plots import plot_sim_matrix, plot_dendogram_silhouettes
@@ -235,7 +237,7 @@ def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
                 sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix, min_n_clusts=overwrite_seeds[seed],
                                                                  max_n_clusts=overwrite_seeds[seed])
             fig_name = os.path.join(fig_path, "similarity_matrix_seed%i.png" % seed)
-            plot_sim_matrix(sim_matrix, t_bins, stim_times, patterns, fig_name)
+            plot_sim_matrix(sim_matrix, t_bins, stim_times[idx], patterns[idx], fig_name)
             fig_name = os.path.join(fig_path, "ward_clustering_seed%i.png" % seed)
             plot_dendogram_silhouettes(clusters, *plotting, fig_name)
         elif method == "density_based":
@@ -245,7 +247,7 @@ def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
             clusters, plotting = db_clustering(pca_transformed)
 
             fig_name = os.path.join(fig_path, "PCA_transformed_seed%i.png" % seed)
-            plot_transformed(pca_transformed, t_bins, stim_times, patterns, fig_name)
+            plot_transformed(pca_transformed, t_bins, stim_times[idx], patterns[idx], fig_name)
             fig_name = os.path.join(fig_path, "PCA_components_seed%i.png" % seed)
             plot_components(pca_components, SpikeMatrixResult.gids, FigureArgs.depths, fig_name)
             fig_name = os.path.join(fig_path, "rho_delta_seed%i.png" % seed)
@@ -253,9 +255,9 @@ def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
 
         clusters_dict[seed] = clusters
         fig_name = os.path.join(fig_path, "cluster_seq_seed%i.png" % seed)
-        plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name)
+        plot_cluster_seqs(clusters, t_bins, stim_times[idx], patterns[idx], fig_name)
         fig_name = os.path.join(fig_path, "clusters_patterns_seed%i.png" % seed)
-        plot_pattern_clusters(clusters, t_bins, stim_times, patterns, fig_name)
+        plot_pattern_clusters(clusters, t_bins, stim_times[idx], patterns[idx], fig_name)
     return clusters_dict
 
 
