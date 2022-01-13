@@ -11,7 +11,7 @@ VERSION = imp.load_source("", "assemblyfire/version.py").__version__
 
 setup(
     name="assemblyfire",
-    author=["Andras Ecker", "Michael Reimann", "Daniela Egas Santander", "Nicolas Ninin"],
+    authors=["Andras Ecker", "Michael Reimann", "Daniela Egas Santander"],
     author_email="andras.ecker@epfl.ch",
     version=VERSION,
     description="find and analyze cell assemblies",
@@ -37,14 +37,14 @@ setup(
                       "scikit-network>=0.24.0",
                       "pyflagser>=0.4.4",
                       "matplotlib>=3.4.3",
-                      "seaborn>=0.11.2",
-                     ],
+                      "seaborn>=0.11.2"],
     packages=find_packages(),
     python_requires=">=3.8",
     entry_points={"console_scripts": ["assemblyfire=assemblyfire.cli:cli"]},
     extras_require={
         "docs": ["sphinx", "sphinx-bluebrain-theme"],
-        "bluepy": ["bluepy[all]>=2.4.2"]
+        "bluepy": ["bluepy[all]>=2.4.2"],
+        "conntility": ["Connectome-utilities @ https://bbpgitlab.epfl.ch/conn/structural/Connectome-utilities"]
     },
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
