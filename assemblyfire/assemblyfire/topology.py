@@ -8,7 +8,7 @@ last modified: 12.2020
 import numpy as np
 from tqdm import tqdm
 
-from assemblyfire.connectivity import ConnectivityMatrix
+# from assemblyfire.connectivity import ConnectivityMatrix  # TODO: fix this...
 # from assemblyfire.assemblies import WeightedAssembly, AssemblyGroup
 
 
