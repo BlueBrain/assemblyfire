@@ -225,7 +225,7 @@ def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
         spike_matrix, t_bins = SpikeMatrixResult.spike_matrix, SpikeMatrixResult.t_bins
         if len(ts) != 2:
             idx = np.where((ts[seed] <= stim_times) & (stim_times < ts[seed+1]))  # "seed" meaning temporal chunk here
-            stim_times, patterns = stim_times[idx], patterns[idx]
+            stim_times, patterns = stim_times[idx], np.asarray(patterns)[idx]
 
         if method == "hierarchical":
             from assemblyfire.plots import plot_sim_matrix, plot_dendogram_silhouettes
