@@ -176,7 +176,6 @@ def plot_dendogram_silhouettes(clusters, linkage, silhouettes, fig_name):
 def _group_by_patterns(clusters, t_bins, stim_times, patterns):
     """reorders time series (of clusters) based on patterns
     returns a matrix for each pattern (max n stims * max length)"""
-
     pattern_names, counts = np.unique(patterns, return_counts=True)
     max_count = np.max(counts)
 
