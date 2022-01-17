@@ -1,6 +1,6 @@
-root_path: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/5b1420ca-dd31-4def-96d6-46fe99d20dcc"
+root_path: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/LayerWiseEShotNoise_PyramidPatterns_long"
 
-patterns_fname: "input_spikes/stimulus_stream__start2000__end602001__rate2__seed12.txt"
+patterns_fname: "stimulus_stream__start2000__end601501__rate2__seed12.txt"
 
 h5_out:
     file_name: "assemblies.h5"
