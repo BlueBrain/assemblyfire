@@ -174,7 +174,7 @@ def _read_h5_metadata(h5f, group_name=None, prefix=None):
     if group_name is not None:
         assert group_name in prefix_grp
         metadata.update(dict(prefix_grp[group_name].attrs))
-    return dict(h5f[prefix].attrs)
+    return metadata
 
 
 def load_assemblies_from_h5(h5f_name, prefix="assemblies"):
