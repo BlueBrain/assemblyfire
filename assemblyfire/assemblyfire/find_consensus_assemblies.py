@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Main run function for finding consensus cell assemblies
 last modified: András Ecker 11.2021
@@ -14,7 +13,7 @@ L = logging.getLogger("assemblyfire")
 
 def run(config_path):
     """
-    Loads in project related info from yaml config file ...
+    Loads in project related info from yaml config file, finds consensus assemblies and saves them to h5
     :param config_path: str - path to project config file
     """
 
