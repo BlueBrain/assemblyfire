@@ -17,6 +17,8 @@ import seaborn as sns
 
 
 sns.set(style="ticks", context="notebook")
+PATTERN_COLORS = {"A": "#234091", "B": "#57B4D0", "C": "#C4A943", "D": "#7E1F19", "E": "#3F7AB3",
+                  "F": "#8CAD8A", "G": "#A1632E", "H": "#66939D", "I": "#66939D", "J": "#665869"}
 RED, BLUE = "#e32b14", "#3271b8"
 
 
@@ -792,4 +794,26 @@ def plot_simplex_counts_consensus(simplex_counts, simplex_counts_control, fig_na
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
+
+
+def plot_n_assemblies(stim_times, patterns, n_assemblies, t_chunks, fig_name):
+    """Plots number of unique assemblies for every pattern presented through time"""
+    stim_times /= 1000; t_chunks /= 1000  # ms to sec conversion
+    fig = plt.figure(figsize=(20, 8))
+    ax = fig.add_subplot(1, 1, 1)
+    for pattern, color in PATTERN_COLORS.items():
+        idx = np.where(patterns == pattern)[0]
+        ax.scatter(stim_times[idx], n_assemblies[idx], color=color, s=20, edgecolor="none", label=pattern)
+    for t_chunk in t_chunks:
+        ax.axvline(t_chunk, color="gray", ls='--', alpha=0.5)
+    ax.legend(title="Patterns", frameon=False)
+    ax.set_xlim([t_chunks[0], t_chunks[-1]])
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("#Unique assemblies")
+    sns.despine()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+
 
