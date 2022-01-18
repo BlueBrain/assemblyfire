@@ -23,6 +23,5 @@ preprocessing_protocol:
 clustering:
     spikes:
         method: "hierarchical"
-        overwrite_n_clusters: {100: 12}
     assemblies:
         method: "hierarchical"
