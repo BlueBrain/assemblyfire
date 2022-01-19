@@ -25,7 +25,7 @@ def assembly_efficacy(config_path):
 
     for seed, assembly_grp in assembly_grp_dict.items():
         efficacies = {assembly.idx: utils.get_syn_properties(c,
-                      utils.get_syn_idx(c, assembly.gids, assembly.gids))["rho0_GB"].value_counts()
+                      utils.get_syn_idx(c, assembly.gids, assembly.gids), ["rho0_GB"])["rho0_GB"].value_counts()
                       for assembly in tqdm(assembly_grp.assemblies, desc="%s assembly efficacies" % seed)}
         fig_name = os.path.join(config.fig_path, "efficacy_%s.png" % seed)
         plot_efficacy(efficacies, fig_name)
@@ -77,5 +77,5 @@ def assembly_topology(config_path):
 
 if __name__ == "__main__":
     config_path = "../configs/v7_bbp-workflow.yaml"
-    assembly_efficacy(config_path)
+    # assembly_efficacy(config_path)
     assembly_topology(config_path)
