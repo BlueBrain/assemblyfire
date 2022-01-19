@@ -150,18 +150,32 @@ def get_spikes(sim, gids, t_start, t_end):
     return spikes.index.to_numpy(), spikes.to_numpy()
 
 
-def get_syn_idx(c, pre_gids, post_gids):
-    """Fast (pure libsonata) syn IDs between `pre_gids` and `post_gids`"""
+def _il_isin(whom, where, parallel):
+    """Sirio's in line np.isin() using joblib as parallel backend"""
+    if parallel:
+        from joblib import Parallel, delayed
+        nproc = os.cpu_count() - 1
+        with Parallel(n_jobs=nproc, prefer="threads") as p:
+            flt = p(delayed(np.isin)(chunk, where) for chunk in np.array_split(whom, nproc))
+        return np.concatenate(flt)
+    else:
+        return np.isin(whom, where)
+
+
+def get_syn_idx(c, pre_gids, post_gids, parallel=True):
+    """Returns syn IDs between `pre_gids` and `post_gids`
+    (~1000x faster than c.connectome.pathway_synapses(pre_gids, post_gids))"""
     edge_fname = c.config["connectome"]
     edges = EdgeStorage(edge_fname)
     edge_pop = edges.open_population(list(edges.population_names)[0])
     # sonata nodes are 0 based (and the functions expect lists of ints)
-    efferents = edge_pop.efferent_edges((pre_gids.astype(int) - 1).tolist()).flatten()
-    afferents = edge_pop.afferent_edges((post_gids.astype(int) - 1).tolist()).flatten()
-    return np.intersect1d(efferents, afferents, assume_unique=True)
+    afferents_edges = edge_pop.afferent_edges((post_gids.astype(int) - 1).tolist())
+    afferent_nodes = edge_pop.source_nodes(afferents_edges)
+    flt = _il_isin(afferent_nodes, pre_gids.astype(int) - 1, parallel=parallel)
+    return afferents_edges.flatten()[flt]
 
 
-def get_syn_properties(c, syn_idx, properties=["rho0_GB"]):
+def get_syn_properties(c, syn_idx, properties):
     return c.connectome.synapse_properties(syn_idx, properties)
 
 
