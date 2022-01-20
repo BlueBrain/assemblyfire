@@ -815,5 +815,23 @@ def plot_n_assemblies(stim_times, patterns, n_assemblies, t_chunks, fig_name):
     plt.close(fig)
 
 
+def plot_synapse_distance_dist(bin_edges, hist, cum, fit, fig_name):
+    """Plots distribution of distances between synapses (on the same section)"""
+    bin_centers = (bin_edges[1:] + bin_edges[:-1]) / 2
+    fig = plt.figure(figsize=(6, 4))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.bar(bin_centers, hist, color="gray", edgecolor="black", lw=0.5)
+    ax.set_xlim([bin_edges[0], bin_edges[-1]])
+    ax.set_xlabel("Inter-synapse distance (um)")
+    ax.set_ylabel("Count")
+    ax2 = ax.twinx()
+    ax2.step(bin_centers, cum, "k-", where="mid")
+    ax2.plot(bin_centers, np.polyval(fit, bin_centers), "r-")
+    ax2.set_ylabel("Cumulative distribution")
+    sns.despine(right=False, offset=5, trim=True)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 
 
