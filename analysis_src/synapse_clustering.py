@@ -5,12 +5,23 @@ last modified: András Ecker 01.2022
 
 import os
 from tqdm import tqdm
+from copy import deepcopy
 import numpy as np
 from scipy.stats import poisson
 from scipy.spatial.distance import pdist, squareform
 
 import assemblyfire.utils as utils
 from assemblyfire.config import Config
+
+
+def _create_lookups(syn_df, assembly_gids):
+    """Create dicts with synapse idx and fraction of those (compared to total)
+    atm. it's only 1 assembly vs. the rest but can be extended (and the rest of the code will handle the extension)"""
+    assembly_syn_idx = syn_df[Synapse.PRE_GID].isin(assembly_gids).to_numpy()
+    assembly_frac = sum(assembly_syn_idx) / len(assembly_syn_idx)
+    syn_idx = {"assembly": assembly_syn_idx, "non_assembly": np.invert(assembly_syn_idx)}
+    fracs = {"assembly": assembly_frac, "non_assembly": 1 - assembly_frac}
+    return syn_idx, fracs
 
 
 def syn_distances(syn_df, mask_col, xzy_cols):
@@ -22,8 +33,8 @@ def syn_distances(syn_df, mask_col, xzy_cols):
     return dists
 
 
-def distance_number_model(dists, assembly_frac, target_range=10.0, fig_name=None):
-    """Creates a cummulative histogram of (valid) inter-synapse distances, fits a line to it
+def distance_number_model(dists, fracs, target_range, fig_name=None):
+    """Creates a cumulative histogram of (valid) inter-synapse distances, fits a line to it
     and based on the slope returns and underlying Poisson model (the mathematical assumption behind the Poisson is
     that the distribution should be uniform (histogram should be flat) and the cumulative a straight line)
     use fig_name != None to save a figure and visually verify"""
@@ -37,11 +48,21 @@ def distance_number_model(dists, assembly_frac, target_range=10.0, fig_name=None
     if fig_name is not None:
         from assemblyfire.plots import plot_synapse_distance_dist
         plot_synapse_distance_dist(d_bins, hist, cum, fit, fig_name)
-    return {"assembly": poisson(target_range * slope * assembly_frac),
-            "non_assembly": poisson(target_range * slope * (1 - assembly_frac))}
+    return {k: poisson(target_range * slope * frac) for k, frac in fracs.items()}
 
 
-def assembly_synapse_clustering(config_path, debug=False):
+def find_clusters(dists, syn_idx_dict, target_range, model_dict, min_nsyns=5, min_log_p=5.0):
+    """Finds `min_nsyns` sized clusters of synapses within `target_range` (um) and tests their significance
+    against the Poisson models build above in `distance_number_model()`"""
+    for k, syn_idx in syn_idx_dict.items():
+        sub_dists = dists[np.ix_(syn_idx, syn_idx)]
+        nsyns = (sub_dists < target_range).sum(axis=1)
+        p_vals = 1.0 - model_dict[k].cdf(nsyns - 1)
+        p_vals[p_vals == 0.0] += 1 / np.power(10, 2*min_log_p)  # for numerical stability (see log10 in the next line)
+        significant = (-np.log10(p_vals) >= min_log_p) & (nsyns >= min_nsyns)
+
+
+def assembly_synapse_clustering(config_path, target_range=10.0, debug=False):
     """Loads in assemblies and..."""
 
     config = Config(config_path)
@@ -64,13 +85,13 @@ def assembly_synapse_clustering(config_path, debug=False):
     syn_df = utils.get_syn_properties(c, utils.get_syn_idx(c, gids, post_gids), syn_properties)
     for gid in post_gids:
         syn_df_gid = syn_df.loc[syn_df[Synapse.POST_GID] == gid]
+        syn_idx, fracs = _create_lookups(syn_df_gid, assembly.gids)
         dists = syn_distances(syn_df_gid, Synapse.POST_SECTION_ID, xyz)
-        assembly_frac = len(syn_df_gid.loc[syn_df_gid[Synapse.PRE_GID].isin(assembly.gids)]) / len(syn_df_gid)
         if debug:
             fig_name = os.path.join(fig_dir, "assembly%i_a%i_synapse_dists.png" % (assembly.idx[0], gid))
-            model = distance_number_model(dists, assembly_frac, fig_name=fig_name)
+            model = distance_number_model(deepcopy(dists), fracs, target_range, fig_name=fig_name)
         else:
-            model = distance_number_model(dists, assembly_frac)
+            model = distance_number_model(deepcopy(dists), fracs, target_range)
 
 
 if __name__ == "__main__":
