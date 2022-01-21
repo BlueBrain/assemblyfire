@@ -1,6 +1,7 @@
 """
-...
-last modified: András Ecker 01.2022
+Selects assembly neurons with high indegree and finds synapse clusters on them
+authors: András Ecker, Michael Reimann
+last modified: 01.2022
 """
 
 import os
