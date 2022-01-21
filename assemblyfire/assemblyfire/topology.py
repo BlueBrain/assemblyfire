@@ -1,54 +1,15 @@
-# -*- coding: utf-8 -*-
 """
-Advanced network metrics on `connectivity.py`
+Advanced network metrics on ConnectivityMatrix (now in `conntility`)
 authors: Daniela Egas Santander, Nicolas Ninin, András Ecker
-last modified: 12.2020
+last modified: 01.2022
 """
 
 import numpy as np
 from tqdm import tqdm
-
-# from assemblyfire.connectivity import ConnectivityMatrix  # TODO: fix this...
-# from assemblyfire.assemblies import WeightedAssembly, AssemblyGroup
+from conntility.connectivity import ConnectivityMatrix
 
 
-def closeness_connected_components(matrix, directed=False, return_sum=True):
-    """
-    Compute the closeness of each connected component of more than 1 vertex
-    :param matrix: shape (n,n)
-    :param directed: if True compute using strong component and directed closeness
-    :param return_sum: if True return only one list given by summing over all the component
-    :return a signle array( if return_sum=True) or a list of array of shape n,
-    containting closeness of vertex in this component
-    or 0 if vertex is not in the component, in any case closeness cant be zero otherwise
-    """
-    from sknetwork.ranking import Closeness
-    from scipy.sparse.csgraph import connected_components
-
-    if directed:
-        n_comp, comp = connected_components(matrix, directed=True, connection="strong")
-    else:
-        n_comp, comp = connected_components(matrix, directed=False)
-        matrix = matrix + matrix.T  # we need to make the matrix symmetric
-
-    closeness = Closeness()  # if matrix is not symmetric automatically use directed
-    n = matrix.shape[0]
-    all_c = []
-    for i in range(n_comp):
-        c = np.zeros(n)
-        idx = np.where(comp == i)[0]
-        sub_mat = matrix[np.ix_(idx, idx)].tocsr()
-        if sub_mat.getnnz() > 0:
-            c[idx] = closeness.fit_transform(sub_mat)
-            all_c.append(c)
-    if return_sum:
-        all_c = np.array(all_c)
-        return np.sum(all_c, axis=0)
-    else:
-        return all_c
-
-'''TODO: fix this...
-class NetworkAssembly(ConnectivityMatrix):
+class AssemblyTopology(ConnectivityMatrix):
     """
     A class derived from ConnectivityMatrix with additional information on networks metrics
     of the subgraph associated to an assembly within the connectivity matrix of the circuit.
@@ -59,22 +20,22 @@ class NetworkAssembly(ConnectivityMatrix):
     def degree(self, sub_gids=None, kind="in"):
         """Return in/out degrees of the subgraph, if None compute on the whole graph"""
         if sub_gids is not None:
-            matrix = self.subarray(self.__extract_gids__(sub_gids))
+            array = self.subarray(self.__extract_gids__(sub_gids))
         else:
-            matrix = self.array
+            array = self.array
         if kind == "in":
-            return np.sum(matrix, axis=0)
+            return np.sum(array, axis=0)
         elif kind == "out":
-            return np.sum(matrix, axis=1)
+            return np.sum(array, axis=1)
         else:
             ValueError("Need to specify 'in' or 'out' degree!")
 
     def density(self, sub_gids=None):
         if sub_gids is None:
-            m = self.matrix
+            matrix = self.matrix
         else:
-            m = self.submatrix(sub_gids)
-        return m.getnnz()/np.prod(m.shape)
+            matrix = self.submatrix(sub_gids)
+        return matrix.getnnz()/np.prod(matrix.shape)
 
     def simplex_counts(self, sub_gids):
         """Return the simplex counts of submatrix specified by `sub_gids`"""
@@ -88,73 +49,13 @@ class NetworkAssembly(ConnectivityMatrix):
         sub_mat = self.submatrix(self.__extract_gids__(sub_gids))
         return pyflagser.flagser_unweighted(sub_mat, directed=True)["betti"]
 
-    def convex_hull(self, sub_gids):
-        """Return the convex hull of the sub gids in the 3D space. Require to know x,y,z position for gids"""
-        pass
-
-    def communicability(self, sub_gids):
-        pass
-
-    def centrality(self, sub_gids, kind="closeness", directed=False):
-        """Compute a centrality for the sub graph defined by sub_gids. `kind` can be 'betweeness' or 'closeness'"""
-        if kind == "closeness":
-            return self.closeness(sub_gids, directed)
-        else:
-            ValueError("Kind must be 'closeness'!")
-
-    def closeness(self, sub_gids=None, directed=False):
-        """Compute closeness centrality using sknetwork on all connected components or strongly connected
-        component (if directed==True)"""
-        if sub_gids is not None:
-            m = self.submatrix(self.__extract_gids__(sub_gids))
-        else:
-            m = self.matrix
-        return closeness_connected_components(m, directed=directed)
-
-    def connected_components(self, sub_gids=None):
-        """Returns a list of the size of the connected components of the underlying undirected graph on sub_gids,
-        if None, compute on the whole graph"""
-        import networkx as nx
-
-        if sub_gids is not None:
-            matrix = self.subarray(self.__extract_gids__(sub_gids))
-        else:
-            matrix = self.array
-
-        """I keep it here for now in case it's faster to implement it with scipy -- Daniela
-        from scipy.sparse.csgraph import connected_components
-
-        if sub_gids is not None:
-            sub_mat = self.submatrix(self.__extract_gids__(sub_gids))
-        else:
-            sub_mat = self.matrix"""
-
-        matrix_und = np.where((matrix+matrix.T) >= 1, 1, 0)
-        # TODO: Change the code from below to scipy implementation!
-        G = nx.from_numpy_matrix(matrix_und)
-        return [len(c) for c in sorted(nx.connected_components(G), key=len, reverse=True)]
-        # TODO:  Possibly change this to list of gids for each connecte component for this use the line below
-        # return sorted(nx.connected_components(G) # Is this coming out in a usable way or should we transform to gids?
-
-    def core_number(self, sub_gids):
-        """Returns k core of directed graph, where degree of a vertex is the sum of in degree and out degree"""
-        # TODO: Implement directed (k,l) core and k-core of underlying undirected graph (very similar to this)
-        import networkx
-        G = networkx.from_numpy_matrix(self.submatrix(self.__extract_gids__(sub_gids)))
-        # Very inefficient (returns a dictionary!). TODO: Look for different implementation
-        return networkx.algorithms.core.core_number(G)
-
-    # TODO: Filtered simplex counts with different weights on vertices (coreness, intersection)
-    #  or on edges (strength of connection).
-'''
-
 
 def in_degree_assemblies(assembly_grp_dict, circuit):
     """
     Computes the indegree distribution of assemblies across seeds
     and a random controls of the same size/depth profile/mtype composition
     :param assembly_grp_dict: dict with seeds as keys and assembly groups as values
-    :param circuit: NetworkAssembly object for the circuit where the assemblies belong to
+    :param circuit: AssemblyTopology object for the circuit where the assemblies belong to
     :return in_degrees: dict with the same keys as `assembly_grp_dict` - within that an other dict
         with keys as assembly labels and list of in degrees as values
     :return in_degrees_control: dict with the same keys as `assembly_grp_dict` - within that an other dict
@@ -182,7 +83,7 @@ def simplex_counts_assemblies(assembly_grp_dict, circuit):
     Computes the simplices of assemblies across seeds
     and a random controls of the same size/depth profile/mtype composition
     :param assembly_grp_dict: dict with seeds as keys and assembly groups as values
-    :param circuit: NetworkAssembly object for the circuit where the assemblies belong to
+    :param circuit: AssemblyTopology object for the circuit where the assemblies belong to
     :return simplex_count: dict with the same keys as `assembly_grp_dict` - within that an other dict
         with keys as assembly labels and list of simplex counts as values
     :return simplex_counts_control: dict with the same keys as `assembly_grp_dict` - within that an other dict
@@ -204,14 +105,6 @@ def simplex_counts_assemblies(assembly_grp_dict, circuit):
                                                   circuit.sample_vertices_from_categorical_property(assembly))
                                                   for assembly in assembly_grp.assemblies}
     return simplex_counts, simplex_counts_control
-
-
-def filtered_simplex_counts(weighted_assembly, circuit, method="strength"):
-    filtration = weighted_assembly.filtration(method=method)
-    simplex_counts = []
-    for i in range(len(filtration.assemblies)):
-        simplex_counts.append(circuit.simplex_counts(filtration.assemblies[i]))
-    return simplex_counts
 
 
 # TODO: maybe this should be moved to the ConsensusAssembly class
@@ -243,7 +136,7 @@ def simplex_counts_dict(ref_assemblies_dict, circuit, N, sub_assemblies_dict=Non
     """
     Computes the simplex counts of the assemblies and thier random controls.
     :param ref_assemblies_dict: dictionary with Assembly objects
-    :param circuit: NetworkAssembly object of the circuit where the assemblies belong to
+    :param circuit: AssemblyTopology object of the circuit where the assemblies belong to
     :param N: number of random samples from each kind
     :param sub_assemblies_dict: dictionary with (bigger) Assembly objects. E.g. union of a ConsensusAssembly
     :return simplex_count: dictionary with the same keys as ref_assemblies_dict
