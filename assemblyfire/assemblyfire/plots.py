@@ -833,5 +833,42 @@ def plot_synapse_distance_dist(bin_edges, hist, cum, fit, fig_name):
     plt.close(fig)
 
 
+def plot_synapse_clusters(morph, cluster_df, xyz, fig_name):
+    """Plots neuron morphology and (10 biggest) detected synapse clusters on it"""
+    from neurom import load_morphology, NeuriteType
+    from neurom.view import matplotlib_impl
+
+    cmap = plt.cm.get_cmap("tab20", 10)
+    labels = [label for label in list(cluster_df.columns) if label not in xyz]
+    n = len(labels)
+    fig = plt.figure(figsize=(n*4, 6))
+    for i, label in enumerate(labels):
+        ax = fig.add_subplot(1, n, i+1)
+        matplotlib_impl.plot_morph(neurite_type=(NeuriteType.apical_dendrite, NeuriteType.basal_dendrite),
+                                   ax=ax, morph=load_morphology(morph), color="black")
+        ax.set_title(label)
+        ax.set_xlabel("x (um)")
+        df = cluster_df.loc[cluster_df[label] >= 0]
+        if len(df):
+            clusters, counts = np.unique(df[label].to_numpy(), return_counts=True)
+            clusters = clusters[np.argsort(counts)[::-1]]  # sort them based on size (decreasing order)
+            clusters = clusters[:10] if len(clusters) > 10 else clusters  # take only 10 biggest
+            for j, cluster in enumerate(clusters):
+                ax.scatter(df.loc[df[label] == cluster, xyz[0]].to_numpy(),
+                           df.loc[df[label] == cluster, xyz[1]].to_numpy(),
+                           color=cmap(j), s=20, label="cluster%i" % cluster)
+            ax.legend(frameon=False)
+        if i == 0:
+            ax.set_ylabel("y (um)")
+            sns.despine(ax=ax, trim=True)
+        else:
+            ax.set_yticks([])
+            sns.despine(ax=ax, left=True, trim=True)
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+
 
 

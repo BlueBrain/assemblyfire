@@ -50,6 +50,14 @@ def get_sim_path(root_path):
     return sim_paths
 
 
+def save_syn_clusters(root_path, assembly_idx, cluster_df):
+    """Saves `cluster_df` with synapse clusters for given assembly"""
+    save_dir = os.path.join(root_path, "analyses", "seed%i_syn_clusters" % assembly_idx[1])
+    ensure_dir(save_dir)
+    pklf_name = os.path.join(save_dir, "assembly%i.pkl" % assembly_idx[0])
+    cluster_df.to_pickle(pklf_name)
+
+
 def get_stimulus_stream(f_name, t_start, t_end):
     """Reads the series of presented patterns from .txt file"""
     stim_times, patterns = [], []
