@@ -1,3 +1,0 @@
-[submodule "pyflagsercontain/pybind11"]
-	path = pyflagsercontain/pybind11
-	url = https://github.com/pybind/pybind11.git

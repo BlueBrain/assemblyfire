@@ -33,7 +33,7 @@ setup(
                       "scipy>=1.7.2",
                       "pandas>=1.3.4",
                       "scikit-learn>=1.0.1",
-                      "pyflagser>=0.4.4",
+                      "libsonata>=0.1.10",
                       "matplotlib>=3.4.3",
                       "seaborn>=0.11.2"],
     packages=find_packages(),
@@ -42,7 +42,8 @@ setup(
     extras_require={
         "docs": ["sphinx", "sphinx-bluebrain-theme"],
         "bluepy": ["bluepy[all]>=2.4.2"],
-        "conntility": ["Connectome-utilities @ https://bbpgitlab.epfl.ch/conn/structural/Connectome-utilities"]
+        "conntility": ["Connectome-utilities @ https://bbpgitlab.epfl.ch/conn/structural/Connectome-utilities"],
+        "pyflagsercount": ["flagser-count @ https://github.com/JasonPSmith/flagser-count"]
     },
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
