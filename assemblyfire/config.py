@@ -117,3 +117,15 @@ class Config(object):
         assert self.config["clustering"]["assemblies"]["method"] in ["hierarchical", "greedy"]
         return self.config["clustering"]["assemblies"]["method"]
 
+    @property
+    def syn_clustering_target_range(self):
+        return self.config["clustering"]["synapses"]["target_range"]
+
+    @property
+    def syn_clustering_min_nsyns(self):
+        return self.config["clustering"]["synapses"]["min_nsyns"]
+
+    @property
+    def syn_clustering_n_neurons_sample(self):
+        return self.config["clustering"]["synapses"]["n_neurons_sample"]
+

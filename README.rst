@@ -33,7 +33,8 @@ Examples
 
 .. code-block::
 
-  assemblyfire -v find-assemblies configs/v7_bbp-workflow.yaml
-  assemblyfire -v consensus configs/v7_bbp-workflow.yaml
-  assemblyfire -v conn-mat configs/v7_bbp-workflow.yaml
-  assemblyfire -v single-cell configs/v7_bbp-workflow.yaml
+  assemblyfire -v assemblies configs/v7_10seeds.yaml
+  assemblyfire -v consensus configs/v7_10seeds.yaml
+  assemblyfire -v conn-mat configs/v7_10seeds.yaml
+  assemblyfire -v syn-clust configs/v7_10seeds.yaml
+  assemblyfire -v single-cell configs/v7_10seeds.yaml

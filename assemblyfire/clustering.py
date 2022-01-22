@@ -498,4 +498,4 @@ def cluster_synapses(c, post_gids, assembly, target_range, min_nsyns, log_sign_t
             fig_name = os.path.join(fig_dir, "assembly%i_a%i_synapse_clusters.png" % (assembly.idx[0], gid))
             plot_synapse_clusters(morph, pd.concat((cluster_df[labels], syn_df_gid[xyz]), axis=1), xyz, fig_name)
         cluster_dfs.append(cluster_df)
-    return pd.concat(cluster_dfs).sort_index(inplace=True)
+    return pd.concat(cluster_dfs)

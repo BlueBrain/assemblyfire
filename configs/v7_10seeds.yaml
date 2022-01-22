@@ -26,3 +26,7 @@ clustering:
         overwrite_n_clusters: {100: 12}
     assemblies:
         method: "hierarchical"
+    synapses:
+        target_range: 10
+        min_nsyns: 5
+        n_neurons_sample: 10

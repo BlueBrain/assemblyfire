@@ -55,6 +55,7 @@ def save_syn_clusters(root_path, assembly_idx, cluster_df):
     save_dir = os.path.join(root_path, "analyses", "seed%i_syn_clusters" % assembly_idx[1])
     ensure_dir(save_dir)
     pklf_name = os.path.join(save_dir, "assembly%i.pkl" % assembly_idx[0])
+    cluster_df.sort_index(inplace=True)
     cluster_df.to_pickle(pklf_name)
 
 

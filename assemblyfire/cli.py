@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 CLI to detect and analyse cell assemblies
- * `assemblyfire find-assemblies` config_path: detect assemblies in spiking data
+ * `assemblyfire assemblies config_path`: detect assemblies in spiking data
  * `assemblyfire consensus config_path`: create consensus assemblies from assemblies across seeds
- * `assemblyfire conn-mat`: loads in connectivity matrix
+ * `assemblyfire conn-mat config_path`: gets connectivity matrix
+ * `assemblyfire syn-clust config_path`: finds clusters of synapses in assembly neurons
  * `assemblyfire single-cell config_path`: gets single cell features from simulations
 last modified: Thomas Delemontex, András Ecker 11.2020
 """
@@ -29,7 +30,7 @@ def cli(verbose):
 
 @cli.command()
 @click.argument("config_path", required=True)
-def find_assemblies(config_path):
+def assemblies(config_path):
     """CLI for `find_assemblies.py/run()`"""
     from assemblyfire.find_assemblies import run
     run(config_path)
