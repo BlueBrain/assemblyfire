@@ -53,6 +53,15 @@ def conn_mat(config_path):
 
 @cli.command()
 @click.argument("config_path", required=True)
+@click.argument("debug", required=False, default=False)
+def syn_clust(config_path, debug):
+    """CLI for `find_synapse_clusters.py/run()`"""
+    from assemblyfire.find_synapse_clusters import run
+    run(config_path, debug)
+
+
+@cli.command()
+@click.argument("config_path", required=True)
 def single_cell(config_path):
     """CLI for `get_single_cell_features.py/run()`"""
     from assemblyfire.get_single_cell_features import run
