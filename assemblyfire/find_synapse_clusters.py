@@ -19,7 +19,7 @@ L = logging.getLogger("assemblyfire")
 def run(config_path, debug):
     """
     Loads in asssemblies and connectivity matrix from saved h5 file, and for each assembly
-    finds the most innervated neurons, looks for synapse clusters and saved to pickle files
+    finds the most innervated L5_TTPCs, looks for synapse clusters and saved to pickle files
     :param config_path: str - path to project config file
     :param debug: bool - to save figures for visual inspection
     """
@@ -35,8 +35,10 @@ def run(config_path, debug):
     for seed, assembly_grp in tqdm(assembly_grp_dict.items(), desc="Iterating over seeds"):
         for assembly in tqdm(assembly_grp.assemblies, desc="%s syn. clusters" % seed, leave=False):
             fig_dir = os.path.join(config.fig_path, "%s_debug" % seed) if debug else None
-            sort_idx = np.argsort(conn_mat.degree(assembly, kind="in"))[::-1]  # sort by in-degree
-            post_gids = assembly.gids[sort_idx[:config.syn_clustering_n_neurons_sample]]
+            # sort gids by in-degree (in the assembly subgraph) and get first n L5_TTPCs
+            sorted_gids = assembly.gids[np.argsort(conn_mat.degree(assembly, kind="in"))[::-1]]
+            post_gids = sorted_gids[np.nonzero(c.cells.get(sorted_gids, "mtype").isin(["L5_TPC:A",
+                        "L5_TPC:B"]).to_numpy())[0][:config.syn_clustering_n_neurons_sample]]
             cluster_df = cluster_synapses(c, post_gids, assembly, config.syn_clustering_target_range,
                                           config.syn_clustering_min_nsyns, fig_dir=fig_dir)
             save_syn_clusters(config.root_path, assembly.idx, cluster_df)
