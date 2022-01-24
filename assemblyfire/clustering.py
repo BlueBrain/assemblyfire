@@ -1,14 +1,14 @@
 """
 Functions to run either hierarchical clustering (via Ward's linkage)
 of the cosine similarity matrix of significant time bins
-a la Perez-Ortega et al. 2020 (see also Carillo-Reid et al. 2015), or
+a la Perez-Ortega et al. 2021 (see also Carillo-Reid et al. 2015), or
 density based clustering a la Rodriguez and Laio 2014
 (slightly modified by Yger et al. 2018)
-of spike matrix projected to PCA space a la Herzog et al. 2020.
+of spike matrix projected to PCA space a la Herzog et al. 2021.
 Then "core-cells" and cell assemblies are detected with correlation
-based methods from (Montijn et al. 2016 and) Herzog et al. 2020
+based methods from (Montijn et al. 2016 and) Herzog et al. 2021
 Assemblies are clustered into consensus assemblies via hierarchical clustering
-last modified: András Ecker 01.2022
+authors: András Ecker, Michael Reimann; last modified: 01.2022
 """
 
 import os
@@ -74,7 +74,7 @@ def PCA_ncomps(matrix, n_components):
 
 
 def calc_rho_delta(dists, ratio_to_keep):
-    """Herzog et al. 2020: calculates local density: \rho_i = 1 / (1/N*\sum_{j:d_ij<d_c} d_ij) and
+    """Herzog et al. 2021: calculates local density: \rho_i = 1 / (1/N*\sum_{j:d_ij<d_c} d_ij) and
     minimum distance with points with higher density: \delta_i = min_{j:\rho_j>\rho_i} (d_ij)"""
     # keep a given % of the neighbours a la Yger et al. 2018
     # (not constant d_c as in the original Rodrigez and Laio 2014 paper)
@@ -210,8 +210,8 @@ def within_cluster_correlations(spike_matrix, core_cell_idx):
 def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
     """
     Cluster spikes either via hierarchical clustering (Ward's linkage)
-    of the cosine similarity matrix of significant time bins (see Perez-Ortega et al. 2020), or
-    density based clustering of spike matrix projected to PCA space (see Herzog et al. 2020)
+    of the cosine similarity matrix of significant time bins (see Perez-Ortega et al. 2021), or
+    density based clustering of spike matrix projected to PCA space (see Herzog et al. 2021)
     :param spike_matrix_dict: dict with seed as key and SpikeMatrixResult (see `spikes.py`) as value
     :param method: str - clustering method (read from yaml config file)
     :param overwrite_seeds: dict with seeds as keys and values as desired number of clusters
@@ -267,7 +267,7 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, h5_prefix, Fig
     """
     Finds "core cells" - cells which correlate with the activation of (clustered) time bins
     and then checks within group correlations against the mean correlation to decide
-    if the core cell group is an assembly or not a la Herzog et al. 2020
+    if the core cell group is an assembly or not a la Herzog et al. 2021
     :param spike_matrix_dict: dict with seed as key and SpikeMatrixResult (see `spikes.py`) as value
     :param clusters_dict: dict with seed as key and clustered (significant) time bins as value (see `cluster_spikes()`)
     :param h5f_name: str - name of the HDF5 file (dumping the assemblies and their metadata)
@@ -417,7 +417,7 @@ def distance_model(dists, fracs, target_range, fig_name=None):
     return {label: poisson(target_range * slope * frac) for label, frac in fracs.items()}
 
 
-def merge_clusters(clusters):
+def merge_clusters(clusters, min_nsyns):
     """Cleans raw clusters and merges them by taking the boolean array of raw clusters,
     and for each cluster `i` (while loop) checks all cluster `j`s for common synapses (`np.any()`, no explicit loop)
     and if there are any, adds those to cluster `i` and deletes cluster `j`.
@@ -428,7 +428,7 @@ def merge_clusters(clusters):
     i = 0
     while i < (clusters.shape[1] - 1):
         idx_partners = np.arange(i + 1, clusters.shape[1])
-        matches = np.any(clusters[:, [i]] & clusters[:, idx_partners], axis=0)
+        matches = np.sum(clusters[:, [i]] & clusters[:, idx_partners], axis=0) > (min_nsyns - 1)
         if not np.any(matches):
             i += 1
         else:
@@ -487,7 +487,7 @@ def cluster_synapses(c, post_gids, assembly, target_range, min_nsyns, log_sign_t
             significant = (-np.log10(p_vals) >= log_sign_th) & (nsyns >= min_nsyns)
             if np.any(significant):
                 raw_clusters = sub_dists[:, significant] < target_range
-                merged_clusters = merge_clusters(raw_clusters)
+                merged_clusters = merge_clusters(raw_clusters, min_nsyns)
                 row_idx, col_idx = np.nonzero(merged_clusters)
                 results[syn_idx[row_idx], i] = col_idx  # set cluster labels (starting at 0)
         data = np.concatenate((syn_df_gid[[Synapse.PRE_GID, Synapse.POST_GID]].to_numpy(), results), axis=1)
