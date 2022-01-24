@@ -27,6 +27,6 @@ clustering:
     assemblies:
         method: "hierarchical"
     synapses:
-        target_range: 10
+        target_range: 5
         min_nsyns: 5
         n_neurons_sample: 10
