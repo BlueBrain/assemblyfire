@@ -22,22 +22,9 @@ from assemblyfire.config import Config
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
 
 
-def get_bluepy_simulation(blueconfig_path):
-    try:
-        from bluepy import Simulation
-    except ImportError as e:
-        msg = (
-            "Assemblyfire requirements are not installed.\n"
-            "Please pip install bluepy as follows:\n"
-            " pip install -i https://bbpteam.epfl.ch/repository/devpi/simple bluepy[all]"
-        )
-        raise ImportError(str(e) + "\n\n" + msg)
-    return Simulation(blueconfig_path)
-
-
 def load_spikes(blueconfig_path, target, t_start, t_end):
     """Loads in spikes from simulations using bluepy"""
-    from assemblyfire.utils import get_E_gids, get_spikes
+    from assemblyfire.utils import get_bluepy_simulation, get_E_gids, get_spikes
     sim = get_bluepy_simulation(blueconfig_path)
     gids = get_E_gids(sim.circuit, target)
     spike_times, spiking_gids = get_spikes(sim, gids, t_start, t_end)
