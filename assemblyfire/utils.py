@@ -27,6 +27,19 @@ def get_bluepy_circuit(circuitconfig_path):
     return Circuit(circuitconfig_path)
 
 
+def get_bluepy_simulation(blueconfig_path):
+    try:
+        from bluepy import Simulation
+    except ImportError as e:
+        msg = (
+            "Assemblyfire requirements are not installed.\n"
+            "Please pip install bluepy as follows:\n"
+            " pip install -i https://bbpteam.epfl.ch/repository/devpi/simple bluepy[all]"
+        )
+        raise ImportError(str(e) + "\n\n" + msg)
+    return Simulation(blueconfig_path)
+
+
 def ensure_dir(dirpath):
     if not os.path.exists(dirpath):
         os.makedirs(dirpath)
@@ -50,11 +63,14 @@ def get_sim_path(root_path):
     return sim_paths
 
 
-def save_syn_clusters(root_path, assembly_idx, cluster_df):
+def save_syn_clusters(root_path, assembly_idx, cluster_df, late_assembly=False):
     """Saves `cluster_df` with synapse clusters for given assembly"""
     save_dir = os.path.join(root_path, "analyses", "seed%i_syn_clusters" % assembly_idx[1])
     ensure_dir(save_dir)
-    pklf_name = os.path.join(save_dir, "assembly%i.pkl" % assembly_idx[0])
+    if not late_assembly:
+        pklf_name = os.path.join(save_dir, "assembly%i.pkl" % assembly_idx[0])
+    else:
+        pklf_name = os.path.join(save_dir, "late_assembly%i.pkl" % assembly_idx[0])
     cluster_df.sort_index(inplace=True)
     cluster_df.to_pickle(pklf_name)
 

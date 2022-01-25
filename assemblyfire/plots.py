@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
 """
 Assembly detection related plots
-author: András Ecker, last update: 11.2021
+author: András Ecker, last update: 01.2022
 """
 
 import numpy as np
@@ -862,6 +861,7 @@ def plot_synapse_clusters(morph, cluster_df, xyz, fig_name):
             ax.set_ylabel("y (um)")
             sns.despine(ax=ax, trim=True)
         else:
+            ax.set_ylabel("")
             ax.set_yticks([])
             sns.despine(ax=ax, left=True, trim=True)
     fig.tight_layout()
@@ -884,8 +884,8 @@ def get_michelson_contrast(cluster_dfs):
         uncond_probs = df["rho"].value_counts(normalize=True)
         probs[assembly_label] = uncond_probs.to_numpy()
         cond_probs, pot_contrast, dep_contrast = {}, np.zeros((2, 2)), np.zeros((2, 2))
-        cond_probs["++"] = df.loc[df[assembly_label] >=0, "rho"].value_counts(normalize=True)
-        cond_probs["+-"] = df.loc[df[assembly_label] == -1, "rho"].value_counts(normalize=True)
+        cond_probs["++"] = df.loc[df["assembly%i" % assembly_label] >=0, "rho"].value_counts(normalize=True)
+        cond_probs["+-"] = df.loc[df["assembly%i" % assembly_label] == -1, "rho"].value_counts(normalize=True)
         cond_probs["-+"] = df.loc[df["non_assembly"] >=0, "rho"].value_counts(normalize=True)
         cond_probs["--"] = df.loc[df["non_assembly"] == -1, "rho"].value_counts(normalize=True)
         for i, assembly in enumerate(["+", "-"]):
@@ -899,34 +899,21 @@ def get_michelson_contrast(cluster_dfs):
     return probs, pot_contrasts, dep_contrasts
 
 
-def _clip_matrices(matrices, min_clip=0, max_clip=None):
-    """Helper function that sets values to NaN before plotting"""
-    clipped_matrices = deepcopy(matrices)
-    for label, matrix in clipped_matrices.items():
-        if min_clip is not None:
-            matrix[matrix < min_clip] = np.nan
-        if max_clip is not None:
-            matrix[matrix > max_clip] = np.nan
-    return clipped_matrices
-
-
-def plot_grouped_diffs(cluster_dfs, fig_name):
+def plot_cond_rhos(cluster_dfs, fig_name):
     """For every assembly plots pie chart with initial rhos in sample neurons and 2 matrices
     with the cond. prob of being potentiated and depressed (in a 2x2 grid - see `get_michelson_contrast()` above)"""
     plt.rcParams["patch.edgecolor"] = "black"
-    pot_cmap = plt.get_cmap("Reds").copy()
-    pot_cmap.set_bad((0, 0, 0))
-    dep_cmap = plt.get_cmap("Blues").copy()
-    dep_cmap.set_bad((0, 0, 0))
+    neg_colors = plt.cm.Greys_r(np.linspace(0, 1, 128))
+    pot_colors = plt.cm.Reds(np.linspace(0, 1, 128))
+    dep_colors = plt.cm.Blues(np.linspace(0, 1, 128))
+    pot_cmap = colors.LinearSegmentedColormap.from_list("pot_cmap", np.vstack((neg_colors, pot_colors)))
+    dep_cmap = colors.LinearSegmentedColormap.from_list("pot_cmap", np.vstack((neg_colors, dep_colors)))
 
-    probs, pot_contrasts, dep_contrasts = get_michelson_contrast(cluster_dfs)
-    pot_matrices, dep_matrices = _clip_matrices(pot_contrasts), _clip_matrices(dep_contrasts)
+    probs, pot_matrices, dep_matrices = get_michelson_contrast(cluster_dfs)
     assembly_labels = np.sort(list(probs.keys()))
     n = len(assembly_labels)
-    min_pot = np.min([np.nanmin(pot_matrix) for _, pot_matrix in pot_matrices.items()])
-    max_pot = np.max([np.nanmax(pot_matrix) for _, pot_matrix in pot_matrices.items()])
-    min_dep = np.min([np.nanmin(dep_matrix) for _, dep_matrix in dep_matrices.items()])
-    max_dep = np.max([np.nanmax(dep_matrix) for _, dep_matrix in dep_matrices.items()])
+    pot_extr = np.max([np.max(np.abs(pot_matrix)) for _, pot_matrix in pot_matrices.items()])
+    dep_extr = np.max([np.max(np.abs(dep_matrix)) for _, dep_matrix in dep_matrices.items()])
 
     fig = plt.figure(figsize=(20, 8))
     gs = gridspec.GridSpec(3, n+1, width_ratios=[10 for i in range(n)] + [1])
@@ -934,11 +921,11 @@ def plot_grouped_diffs(cluster_dfs, fig_name):
         ax = fig.add_subplot(gs[0, i])
         ax.pie(probs[assembly_label], labels=["%.3f" % prob for prob in probs[assembly_label]],
                colors=[BLUE, RED], normalize=True)
-        ax.set_title("%s" % assembly_label)
+        ax.set_title("assembly %i" % assembly_label)
         ax2 = fig.add_subplot(gs[1, i])
-        i_pot = ax2.imshow(pot_matrices[assembly_label], cmap=pot_cmap, aspect="auto", vmin=min_pot, vmax=max_pot)
+        i_pot = ax2.imshow(pot_matrices[assembly_label], cmap=pot_cmap, aspect="auto", vmin=-pot_extr, vmax=pot_extr)
         ax3 = fig.add_subplot(gs[2, i])
-        i_dep = ax3.imshow(dep_matrices[assembly_label], cmap=dep_cmap, aspect="auto", vmin=min_dep, vmax=max_dep)
+        i_dep = ax3.imshow(dep_matrices[assembly_label], cmap=dep_cmap, aspect="auto", vmin=-dep_extr, vmax=dep_extr)
         if i == 0:
             ax2.set_yticks([0, 1])
             ax2.set_yticklabels(["assembly", "non-assembly"])

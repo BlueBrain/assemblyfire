@@ -378,15 +378,27 @@ def cluster_assemblies(assemblies, n_assemblies, distance_metric, linkage_method
     return sim_matrix, clusters - 1, plotting
 
 
-def _create_lookups(syn_df, assembly):
-    """Create dicts with synapse idx and fraction of those (compared to total)
-    atm. it's only 1 assembly vs. the rest but can be extended (and the rest of the code will handle the extension)"""
+def _create_lookups(syn_df, assembly_grp):
+    """Create dicts with synapse idx and fraction of those (compared to total) for all assemblies
+    in the `assembly_grp`. (As neurons can be part of more than 1 assembly, `fracs` won't add up to 1)"""
     from bluepy.enums import Synapse
-    assembly_syns = syn_df[Synapse.PRE_GID].isin(assembly.gids).to_numpy()
-    assembly_frac = sum(assembly_syns) / len(assembly_syns)
-    syn_idx = {"assembly%i" % assembly.idx[0]: np.nonzero(assembly_syns)[0],
-               "non_assembly": np.nonzero(np.invert(assembly_syns))[0]}
-    fracs = {"assembly%i" % assembly.idx[0]: assembly_frac, "non_assembly": 1 - assembly_frac}
+    syn_idx, fracs = {}, {}
+    all_assembly_syn_idx = np.array([], dtype=int)
+    for assembly in assembly_grp:
+        assembly_syns = syn_df[Synapse.PRE_GID].isin(assembly.gids).to_numpy()
+        assembly_frac = sum(assembly_syns) / len(assembly_syns)
+        fracs["assembly%i" % assembly.idx[0]] = assembly_frac
+        assembly_syn_idx = np.nonzero(assembly_syns)[0]
+        syn_idx["assembly%i" % assembly.idx[0]] = assembly_syn_idx
+        all_assembly_syn_idx = np.concatenate((all_assembly_syn_idx, assembly_syn_idx))
+    # finds synapses that aren't coming from any assembly
+    all_assembly_syn_idx = np.unique(all_assembly_syn_idx)  # neurons can be part of more than 1 assemblies...
+    non_assembly_syn_idx = np.arange(len(syn_df))
+    non_assembly_syn_idx = non_assembly_syn_idx[np.in1d(non_assembly_syn_idx, all_assembly_syn_idx,
+                                                        assume_unique=True, invert=True)]
+    assert (len(all_assembly_syn_idx) + len(non_assembly_syn_idx) == len(syn_df)), "Synapse numbers don't add up..."
+    syn_idx["non_assembly"] = non_assembly_syn_idx
+    fracs["non_assembly"] = len(non_assembly_syn_idx) / len(syn_df)
     return syn_idx, fracs
 
 
@@ -438,13 +450,18 @@ def merge_clusters(clusters, min_nsyns):
     return clusters
 
 
-def cluster_synapses(c, post_gids, assembly, target_range, min_nsyns, log_sign_th=5.0, fig_dir=None):
+def cluster_synapses(sim, post_gids, assembly_grp, base_assembly_idx,
+                     target_range, min_nsyns, log_sign_th=5.0, fig_dir=None):
     """
     Finds `min_nsyns` sized clusters of synapses within `target_range` (um) and tests their significance
-    against a Poisson model (see `distance_model()` above) on all `post_gids` from the `assembly` passed
-    :param c: bleupy circuit object
+    against a Poisson model (see `distance_model()` above) on all `post_gids` from the assemblies
+    passed in the `assembly_grp`
+    :param sim: bleupy simulation object (used only for .circuit and .target)
     :param post_gids: selected gids from the assembly in which the function will look for synapse clusters
-    :param assembly: assembly object (used only for .gids and .idx)
+    :param assembly_grp: AssemblyGroup object - synapse clusters (on `post_gids`) will be detected
+                         from all assemblies passed (and for the remaining non-assembly neurons)
+    :param base_assembly_idx: ID of the base assembly in the group (if more than 1 is passed in `assembly_grp`)
+                              (This is only used for naming figures if `fig_dir` is not None)
     :param target_range: max distance from synapse center to consider for clustering
     :param min_nsyns: minimum number of synapses within one cluster
     :param log_sign_th: significance threshold (after taking log of p-values)
@@ -462,16 +479,17 @@ def cluster_synapses(c, post_gids, assembly, target_range, min_nsyns, log_sign_t
     if fig_dir is not None:
         utils.ensure_dir(fig_dir)
 
-    gids = utils.get_E_gids(c, "hex_O1")  # TODO: not hard code target
+    c = sim.circuit
+    gids = utils.get_E_gids(c, sim.target)
     # get all necessary synapse properties in one go (and chunk later in the loop)
     syn_df = utils.get_syn_properties(c, utils.get_syn_idx(c, gids, post_gids), syn_properties)
     cluster_dfs = []
     for gid in post_gids:
         syn_df_gid = syn_df.loc[syn_df[Synapse.POST_GID] == gid]
-        syn_idx_dict, fracs = _create_lookups(syn_df_gid, assembly)
+        syn_idx_dict, fracs = _create_lookups(syn_df_gid, assembly_grp)
         dists = syn_distances(syn_df_gid, Synapse.POST_SECTION_ID, xyz)
         if fig_dir is not None:
-            fig_name = os.path.join(fig_dir, "assembly%i_a%i_synapse_dists.png" % (assembly.idx[0], gid))
+            fig_name = os.path.join(fig_dir, "assembly%i_a%i_synapse_dists.png" % (base_assembly_idx, gid))
             models = distance_model(deepcopy(dists), fracs, target_range, fig_name=fig_name)
         else:
             models = distance_model(deepcopy(dists), fracs, target_range)
@@ -495,7 +513,7 @@ def cluster_synapses(c, post_gids, assembly, target_range, min_nsyns, log_sign_t
         if fig_dir is not None:
             from assemblyfire.plots import plot_synapse_clusters
             morph = c.morph.get(int(gid), transform=True)
-            fig_name = os.path.join(fig_dir, "assembly%i_a%i_synapse_clusters.png" % (assembly.idx[0], gid))
+            fig_name = os.path.join(fig_dir, "assembly%i_a%i_synapse_clusters.png" % (base_assembly_idx, gid))
             plot_synapse_clusters(morph, pd.concat((cluster_df[labels], syn_df_gid[xyz]), axis=1), xyz, fig_name)
         cluster_dfs.append(cluster_df)
     return pd.concat(cluster_dfs)
