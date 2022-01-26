@@ -466,7 +466,7 @@ def plot_simplex_counts(simplex_counts, simplex_counts_control, fig_name):
         ax.plot(simplex_counts_control["mtypes"][assembly_label], color="black", lw=1, label="ctrl. mtype comp.")
         ax.set_title("Assembly %i" % assembly_label[0])
         ax.set_yticks([])
-        ax.set_xlim([0, 5])  # TODO not hard code this
+        ax.set_xlim([0, 6])  # TODO not hard code this
         sns.despine(ax=ax, left=True, offset=5)
         if i == 0:
             ax.legend(frameon=False)
