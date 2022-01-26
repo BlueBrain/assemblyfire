@@ -418,7 +418,7 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name):
     """Plots in degrees for assemblies (within one seed) and random controls"""
     assembly_labels = list(in_degrees.keys())
     n = len(assembly_labels)
-    cmap = plt.cm.get_cmap("tab20", np.max(assembly_labels)+1)
+    cmap = plt.cm.get_cmap("tab20", np.max([assembly_label[0] for assembly_label in assembly_labels])+1)
 
     fig = plt.figure(figsize=(20, 8))
     n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
@@ -452,7 +452,7 @@ def plot_simplex_counts(simplex_counts, simplex_counts_control, fig_name):
     """Plots simplex counts for assemblies (within one seed) and random controls"""
     assembly_labels = list(simplex_counts.keys())
     n = len(assembly_labels)
-    cmap = plt.cm.get_cmap("tab20", np.max(assembly_labels)+1)
+    cmap = plt.cm.get_cmap("tab20", np.max([assembly_label[0] for assembly_label in assembly_labels])+1)
 
     fig = plt.figure(figsize=(20, 8))
     n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
@@ -588,35 +588,6 @@ def plot_consensus_mtypes(union_gids, union_mtypes, consensus_gids, gids, consen
     ax2.set_yticks([])
     sns.despine(ax=ax, left=True, bottom=True)
     sns.despine(ax=ax2, left=True, bottom=True)
-    fig.tight_layout()
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
-    plt.close(fig)
-
-
-def plot_consensus_in_degree(consensus_in_degrees, control_in_degrees_depth, control_in_degrees_mtypes, fig_name):
-    """Plots distribution of consensus in degrees (and some random controls)"""
-    n = len(consensus_in_degrees)
-    cmap = plt.cm.get_cmap("tab20", n)
-    fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(np.floor_divide(n, 5)+1, 5)
-    for i in range(n):
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)-5])
-        max_in_degree = np.max(consensus_in_degrees[i])
-        ax.hist(consensus_in_degrees[i], bins=50, range=(0, max_in_degree),
-                color=cmap(i), edgecolor=cmap(i), alpha=0.7, label="core")
-        ax.hist(control_in_degrees_depth[i], bins=50, range=(0, max_in_degree),
-                color="black", histtype="step", label="ctrl. depth profile")
-        ax.hist(control_in_degrees_mtypes[i], bins=50, range=(0, max_in_degree),
-                color="black", histtype="step", linestyle="dashed", label="ctrl. mtype comp.")
-        ax.set_title("cons%s\n(n=%i)" % (i + 1, consensus_in_degrees[i].shape[0]))
-        ax.set_xlim([0, max_in_degree])
-        ax.set_yticks([])
-        sns.despine(ax=ax, left=True, offset=5)
-        if i == 0:
-            ax.legend(frameon=False)
-    fig.add_subplot(1, 1, 1, frameon=False)
-    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
-    plt.xlabel("In degrees")
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
