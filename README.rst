@@ -25,8 +25,6 @@ Installation
   cd assemblyfire/
   pip install -e .
 
-  # flagser needs to be compiled and installed separately (see setup.py for github path)
-
 
 Examples
 --------

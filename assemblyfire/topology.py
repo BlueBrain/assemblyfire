@@ -37,19 +37,17 @@ class AssemblyTopology(ConnectivityMatrix):
             matrix = self.submatrix(sub_gids)
         return matrix.getnnz()/np.prod(matrix.shape)
 
-    ''' TODO: fix flagser imports
     def simplex_counts(self, sub_gids):
         """Return the simplex counts of submatrix specified by `sub_gids`"""
-        from pyflagsercount import 
+        from pyflagser import flagser_count_unweighted
         sub_mat = self.submatrix(self.__extract_gids__(sub_gids))
         return flagser_count_unweighted(sub_mat, directed=True)
 
     def betti_counts(self, sub_gids):
         """Return the betti counts of submatrix specified by `sub_gids`"""
-        from pyflagsercount import 
+        from pyflagser import flagser_unweighted
         sub_mat = self.submatrix(self.__extract_gids__(sub_gids))
         return flagser_unweighted(sub_mat, directed=True)["betti"]
-    '''
 
 
 def in_degree_assemblies(assembly_grp_dict, conn_mat):

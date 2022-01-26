@@ -64,5 +64,5 @@ def assembly_simplex_counts(config_path):
 if __name__ == "__main__":
     config_path = "../configs/v7_bbp-workflow.yaml"
     assembly_efficacy(config_path)
-    # assembly_in_degree(config_path)
-    # assembly_simplex_counts(config_path)
+    assembly_in_degree(config_path)
+    assembly_simplex_counts(config_path)
