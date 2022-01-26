@@ -14,17 +14,17 @@ from assemblyfire.plots import plot_efficacy, plot_in_degrees, plot_simplex_coun
 
 
 def assembly_efficacy(config_path):
-    """Loads in assemblies and counts synapses initialized at depressed (rho=0) and potentiated (rho=1) states"""
+    """Loads in assemblies and plots synapses initialized at depressed (rho=0) and potentiated (rho=1) states"""
 
     config = Config(config_path)
-    sim_paths = utils.get_sim_path(config.root_path)
-    c = utils.get_bluepy_circuit(sim_paths.iloc[0])
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+    sim = utils.get_bluepy_simulation(utils.get_sim_path(config.root_path).iloc[0])
+    rhos = utils.get_rho0s(sim.circuit, sim.target)  # get all rhos in one go and then index them as needed
 
-    for seed, assembly_grp in assembly_grp_dict.items():
-        efficacies = {assembly.idx: utils.get_syn_properties(c,
-                      utils.get_syn_idx(c, assembly.gids, assembly.gids), ["rho0_GB"])["rho0_GB"].value_counts()
-                      for assembly in tqdm(assembly_grp.assemblies, desc="%s assembly efficacies" % seed)}
+    for seed, assembly_grp in tqdm(assembly_grp_dict.items(), desc="Getting efficacies"):
+        efficacies = {assembly.idx: rhos.loc[rhos["pre_gid"].isin(assembly.gids)
+                                             & rhos["post_gid"].isin(assembly.gids), "rho"].value_counts()
+                      for assembly in assembly_grp.assemblies}
         fig_name = os.path.join(config.fig_path, "efficacy_%s.png" % seed)
         plot_efficacy(efficacies, fig_name)
 
@@ -43,7 +43,8 @@ def assembly_in_degree(config_path):
 
 
 def assembly_simplex_counts(config_path):
-    """Loads in assemblies and plots simplex counts (seed by seed and then for consensus assemblies)"""
+    """Loads in assemblies and plots simplex counts (seed by seed
+    and then for all instantiations per consensus assemblies)"""
 
     config = Config(config_path)
     conn_mat = AssemblyTopology.from_h5(config.h5f_name,

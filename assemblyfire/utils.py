@@ -1,6 +1,6 @@
 """
 Assembly detection related utility functions (mostly loading simulation related stuff)
-author: András Ecker, last update: 11.2021
+author: András Ecker, last update: 001.2022
 """
 
 import os
@@ -202,6 +202,16 @@ def get_syn_idx(c, pre_gids, post_gids, parallel=True):
 
 def get_syn_properties(c, syn_idx, properties):
     return c.connectome.synapse_properties(syn_idx, properties)
+
+
+def get_rho0s(c, target):
+    """Get initial efficacies (rho0_GB in the sonata file) for all EXC synapses in the `target`"""
+    from bluepy.enums import Synapse
+    gids = get_E_gids(c, target)
+    syn_idx = get_syn_idx(c, gids, gids)
+    syn_df = get_syn_properties(c, syn_idx, [Synapse.PRE_GID, Synapse.POST_GID, "rho0_GB"])
+    syn_df.columns = ["pre_gid", "post_gid", "rho"]
+    return syn_df
 
 
 def _read_h5_metadata(h5f, group_name=None, prefix=None):
