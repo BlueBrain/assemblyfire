@@ -14,13 +14,12 @@ class AssemblyTopology(ConnectivityMatrix):
     A class derived from ConnectivityMatrix with additional information on networks metrics
     of the subgraph associated to an assembly within the connectivity matrix of the circuit.
     """
-    def __extract_gids__(self, sub_gids):
-        return self.__extract_vertex_ids__(sub_gids)
 
-    def degree(self, sub_gids=None, kind="in"):
-        """Return in/out degrees of the subgraph, if None compute on the whole graph"""
-        if sub_gids is not None:
-            array = self.subarray(self.__extract_gids__(sub_gids))
+    def degree(self, pre_gids=None, post_gids=None, kind="in"):
+        """Return in/out degrees of the (symmetric) subarray specified by `pre_gids`
+        (if `post_gids` is given as well, then the subarray will be asymmetric)"""
+        if pre_gids is not None:
+            array = self.subarray(pre_gids, sub_gids_post=post_gids)
         else:
             array = self.array
         if kind == "in":
@@ -31,6 +30,7 @@ class AssemblyTopology(ConnectivityMatrix):
             ValueError("Need to specify 'in' or 'out' degree!")
 
     def density(self, sub_gids=None):
+        """Return the density of submatrix specified by `sub_gids`"""
         if sub_gids is None:
             matrix = self.matrix
         else:
@@ -40,22 +40,23 @@ class AssemblyTopology(ConnectivityMatrix):
     def simplex_counts(self, sub_gids):
         """Return the simplex counts of submatrix specified by `sub_gids`"""
         from pyflagser import flagser_count_unweighted
-        sub_mat = self.submatrix(self.__extract_gids__(sub_gids))
+        sub_mat = self.submatrix(sub_gids)
         return flagser_count_unweighted(sub_mat, directed=True)
 
     def betti_counts(self, sub_gids):
         """Return the betti counts of submatrix specified by `sub_gids`"""
         from pyflagser import flagser_unweighted
-        sub_mat = self.submatrix(self.__extract_gids__(sub_gids))
+        sub_mat = self.submatrix(sub_gids)
         return flagser_unweighted(sub_mat, directed=True)["betti"]
 
 
-def in_degree_assemblies(assembly_grp_dict, conn_mat):
+def in_degree_assemblies(assembly_grp_dict, conn_mat, post_id=None):
     """
-    Computes the indegree distribution of assemblies across seeds
-    and a random controls of the same size/depth profile/mtype composition
+    Computes the in degree distribution within assemblies (or cross-assemblies if `post_assembly_id` is specified)
+    across seeds and a random controls of the same size/depth profile/mtype composition
     :param assembly_grp_dict: dict with seeds as keys and assembly groups as values
     :param conn_mat: AssemblyTopology object for the circuit where the assemblies belong to
+    :param post_id: optional ID of postsynaptic assembly for cross-assembly in degrees
     :return in_degrees: dict with the same keys as `assembly_grp_dict` - within that an other dict
                         with keys as assembly labels and list of in degrees as values
     :return in_d_control: dict with the same keys as `assembly_grp_dict` - within that an other dict
@@ -65,16 +66,17 @@ def in_degree_assemblies(assembly_grp_dict, conn_mat):
     in_degrees = {}
     in_d_control = {seed: {} for seed in list(assembly_grp_dict.keys())}
     for seed, assembly_grp in tqdm(assembly_grp_dict.items(), desc="Getting in-degrees"):
-        in_degrees[seed] = {assembly.idx: conn_mat.degree(assembly.gids, kind="in")
+        post_gids = assembly_grp.loc((post_id, int(seed.split("seed")[1]))).gids if post_id is not None else None
+        in_degrees[seed] = {assembly.idx: conn_mat.degree(assembly.gids, post_gids, kind="in")
                             for assembly in assembly_grp.assemblies}
-        in_d_control[seed]["n"] = {assembly.idx: conn_mat.degree(conn_mat.random_n_gids(assembly.gids), kind="in")
-                                   for assembly in assembly_grp.assemblies}
+        in_d_control[seed]["n"] = {assembly.idx: conn_mat.degree(conn_mat.random_n_gids(assembly.gids), post_gids,
+                                   kind="in") for assembly in assembly_grp.assemblies}
         in_d_control[seed]["depths"] = {assembly.idx: conn_mat.degree(
-                                        conn_mat.index("[PH]y").random_numerical_gids(assembly.gids), kind="in")
-                                        for assembly in assembly_grp.assemblies}
+                                        conn_mat.index("[PH]y").random_numerical_gids(assembly.gids), post_gids,
+                                        kind="in") for assembly in assembly_grp.assemblies}
         in_d_control[seed]["mtypes"] = {assembly.idx: conn_mat.degree(
-                                        conn_mat.index("mtype").random_categorical_gids(assembly.gids), kind="in")
-                                        for assembly in assembly_grp.assemblies}
+                                        conn_mat.index("mtype").random_categorical_gids(assembly.gids), post_gids,
+                                        kind="in") for assembly in assembly_grp.assemblies}
     return in_degrees, in_d_control
 
 

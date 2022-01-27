@@ -414,7 +414,7 @@ def plot_single_cell_features(gids, r_spikes, mean_ts, std_ts, ystuff, depths, b
     plt.close(fig)
 
 
-def plot_in_degrees(in_degrees, in_degrees_control, fig_name):
+def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"):
     """Plots in degrees for assemblies (within one seed) and random controls"""
     assembly_labels = list(in_degrees.keys())
     n = len(assembly_labels)
@@ -442,7 +442,7 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name):
             ax.legend(frameon=False)
     fig.add_subplot(1, 1, 1, frameon=False)
     plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
-    plt.xlabel("In degree")
+    plt.xlabel(xlabel)
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight", transparent=True)
     plt.close(fig)

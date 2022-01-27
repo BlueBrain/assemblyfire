@@ -8,8 +8,8 @@ from tqdm import tqdm
 
 import assemblyfire.utils as utils
 from assemblyfire.config import Config
-from assemblyfire.topology import AssemblyTopology, in_degree_assemblies, simplex_counts_assemblies,\
-                                  simplex_counts_consensus_instantiations
+from assemblyfire.topology import AssemblyTopology, in_degree_assemblies, \
+                                  simplex_counts_assemblies, simplex_counts_consensus_instantiations
 from assemblyfire.plots import plot_efficacy, plot_in_degrees, plot_simplex_counts, plot_simplex_counts_consensus
 
 
@@ -30,16 +30,23 @@ def assembly_efficacy(config_path):
 
 
 def assembly_in_degree(config_path):
-    """Loads in assemblies and plots in degrees (seed by seed)"""
+    """Loads in assemblies and plots in degrees within assemblies and cross assemblies seed-by-seed
+    (for cross assembly in degrees the postsynaptic target assembly is fixed: the late assembly)"""
 
     config = Config(config_path)
     conn_mat = AssemblyTopology.from_h5(config.h5f_name,
                                         prefix=config.h5_prefix_connectivity, group_name="full_matrix")
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+
     in_degrees, in_degrees_control = in_degree_assemblies(assembly_grp_dict, conn_mat)
     for seed, in_degree in in_degrees.items():
         fig_name = os.path.join(config.fig_path, "in_degrees_%s.png" % seed)
         plot_in_degrees(in_degree, in_degrees_control[seed], fig_name)
+
+    in_degrees, in_degrees_control = in_degree_assemblies(assembly_grp_dict, conn_mat, post_id=0)
+    for seed, in_degree in in_degrees.items():
+        fig_name = os.path.join(config.fig_path, "cross_assembly_in_degrees_%s.png" % seed)
+        plot_in_degrees(in_degree, in_degrees_control[seed], fig_name, xlabel="Cross assembly (any to 0) in degree")
 
 
 def assembly_simplex_counts(config_path):
@@ -52,6 +59,7 @@ def assembly_simplex_counts(config_path):
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
     consensus_assembly_dict = utils.load_consensus_assemblies_from_h5(config.h5f_name,
                                                                       prefix=config.h5_prefix_consensus_assemblies)
+
     simplex_counts, simplex_counts_control = simplex_counts_assemblies(assembly_grp_dict, conn_mat)
     for seed, simplices in simplex_counts.items():
         fig_name = os.path.join(config.fig_path, "simplex_counts_%s.png" % seed)
