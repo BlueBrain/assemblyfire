@@ -64,7 +64,10 @@ class Config(object):
 
     @property
     def fig_path(self):
-        return os.path.join(self.root_fig_path, os.path.split(self.root_path)[1])
+        if os.path.split(os.path.split(self.root_path)[0])[1] != "rerun":
+            return os.path.join(self.root_fig_path, os.path.split(self.root_path)[1])
+        else:
+            return os.path.join(self.root_fig_path, "rerun_%s" % os.path.split(self.root_path)[1])
 
     @property
     def target(self):

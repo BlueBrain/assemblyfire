@@ -1,0 +1,27 @@
+root_path: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/rerun/e0fbb0c8-07a4-49e0-be7d-822b2b2148fb"
+
+patterns_fname: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/e0fbb0c8-07a4-49e0-be7d-822b2b2148fb/input_spikes/stimulus_stream__start2000__end61501__rate2__seed12.txt"
+
+h5_out:
+    file_name: "assemblies.h5"
+    prefixes:
+        spikes: "spikes"
+        assemblies: "assemblies"
+        consensus_assemblies: "consensus"
+        connectivity: "connectivity"
+        single_cell_features: "single_cell"
+
+root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures/v7_assemblies"
+
+preprocessing_protocol:
+    target: "hex_O1"
+    t_start: 1500
+    t_end: 62000
+    bin_size: 20
+    threshold_rate: True
+
+clustering:
+    spikes:
+        method: "hierarchical"
+    assemblies:
+        method: "hierarchical"
