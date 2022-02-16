@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Consensus assembly botany stuff (so far: mtype composition and depth profile of core vs. union)
 last modified: András Ecker 11.2021
