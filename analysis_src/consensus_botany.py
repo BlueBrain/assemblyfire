@@ -1,15 +1,15 @@
 """
-Consensus assembly botany stuff (so far: mtype composition and depth profile of core vs. union)
-last modified: András Ecker 11.2021
+Consensus assembly botany stuff (so far: mtype composition and depth profile of core vs. union and simplex counts)
+last modified: András Ecker 02.2022
 """
 
 import os
 import numpy as np
 
 from assemblyfire.config import Config
-from assemblyfire.topology import AssemblyTopology
+from assemblyfire.topology import AssemblyTopology, simplex_counts_consensus_instantiations
 from assemblyfire.utils import get_sim_path, get_figure_asthetics, load_consensus_assemblies_from_h5
-from assemblyfire.plots import plot_consensus_mtypes
+from assemblyfire.plots import plot_consensus_mtypes, plot_simplex_counts_consensus
 
 
 def consensus_botany(config_path):
@@ -19,6 +19,10 @@ def consensus_botany(config_path):
     consensus_assemblies = load_consensus_assemblies_from_h5(config.h5f_name,
                                                              prefix=config.h5_prefix_consensus_assemblies)
     conn_mat = AssemblyTopology.from_h5(config.h5f_name, prefix=config.h5_prefix_connectivity)
+
+    simplex_counts, simplex_counts_control = simplex_counts_consensus_instantiations(consensus_assemblies, conn_mat)
+    fig_name = os.path.join(config.fig_path, "simplex_counts_consensus.png")
+    plot_simplex_counts_consensus(simplex_counts, simplex_counts_control, fig_name)
 
     all_gids = conn_mat.gids
     consensus_gids = [assembly.gids for _, assembly in consensus_assemblies.items()]
