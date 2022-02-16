@@ -214,6 +214,12 @@ def get_rho0s(c, target):
     return syn_df
 
 
+def read_base_h5_metadata(h5f_name):
+    """Reads ''base'' metadata from h5 attributes (root_path, seeds etc.)"""
+    h5f = h5py.File(h5f_name, "r")
+    return dict(h5f["spikes"].attrs)
+
+
 def _read_h5_metadata(h5f, group_name=None, prefix=None):
     """Reads metadata from h5 attributes"""
     if prefix is None:
