@@ -8,9 +8,9 @@ import os
 import numpy as np
 
 from assemblyfire.config import Config
-from assemblyfire.topology import NetworkAssembly
+from assemblyfire.topology import AssemblyTopology
 from assemblyfire.utils import get_sim_path, get_figure_asthetics, load_consensus_assemblies_from_h5
-from assemblyfire.plots import plot_consensus_mtypes, plot_consensus_in_degree
+from assemblyfire.plots import plot_consensus_mtypes
 
 
 def consensus_botany(config_path):
@@ -19,12 +19,12 @@ def consensus_botany(config_path):
     config = Config(config_path)
     consensus_assemblies = load_consensus_assemblies_from_h5(config.h5f_name,
                                                              prefix=config.h5_prefix_consensus_assemblies)
-    network = NetworkAssembly.from_h5(config.h5f_name, prefix=config.h5_prefix_connectivity)
+    conn_mat = AssemblyTopology.from_h5(config.h5f_name, prefix=config.h5_prefix_connectivity)
 
-    all_gids = network.gids
+    all_gids = conn_mat.gids
     consensus_gids = [assembly.gids for _, assembly in consensus_assemblies.items()]
     union_gids = [assembly.union.gids for _, assembly in consensus_assemblies.items()]
-    mtypes = network.mtypes  # this is a bit weird that it's stored in NetworkAssembly...
+    mtypes = conn_mat.mtype  # this is a bit weird that it's stored in NetworkAssembly...
     consensus_mtypes = [mtypes[np.searchsorted(all_gids, gids)] for gids in consensus_gids]
     union_mtypes = [mtypes[np.searchsorted(all_gids, gids)] for gids in union_gids]
 
@@ -35,4 +35,4 @@ def consensus_botany(config_path):
 
 
 if __name__ == "__main__":
-    consensus_botany("../configs/v7_bbp-workflow.yaml")
+    consensus_botany("../configs/v7_10mins.yaml")
