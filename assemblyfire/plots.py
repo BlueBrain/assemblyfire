@@ -855,7 +855,7 @@ def get_michelson_contrast(cluster_dfs):
         uncond_probs = df["rho"].value_counts(normalize=True)
         probs[assembly_label] = uncond_probs.to_numpy()
         cond_probs, pot_contrast, dep_contrast = {}, np.zeros((2, 2)), np.zeros((2, 2))
-        cond_probs["++"] = df.loc[df["assembly%i" % assembly_label] >=0, "rho"].value_counts(normalize=True)
+        cond_probs["++"] = df.loc[df["assembly%i" % assembly_label] >= 0, "rho"].value_counts(normalize=True)
         cond_probs["+-"] = df.loc[df["assembly%i" % assembly_label] == -1, "rho"].value_counts(normalize=True)
         cond_probs["-+"] = df.loc[df["non_assembly"] >=0, "rho"].value_counts(normalize=True)
         cond_probs["--"] = df.loc[df["non_assembly"] == -1, "rho"].value_counts(normalize=True)
@@ -901,7 +901,7 @@ def plot_cond_rhos(cluster_dfs, fig_name):
             ax2.set_yticks([0, 1])
             ax2.set_yticklabels(["assembly", "non-assembly"])
             ax3.set_yticks([0, 1])
-            ax3.set_yticklabels(["assembly", "non assembly"])
+            ax3.set_yticklabels(["assembly", "non-assembly"])
         else:
             ax2.set_yticks([])
             ax3.set_yticks([])
