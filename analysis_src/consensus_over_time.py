@@ -36,8 +36,8 @@ def _cluster_assemblies(assembly_grp, n_assemblies, fig_prefix, h5f_name, h5_pre
 
 def consensus_botany(consensus_assemblies, conn_mat, all_gids, mtypes, ystuff, depths, fig_prefix):
     """Plots simplex counts and unions' vs. cores' depth profile and mtype composition"""
-    # simplex_counts, simplex_counts_control = simplex_counts_consensus_instantiations(consensus_assemblies, conn_mat)
-    # plot_simplex_counts_consensus(simplex_counts, simplex_counts_control, fig_prefix + "simplex_counts.png")
+    simplex_counts, simplex_counts_control = simplex_counts_consensus_instantiations(consensus_assemblies, conn_mat)
+    plot_simplex_counts_consensus(simplex_counts, simplex_counts_control, fig_prefix + "simplex_counts.png")
 
     consensus_gids = [assembly.gids for _, assembly in consensus_assemblies.items()]
     union_gids = [assembly.union.gids for _, assembly in consensus_assemblies.items()]
