@@ -61,6 +61,28 @@ def plot_sim_matrix(sim_matrix, t_bins, stim_times, patterns, fig_name):
     plt.close(fig)
 
 
+def plot_mean_sims(t_starts, mean_sims_sliding, window_widths, mean_sims_incr, fig_name):
+    t_starts = t_starts / 1000  # convert to sec
+    window_widths = window_widths / 1000
+    fig = plt.figure(figsize=(10, 6.5))
+    ax = fig.add_subplot(2, 1, 1)
+    ax.plot(t_starts, mean_sims_sliding, label="sliding window of %i (s)" % window_widths[0])
+    ax.legend(frameon=False, loc=4)
+    ax.set_xlim([t_starts[0], window_widths[-1]])
+    ax.set_xlabel("T start (s)")
+    ax.set_ylabel("Mean similarity")
+    ax2 = fig.add_subplot(2, 1, 2)
+    ax2.plot(window_widths, mean_sims_incr, label="fixed start time %i (s)" % t_starts[0])
+    ax2.legend(frameon=False, loc=4)
+    ax2.set_xlim([t_starts[0], window_widths[-1]])
+    ax2.set_xlabel("Window size (s)")
+    ax2.set_ylabel("Mean similarity")
+    sns.despine(trim=True)
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_transformed(transformed, t_bins, stim_times, patterns, fig_name):
     """Plots time series in factor analysis/PCA space"""
     t_idx = _get_pattern_idx(t_bins, stim_times)
