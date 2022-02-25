@@ -61,15 +61,22 @@ def plot_sim_matrix(sim_matrix, t_bins, stim_times, patterns, fig_name):
     plt.close(fig)
 
 
-def plot_mean_sims(t_starts, mean_sims, fig_name):
-    t_starts = t_starts / 1000  # convert to sec
-    fig = plt.figure(figsize=(10, 6.5))
-    ax = fig.add_subplot(1, 1, 1)
-    ax.plot(t_starts, mean_sims)
-    ax.set_xlim([t_starts[0], t_starts[-1]])
+def plot_sims_vs_rate_and_tdiff(sim_matrix, pw_avg_rate, t_offsets, mean_sims, fig_name):
+    """Plots (pairwise) similarity vs. pairwise average firing rate and
+    mean similarity (within time window) against increasing temporal offset"""
+    t_offsets = t_offsets / 1000  # convert to sec
+    fig = plt.figure(figsize=(10, 4))
+    ax = fig.add_subplot(1, 2, 1)
+    ax.plot(t_offsets, mean_sims, color=BLUE)
+    # ax.set_xlim([t_offsets[0], t_offsets[-1]])
     ax.set_xlabel("Minimum time difference (s)")
     ax.set_ylabel("Mean similarity (within time window)")
+    ax2 = fig.add_subplot(1, 2, 2)
+    ax2.scatter(pw_avg_rate, sim_matrix, c=BLUE, alpha=0.8, marker='.', s=10, edgecolor="none")
+    ax2.set_xlabel("Pairwise avg. rate (Hz)")
+    ax2.set_ylabel("Similarity")
     sns.despine(trim=True)
+    fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 

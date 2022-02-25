@@ -11,17 +11,17 @@ from assemblyfire.config import Config
 from assemblyfire.utils import load_spikes_from_h5, get_sim_path
 from assemblyfire.spikes import load_spikes, spikes2mat
 from assemblyfire.clustering import cosine_similarity
-from assemblyfire.plots import plot_mean_sims
+from assemblyfire.plots import plot_sims_vs_rate_and_tdiff
 
 
 def generate_test_dataset(n_patterns=1000, stim_duration=500, late_assembly_offset=100):
     """Generate stereotypical toy dataset for testing the method"""
-    # One randomly selected "assembly" instantly active, followed by the late assembly
+    # One randomly selected "assembly" followed by the late assembly
     rnd_seq = np.hstack([[np.random.randint(9) + 1, 0] for _ in range(n_patterns)])
-    # Active instantly upon stim; zero assembly a bit later
+    # Active instantly upon stim, late assembly a bit later
     ts = np.hstack([[t * stim_duration, t * stim_duration + late_assembly_offset] for t in range(n_patterns)])
     t_dists = pdist(ts.reshape(-1, 1))
-    # similarity = 1 for matching assemblies; 0 for a mismatch
+    # similarity: 1 for matching assemblies, 0 for a mismatch
     sim_mat = np.vstack([rnd_seq == r for r in rnd_seq]).astype(int)
     np.fill_diagonal(sim_mat, 0.)  # stupid numpy...
     sim_mat = squareform(sim_mat)
@@ -41,18 +41,29 @@ def get_thresholded_spikes(config, spike_matrix_dict):
     return spike_matrix, gids, sign_t_bins
 
 
-def get_mean_sims_vs_tdiff(spike_matrix, t_bins, window_width=5000, window_shift=500):
-    """Gets mean similarity (within time window) against increasing temporal separation"""
-    # get similarity and temporal distance matrices
+def _pairwise_mean(x):
+    """Vectorized pairwise mean (returns the same upper triangular format as `pdist`)"""
+    i, j = np.triu_indices(len(x), k=1)
+    return (x[i] + x[j]) / 2
+
+
+def similarity_vs_rate_and_tdiff(spike_matrix, t_bins, window_width=5000, window_shift=500):
+    """Gets (pairwise) similarity vs. pairwise average firing rate and
+    mean similarity (within time window) against increasing temporal offset"""
+    # get similarity and temporal distance "matrices"
     sim_matrix = cosine_similarity(spike_matrix.T)
     np.fill_diagonal(sim_matrix, 0.)  # stupid numpy...
     sim_matrix = squareform(sim_matrix)  # convert to upper triangular matrix
     t_dists = pdist(t_bins.reshape(-1, 1))
+    # get pairwise mean rate (in the same format as the above 2)
+    rate = np.sum(spike_matrix, axis=0)
+    rate /= spike_matrix.shape[0] * 1e-3 * np.min(t_dists)  # last part should be config.bin_size...
+    pw_avg_rate = _pairwise_mean(rate)
     # calculate mean similarity
-    t_starts = np.arange(0, np.max(t_dists) - window_width + window_shift, window_shift)
-    mean_sims = np.array([np.mean(sim_matrix[(t_start < t_dists) & (t_dists < t_start + window_width)])
-                          for t_start in t_starts])
-    return t_starts, mean_sims
+    t_offsets = np.arange(0, np.max(t_dists) - window_width + window_shift, window_shift)
+    mean_sims = np.array([np.mean(sim_matrix[(t_offset < t_dists) & (t_dists < t_offset + window_width)])
+                          for t_offset in t_offsets])
+    return sim_matrix, pw_avg_rate, t_offsets, mean_sims
 
 
 def main(config_path):
@@ -62,9 +73,9 @@ def main(config_path):
         raise RuntimeError("This script only works for chunked simulations!")
 
     spike_matrix, _, t_bins = get_thresholded_spikes(config, spike_matrix_dict)
-    t_starts, mean_sims = get_mean_sims_vs_tdiff(spike_matrix, t_bins)
-    fig_name = os.path.join(config.fig_path, "mean_similarity.png")
-    plot_mean_sims(t_starts, mean_sims, fig_name)
+    sim_matrix, pw_avg_rate, t_offsets, mean_sims = similarity_vs_rate_and_tdiff(spike_matrix, t_bins)
+    fig_name = os.path.join(config.fig_path, "similarity_vs_rate_and_time.png")
+    plot_sims_vs_rate_and_tdiff(sim_matrix, pw_avg_rate, t_offsets, mean_sims, fig_name)
 
 
 if __name__ == "__main__":
