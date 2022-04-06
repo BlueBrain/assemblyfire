@@ -177,9 +177,9 @@ def _corr_spikes_clusters_subprocess(inputs):
     return corr_shuffled_spike_matrix_clusters(*inputs)
 
 
-def sign_corr_ths(spike_matrix, sparse_clusters, N=1000):
-    """Generates surrogate datasets and calculates correlation coefficients
-    then takes 95% percentile of the surrogate datasets as a significance threshold"""
+def sign_corr_ths(spike_matrix, sparse_clusters, th_pct, N=1000):
+    """Generates `N` surrogate datasets and calculates correlation coefficients
+    then takes `th_pct`% percentile of the surrogate datasets as a significance threshold"""
     n = N if mp.cpu_count()-1 > N else mp.cpu_count()-1
     pool = mp.Pool(processes=n)
     corrs = pool.map(_corr_spikes_clusters_subprocess, zip([spike_matrix for _ in range(N)],
@@ -187,7 +187,7 @@ def sign_corr_ths(spike_matrix, sparse_clusters, N=1000):
     pool.terminate()
     corrs = np.dstack(corrs)  # shape: ngids x nclusters x N
     # get sign threshold (compare to Monte-Carlo shuffles)
-    corr_ths = np.percentile(corrs, 95, axis=2, overwrite_input=True)
+    corr_ths = np.percentile(corrs, th_pct, axis=2, overwrite_input=True)
     return corr_ths
 
 
@@ -263,13 +263,14 @@ def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
     return clusters_dict
 
 
-def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, h5_prefix, FigureArgs):
+def detect_assemblies(spike_matrix_dict, clusters_dict, core_cell_th_pct, h5f_name, h5_prefix, FigureArgs):
     """
     Finds "core cells" - cells which correlate with the activation of (clustered) time bins
     and then checks within group correlations against the mean correlation to decide
     if the core cell group is an assembly or not a la Herzog et al. 2021
     :param spike_matrix_dict: dict with seed as key and SpikeMatrixResult (see `spikes.py`) as value
     :param clusters_dict: dict with seed as key and clustered (significant) time bins as value (see `cluster_spikes()`)
+    :param core_cell_th_pct: float - sign. threshold in surrogate dataset for core cell detection
     :param h5f_name: str - name of the HDF5 file (dumping the assemblies and their metadata)
     :param h5_prefix: str - directory name of assemblies within the HDF5 file
     :param FigureArgs: plotting related arguments (see `cli.py`)
@@ -285,7 +286,7 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, h5f_name, h5_prefix, Fig
         # core cells
         sparse_clusters = _convert_clusters(clusters)
         corrs = corr_spike_matrix_clusters(spike_matrix, sparse_clusters)
-        corr_ths = sign_corr_ths(spike_matrix, sparse_clusters)
+        corr_ths = sign_corr_ths(spike_matrix, sparse_clusters, core_cell_th_pct)
         core_cell_idx = np.zeros_like(corrs, dtype=int)
         core_cell_idx[np.where(corrs > corr_ths)] = 1
         # cell assemblies

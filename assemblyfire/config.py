@@ -109,6 +109,13 @@ class Config(object):
         return self.config["clustering"]["spikes"]["method"]
 
     @property
+    def core_cell_th_pct(self):
+        if "core_cell_th_pct" in self.config["clustering"]["spikes"]:
+            return self.config["clustering"]["spikes"]["core_cell_th_pct"]
+        else:
+            return 95  # default hard coded here to 95% percentile as in Herzog et al. 2021
+
+    @property
     def overwrite_seeds(self):
         if "overwrite_n_clusters" in self.config["clustering"]["spikes"]:
             return self.config["clustering"]["spikes"]["overwrite_n_clusters"]

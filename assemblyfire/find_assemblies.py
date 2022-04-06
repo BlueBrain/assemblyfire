@@ -35,5 +35,6 @@ def run(config_path):
                                    FigureArgs=FigureArgs(project_metadata["t"], project_metadata["stim_times"],
                                                          project_metadata["patterns"], depths, None, spikes.fig_path))
     L.info(" Detecting assemblies within clustered time bins and saving them to file...")
-    detect_assemblies(spike_matrix_dict, clusters_dict, spikes.h5f_name, spikes.h5_prefix_assemblies,
+    detect_assemblies(spike_matrix_dict, clusters_dict, spikes.core_cell_th_pct,
+                      spikes.h5f_name, spikes.h5_prefix_assemblies,
                       FigureArgs=FigureArgs(None, None, None, depths, ystuff, spikes.fig_path))
