@@ -430,24 +430,38 @@ def distance_model(dists, fracs, target_range, fig_name=None):
     return {label: poisson(target_range * slope * frac) for label, frac in fracs.items()}
 
 
-def merge_clusters(clusters, min_nsyns):
+def merge_clusters(clusters):
     """Cleans raw clusters and merges them by taking the boolean array of raw clusters,
     and for each cluster `i` (while loop) checks all cluster `j`s for common synapses (`np.any()`, no explicit loop)
-    and if there are any, adds those to cluster `i` and deletes cluster `j`.
-    (This is needed as all clusters are detected minimum `min_nsyns` times at the first place.
+    and if there are more than a continuously decreasing threshold `nsyns_th` (most outer for loop),
+    then adds those to cluster `i` and deletes cluster `j`.
+    (This is needed as clusters can be detected multiple times at the first place.
     Input `cluster.shape[1]` is the number of raw clusters,
     while output `cluster.shape[1]` is the number of merged clusters)
     """
-    i = 0
-    while i < (clusters.shape[1] - 1):
-        idx_partners = np.arange(i + 1, clusters.shape[1])
-        matches = np.sum(clusters[:, [i]] & clusters[:, idx_partners], axis=0) > (min_nsyns - 1)
-        if not np.any(matches):
-            i += 1
-        else:
-            # idx_partners[matches] are the column indices (`j`s) where cluster `i` has at least 1 common synapse
-            clusters[:, i] = np.any(clusters[:, [i] + idx_partners[matches].tolist()], axis=1)
-            clusters = clusters[:, ~np.in1d(range(clusters.shape[1]), idx_partners[matches])]
+    row_idx, col_idx = np.nonzero(clusters)
+    nsyns = len(np.unique(row_idx))  # number of unique synapses in the passed clusters
+    _, counts = np.unique(col_idx, return_counts=True)
+    min_nsyns = np.min(counts)  # minimum number of synapses in the passed clusters
+    nclusts_ub = int(nsyns / min_nsyns)  # upper bound of possible (meaningfull) clusters
+    for nsyns_th in np.arange(min_nsyns-1, 1, -1):
+        i = 0
+        while i < (clusters.shape[1] - 1):
+            idx_partners = np.arange(i + 1, clusters.shape[1])
+            matches = np.sum(clusters[:, [i]] & clusters[:, idx_partners], axis=0) > nsyns_th
+            if not np.any(matches):
+                i += 1
+            else:
+                # idx_partners[matches] are the column indices (`j`s) where cluster `i` has at least 1 common synapse
+                clusters[:, i] = np.any(clusters[:, [i] + idx_partners[matches].tolist()], axis=1)
+                clusters = clusters[:, ~np.in1d(range(clusters.shape[1]), idx_partners[matches])]
+                i += 1
+        row_idx, _ = np.nonzero(clusters)
+        _, counts = np.unique(row_idx, return_counts=True)
+        if np.sum(counts) == nsyns:  # check if all synapses (in the rows) belong to a unique cluster
+            break
+    assert clusters.shape[1] <= nclusts_ub, "After merging there are still more clusters (%i)" \
+                                            "than the theoretical upper bound: %i" % (clusters.shape[1], nclusts_ub)
     return clusters
 
 
@@ -506,7 +520,7 @@ def cluster_synapses(sim, post_gids, assembly_grp, base_assembly_idx,
             significant = (-np.log10(p_vals) >= log_sign_th) & (nsyns >= min_nsyns)
             if np.any(significant):
                 raw_clusters = sub_dists[:, significant] < target_range
-                merged_clusters = merge_clusters(raw_clusters, min_nsyns)
+                merged_clusters = merge_clusters(raw_clusters)
                 row_idx, col_idx = np.nonzero(merged_clusters)
                 results[syn_idx[row_idx], i] = col_idx  # set cluster labels (starting at 0)
         data = np.concatenate((syn_df_gid[[Synapse.PRE_GID, Synapse.POST_GID]].to_numpy(), results), axis=1)
