@@ -1,6 +1,6 @@
-root_path: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/e0fbb0c8-07a4-49e0-be7d-822b2b2148fb"
+root_path: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/LayerWiseEShotNoise_PyramidPatterns"
 
-patterns_fname: "input_spikes/stimulus_stream__start2000__end61501__rate2__seed12.txt"
+patterns_fname: "stimulus_stream__start2000__end61501__rate2__seed12.txt"
 
 h5_out:
     file_name: "assemblies.h5"
@@ -25,3 +25,7 @@ clustering:
         method: "hierarchical"
     assemblies:
         method: "hierarchical"
+    synapses:
+        target_range: 5
+        min_nsyns: 5
+        n_neurons_sample: 10
