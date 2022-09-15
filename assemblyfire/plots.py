@@ -464,7 +464,7 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"
     plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
     plt.xlabel(xlabel)
     fig.tight_layout()
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight", transparent=True)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -494,7 +494,7 @@ def plot_simplex_counts(simplex_counts, simplex_counts_control, fig_name):
     plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
     plt.xlabel("Simplex dimension")
     fig.tight_layout()
-    fig.savefig(fig_name, bbox_inches="tight", transparent=True)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -514,7 +514,7 @@ def plot_efficacy(efficacies, fig_name):
         ax.pie(sizes, labels=["%.2f%%" % ratio for ratio in ratios], colors=[BLUE, RED])
         ax.set_title("Assembly %i\n(nsyns=%.2fM)" % (assembly_label[0], (sizes[0]+sizes[1]) / 1e6))
     fig.tight_layout()
-    fig.savefig(fig_name, bbox_inches="tight", transparent=True)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
     plt.rcParams["patch.edgecolor"] = "white"
 
@@ -910,7 +910,7 @@ def plot_cond_rhos(cluster_dfs, fig_name):
     gs = gridspec.GridSpec(3, n+1, width_ratios=[10 for i in range(n)] + [1])
     for i, assembly_label in enumerate(assembly_labels):
         ax = fig.add_subplot(gs[0, i])
-        ax.pie(probs[assembly_label], labels=["%.3f" % prob for prob in probs[assembly_label]],
+        ax.pie(probs[assembly_label], labels=["%.2f%%" % prob * 100 for prob in probs[assembly_label]],
                colors=[BLUE, RED], normalize=True)
         ax.set_title("assembly %i" % assembly_label)
         ax2 = fig.add_subplot(gs[1, i])
@@ -931,7 +931,7 @@ def plot_cond_rhos(cluster_dfs, fig_name):
     fig.colorbar(i_pot, cax=fig.add_subplot(gs[1, i+1]), label="P(pot|cond) - P(pot) /\n P(pot|cond) + P(pot)")
     fig.colorbar(i_dep, cax=fig.add_subplot(gs[2, i+1]), label="P(dep|cond) - P(pot) /\n P(dep|cond) + P(pot)")
     fig.tight_layout()
-    fig.savefig(fig_name, bbox_inches="tight", transparent=True)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 
 
