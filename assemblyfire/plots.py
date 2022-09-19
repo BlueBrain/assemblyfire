@@ -910,7 +910,7 @@ def plot_cond_rhos(cluster_dfs, fig_name):
     gs = gridspec.GridSpec(3, n+1, width_ratios=[10 for i in range(n)] + [1])
     for i, assembly_label in enumerate(assembly_labels):
         ax = fig.add_subplot(gs[0, i])
-        ax.pie(probs[assembly_label], labels=["%.2f%%" % prob * 100 for prob in probs[assembly_label]],
+        ax.pie(probs[assembly_label], labels=["%.2f%%" % (prob * 100) for prob in probs[assembly_label]],
                colors=[BLUE, RED], normalize=True)
         ax.set_title("assembly %i" % assembly_label)
         ax2 = fig.add_subplot(gs[1, i])
