@@ -49,8 +49,7 @@ def plot_sim_matrix(sim_matrix, t_bins, stim_times, patterns, fig_name):
     np.fill_diagonal(sim_mat, np.nan)
     fig = plt.figure(figsize=(10, 9))
     ax = fig.add_subplot(1, 1, 1)
-    i = ax.imshow(sim_mat, cmap="cividis",
-                  aspect="auto", interpolation="none")
+    i = ax.imshow(sim_mat, cmap="cividis", aspect="auto", interpolation="none")
     fig.colorbar(i)
     ax.set_xticks(t_idx); ax.set_xticklabels(patterns)
     ax.xaxis.tick_top()
@@ -801,6 +800,22 @@ def plot_n_assemblies(stim_times, patterns, n_assemblies, t_chunks, fig_name):
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("#Unique assemblies")
     sns.despine()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_assembly_intersection_corr(intersection_corrs, xlabel, ylabel, fig_name):
+    """Plots similarity matrix of assemblies"""
+    abs_max = np.max(np.abs([np.min(intersection_corrs), np.max(intersection_corrs)]))
+    fig = plt.figure(figsize=(10, 9))
+    ax = fig.add_subplot(1, 1, 1)
+    i = ax.imshow(intersection_corrs, cmap="coolwarm", aspect="auto", interpolation="none",
+                  vmin=-abs_max, vmax=abs_max)
+    fig.colorbar(i, label="intersection correlation")
+    ax.set_xlabel(xlabel)
+    ax.set_xticks([i for i in range(intersection_corrs.shape[0])])
+    ax.set_ylabel(ylabel)
+    ax.set_xticks([i for i in range(intersection_corrs.shape[1])])
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 
