@@ -1,0 +1,34 @@
+root_path: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/LayerWiseOUNoise_Ca1p05_PyramidPatterns"
+
+patterns_fname: "stimulus_stream__start2000__end181501__rate2__seed9.txt"
+
+h5_out:
+    file_name: "assemblies_L23.h5"
+    prefixes:
+        spikes: "spikes"
+        assemblies: "assemblies"
+        consensus_assemblies: "consensus"
+        connectivity: "connectivity"
+        single_cell_features: "single_cell"
+
+root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures/v7_assemblies"
+
+preprocessing_protocol:
+    target: "hex_O1L23"
+    t_start: 1500
+    t_end: 182000
+    bin_size: 20
+    threshold_rate: True
+
+clustering:
+    spikes:
+        method: "hierarchical"
+    assemblies:
+        method: "hierarchical"
+    synapses:
+        target_range: 10
+        min_nsyns: 10
+        mtypes:
+            - "L3_TPC:A"
+            - "L3_TPC:C"
+        n_neurons_sample: 10

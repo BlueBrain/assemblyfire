@@ -64,10 +64,11 @@ class Config(object):
 
     @property
     def fig_path(self):
-        if os.path.split(os.path.split(self.root_path)[0])[1] != "rerun":
+        h5f_name = self.config["h5_out"]["file_name"].split('.')[0]
+        if h5f_name == "assemblies":
             return os.path.join(self.root_fig_path, os.path.split(self.root_path)[1])
         else:
-            return os.path.join(self.root_fig_path, "rerun_%s" % os.path.split(self.root_path)[1])
+            return os.path.join(self.root_fig_path, os.path.split(self.root_path)[1] + h5f_name.split("assemblies")[1])
 
     @property
     def target(self):
@@ -134,6 +135,13 @@ class Config(object):
     @property
     def syn_clustering_min_nsyns(self):
         return self.config["clustering"]["synapses"]["min_nsyns"]
+
+    @property
+    def syn_clustering_mtypes(self):
+        if "mtypes" in self.config["clustering"]["synapses"]:
+            return self.config["clustering"]["synapses"]["mtypes"]
+        else:
+            return ["L5_TPC:A", "L5_TPC:B"]
 
     @property
     def syn_clustering_n_neurons_sample(self):

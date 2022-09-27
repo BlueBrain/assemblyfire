@@ -877,15 +877,18 @@ def get_michelson_contrast(cluster_dfs):
         cond_probs, pot_contrast, dep_contrast = {}, np.zeros((2, 2)), np.zeros((2, 2))
         cond_probs["++"] = df.loc[df["assembly%i" % assembly_label] >= 0, "rho"].value_counts(normalize=True)
         cond_probs["+-"] = df.loc[df["assembly%i" % assembly_label] == -1, "rho"].value_counts(normalize=True)
-        cond_probs["-+"] = df.loc[df["non_assembly"] >=0, "rho"].value_counts(normalize=True)
+        cond_probs["-+"] = df.loc[df["non_assembly"] >= 0, "rho"].value_counts(normalize=True)
         cond_probs["--"] = df.loc[df["non_assembly"] == -1, "rho"].value_counts(normalize=True)
         for i, assembly in enumerate(["+", "-"]):
             for j, clustered in enumerate(["+", "-"]):
                 cond = assembly + clustered
                 p_dep, p_pot = uncond_probs.loc[0], uncond_probs.loc[1]
-                p_dep_cond, p_pot_cond = cond_probs[cond].loc[0], cond_probs[cond].loc[1]
-                pot_contrast[i, j] = (p_pot_cond - p_pot) / (p_pot_cond + p_pot)
-                dep_contrast[i, j] = (p_dep_cond - p_dep) / (p_dep_cond + p_dep)
+                if len(cond_probs[cond]) == 2:
+                    p_dep_cond, p_pot_cond = cond_probs[cond].loc[0], cond_probs[cond].loc[1]
+                    pot_contrast[i, j] = (p_pot_cond - p_pot) / (p_pot_cond + p_pot)
+                    dep_contrast[i, j] = (p_dep_cond - p_dep) / (p_dep_cond + p_dep)
+                else:  # this could happen if no synapse clusters are found...
+                    pot_contrast[i, j], dep_contrast[i, j] = np.nan, np.nan
         pot_contrasts[assembly_label], dep_contrasts[assembly_label] = pot_contrast, dep_contrast
     return probs, pot_contrasts, dep_contrasts
 
@@ -898,13 +901,15 @@ def plot_cond_rhos(cluster_dfs, fig_name):
     pot_colors = plt.cm.Reds(np.linspace(0, 1, 128))
     dep_colors = plt.cm.Blues(np.linspace(0, 1, 128))
     pot_cmap = colors.LinearSegmentedColormap.from_list("pot_cmap", np.vstack((neg_colors, pot_colors)))
-    dep_cmap = colors.LinearSegmentedColormap.from_list("pot_cmap", np.vstack((neg_colors, dep_colors)))
+    dep_cmap = colors.LinearSegmentedColormap.from_list("dep_cmap", np.vstack((neg_colors, dep_colors)))
+    pot_cmap.set_bad(color="tab:pink")
+    dep_cmap.set_bad(color="tab:pink")
 
     probs, pot_matrices, dep_matrices = get_michelson_contrast(cluster_dfs)
     assembly_labels = np.sort(list(probs.keys()))
     n = len(assembly_labels)
-    pot_extr = np.max([np.max(np.abs(pot_matrix)) for _, pot_matrix in pot_matrices.items()])
-    dep_extr = np.max([np.max(np.abs(dep_matrix)) for _, dep_matrix in dep_matrices.items()])
+    pot_extr = np.max([np.nanmax(np.abs(pot_matrix)) for _, pot_matrix in pot_matrices.items()])
+    dep_extr = np.max([np.nanmax(np.abs(dep_matrix)) for _, dep_matrix in dep_matrices.items()])
 
     fig = plt.figure(figsize=(20, 8))
     gs = gridspec.GridSpec(3, n+1, width_ratios=[10 for i in range(n)] + [1])

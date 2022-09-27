@@ -148,21 +148,12 @@ def get_figure_asthetics(circuit_config, target):
     yticks, yticklables, hlines = [], [], []
     for layer in range(2, 7):
         gids = _get_layer_E_gids(c, layer, target)
-        yticklables.append("L%i\n(%i)" % (layer, len(gids)))
-        ys = depths.loc[gids].to_numpy()
-        yticks.append(ys.mean())
-        if c_version == "v5":
-            if layer == 2:
-                hlines.append(ys.max())
-                hlines.append(ys.min())
-            else:
-                hlines.append(ys.min())
-        elif c_version == "v7":
-            # the SSCx is atlas based and doesn't have clear boundaries, so we'll just use top and bottom
-            if layer == 2:
-                hlines.append(ys.min())
-            elif layer == 6:
-                hlines.append(ys.max())
+        if len(gids):
+            yticklables.append("L%i\n(%i)" % (layer, len(gids)))
+            ys = depths.loc[gids].to_numpy()
+            yticks.append(ys.mean())
+            hlines.extend([ys.min(), ys.max()])
+    hlines = [np.min(hlines), np.max(hlines)]  # top and bottom of the circuit
     return depths, {"yticks": yticks, "yticklabels": yticklables, "hlines": hlines}
 
 
