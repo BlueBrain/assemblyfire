@@ -35,6 +35,10 @@ class Config(object):
         return f_name if os.path.isabs(f_name) else os.path.join(self.root_path, f_name)
 
     @property
+    def patterns_projection_name(self):
+        return os.path.split(self.pattern_gids_fname)[1].split('__')[0]
+
+    @property
     def h5f_name(self):
         f_name = self.config["h5_out"]["file_name"]
         return f_name if os.path.isabs(f_name) else os.path.join(self.root_path, f_name)

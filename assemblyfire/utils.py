@@ -1,6 +1,6 @@
 """
 Assembly detection related utility functions (mostly loading simulation related stuff)
-author: András Ecker, last update: 001.2022
+author: András Ecker, last update: 09.2022
 """
 
 import os
@@ -199,6 +199,26 @@ def get_rho0s(c, target):
     syn_df = get_syn_properties(c, syn_idx, [Synapse.PRE_GID, Synapse.POST_GID, "rho0_GB"])
     syn_df.columns = ["pre_gid", "post_gid", "rho"]
     return syn_df
+
+
+def determine_bins(unique_ns, counts, min_samples):
+    """Based on the long-tailed distribution of data, determines optimal binning,
+    to have minimum `min_samples` datapoints in each bin (used for calculating probabilities from those numbers)"""
+    cumsum, bin_edges = 0, [unique_ns[-1]]
+    for i, count in enumerate(counts[::-1]):  # assumes long tail (towards higher values)
+        cumsum += count
+        if cumsum > min_samples:
+            bin_edges.append(unique_ns[-(i+1)])
+            cumsum = 0
+    bin_edges = np.array(bin_edges[::-1])
+    diffs = np.diff(bin_edges)
+    bin_centers = []
+    for i, diff in enumerate(diffs):
+        if diff == 1:
+            bin_centers.append(bin_edges[i + 1])
+        else:
+            bin_centers.append(np.mean([bin_edges[i], bin_edges[i + 1]]))
+    return bin_edges, np.array(bin_centers)
 
 
 def save_syn_clusters(root_path, assembly_idx, cluster_df, late_assembly=False):

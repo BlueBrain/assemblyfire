@@ -3,6 +3,7 @@ Assembly detection related plots
 author: András Ecker, last update: 01.2022
 """
 
+import warnings
 import numpy as np
 from copy import deepcopy
 from scipy.cluster.hierarchy import dendrogram, set_link_color_palette
@@ -433,6 +434,27 @@ def plot_single_cell_features(gids, r_spikes, mean_ts, std_ts, ystuff, depths, b
     plt.close(fig)
 
 
+def plot_efficacy(efficacies, fig_name):
+    """Plots efficacies (depressed and potentiated) for synapses within assemblies (within one seed)"""
+    plt.rcParams["patch.edgecolor"] = "black"
+    assembly_labels = list(efficacies.keys())
+    n = len(assembly_labels)
+
+    fig = plt.figure(figsize=(20, 8))
+    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
+    gs = gridspec.GridSpec(n_rows, 5)
+    for i, assembly_label in enumerate(assembly_labels):
+        sizes = np.array([efficacies[assembly_label][0], efficacies[assembly_label][1]])
+        ratios = 100 * sizes / np.sum(sizes)
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        ax.pie(sizes, labels=["%.2f%%" % ratio for ratio in ratios], colors=[BLUE, RED])
+        ax.set_title("Assembly %i\n(nsyns=%.2fM)" % (assembly_label[0], (sizes[0]+sizes[1]) / 1e6))
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+    plt.rcParams["patch.edgecolor"] = "white"
+
+
 def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"):
     """Plots in degrees for assemblies (within one seed) and random controls"""
     assembly_labels = list(in_degrees.keys())
@@ -497,25 +519,31 @@ def plot_simplex_counts(simplex_counts, simplex_counts_control, fig_name):
     plt.close(fig)
 
 
-def plot_efficacy(efficacies, fig_name):
-    """Plots efficacies (depressed and potentiated) for synapses within assemblies (within one seed)"""
-    plt.rcParams["patch.edgecolor"] = "black"
-    assembly_labels = list(efficacies.keys())
-    n = len(assembly_labels)
+def plot_assembly_prob_from_innervation(bin_centers, assembly_probs, fig_name):
+    """Plots assembly membership probability vs. number of connections from pattern"""
+    pattern_names = np.sort(list(bin_centers.keys()))
+    if len(pattern_names) != len(PATTERN_COLORS):
+        warnings.warn("Not the expected %i pattern names are passed..." % len(PATTERN_COLORS))
+    assembly_labels = np.sort(list(assembly_probs[pattern_names[0]].keys()))
+    cmap = plt.cm.get_cmap("tab20", np.max([assembly_label for assembly_label in assembly_labels])+1)
 
     fig = plt.figure(figsize=(20, 8))
-    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
-    gs = gridspec.GridSpec(n_rows, 5)
-    for i, assembly_label in enumerate(assembly_labels):
-        sizes = np.array([efficacies[assembly_label][0], efficacies[assembly_label][1]])
-        ratios = 100 * sizes / np.sum(sizes)
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
-        ax.pie(sizes, labels=["%.2f%%" % ratio for ratio in ratios], colors=[BLUE, RED])
-        ax.set_title("Assembly %i\n(nsyns=%.2fM)" % (assembly_label[0], (sizes[0]+sizes[1]) / 1e6))
+    gs = gridspec.GridSpec(2, 5)
+    for i, pattern_name in enumerate(pattern_names):
+        ax = fig.add_subplot(gs[i])
+        for j, assembly_label in enumerate(assembly_labels):
+            ax.plot(bin_centers[pattern_name], assembly_probs[pattern_name][assembly_label], color=cmap(j))
+        ax.set_title("pattern %s" % pattern_name)
+        ax.set_xlim([0, bin_centers[pattern_name][-1] + 1])
+        ax.set_ylim([0, 1])
+    sns.despine(trim=True, offset=2)
+    fig.add_subplot(1, 1, 1, frameon=False)
+    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    plt.xlabel("#Connections from pattern")
+    plt.ylabel("Prob. of assembly membership")
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
-    plt.rcParams["patch.edgecolor"] = "white"
 
 
 def plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name):
