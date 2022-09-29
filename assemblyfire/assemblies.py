@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Classes to handle cell assemblies detected in the previous step of the pipeline
 authors: Michael Reimann, András Ecker, Daniela Egas Santander
@@ -446,7 +445,7 @@ class AssemblyGroup(object):
         :param other: Another AssemblyGroup object. If none provided, this object is used
         :param moment: Which statistical moment (see scipy.stats; "m" = mean, "v" = variance)
         :return: (numpy.array) The matrix of expected values for the size of overlaps between assemblies, based on
-        their respective sizes and the. Here, for all pairs of assemblies in this and other
+        their respective sizes and the ... Here, for all pairs of assemblies in this and other
         """
         if other is None:
             return self.expected_intersection_sizes(self)
@@ -459,7 +458,7 @@ class AssemblyGroup(object):
         :param other: Another AssemblyGroup object. If none provided, this object is used
         :param moment: Which statistical moment (see scipy.stats; "m" = mean, "v" = variance)
         :return: (numpy.array) The matrix of expected values for the size of overlaps between assemblies, based on
-        their respective sizes and the. Here, for all assemblies in this group and the corresponding one in the other
+        their respective sizes and the ... Here, for all assemblies in this group and the corresponding one in the other
         """
         if other is None:
             return self.expected_aligned_intersection_sizes(self)
