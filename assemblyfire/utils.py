@@ -4,6 +4,7 @@ author: András Ecker, last update: 001.2022
 """
 
 import os
+import pickle
 import h5py
 from collections import namedtuple
 import numpy as np
@@ -63,18 +64,6 @@ def get_sim_path(root_path):
     return sim_paths
 
 
-def save_syn_clusters(root_path, assembly_idx, cluster_df, late_assembly=False):
-    """Saves `cluster_df` with synapse clusters for given assembly"""
-    save_dir = os.path.join(root_path, "analyses", "seed%i_syn_clusters" % assembly_idx[1])
-    ensure_dir(save_dir)
-    if not late_assembly:
-        pklf_name = os.path.join(save_dir, "assembly%i.pkl" % assembly_idx[0])
-    else:
-        pklf_name = os.path.join(save_dir, "late_assembly%i.pkl" % assembly_idx[0])
-    cluster_df.sort_index(inplace=True)
-    cluster_df.to_pickle(pklf_name)
-
-
 def get_stimulus_stream(f_name, t_start, t_end):
     """Reads the series of presented patterns from .txt file"""
     stim_times, patterns = [], []
@@ -88,14 +77,20 @@ def get_stimulus_stream(f_name, t_start, t_end):
     return stim_times[idx], patterns[idx]
 
 
-def get_E_gids(c, target):
-    from bluepy.enums import Cell
-    return c.cells.ids({"$target": target, Cell.SYNAPSE_CLASS: "EXC"})
+def get_pattern_gids(pklf_name):
+    """Loads VPM gids corresponding to patterns from .pkl file"""
+    with open(pklf_name, "rb") as f:
+        pattern_gids = pickle.load(f)
+    return pattern_gids
 
 
-def _get_layer_E_gids(c, layer, target):
+def get_gids(c, target):
+    return c.cells.ids({"$target": target})
+
+
+def _get_layer_gids(c, layer, target):
     from bluepy.enums import Cell
-    return c.cells.ids({"$target": target, Cell.LAYER: layer, Cell.SYNAPSE_CLASS: "EXC"})
+    return c.cells.ids({"$target": target, Cell.LAYER: layer})
 
 
 def get_mtypes(c, gids):
@@ -136,7 +131,7 @@ def _guess_circuit_version(target):
 def get_figure_asthetics(circuit_config, target):
     """Gets gid depths, layer boundaries and cell numbers for figure asthetics"""
     c = get_bluepy_circuit(circuit_config)
-    gids = get_E_gids(c, target)
+    gids = get_gids(c, target)
     c_version = _guess_circuit_version(target)
     # get depths
     assert c_version in ["v5", "v7"], "Circuit version %s is not supported yet..." % c_version
@@ -147,7 +142,7 @@ def get_figure_asthetics(circuit_config, target):
     # get ystuff
     yticks, yticklables, hlines = [], [], []
     for layer in range(2, 7):
-        gids = _get_layer_E_gids(c, layer, target)
+        gids = _get_layer_gids(c, layer, target)
         if len(gids):
             yticklables.append("L%i\n(%i)" % (layer, len(gids)))
             ys = depths.loc[gids].to_numpy()
@@ -195,14 +190,27 @@ def get_syn_properties(c, syn_idx, properties):
     return c.connectome.synapse_properties(syn_idx, properties)
 
 
+# TODO: save a df and only load that here...
 def get_rho0s(c, target):
     """Get initial efficacies (rho0_GB in the sonata file) for all EXC synapses in the `target`"""
     from bluepy.enums import Synapse
-    gids = get_E_gids(c, target)
+    gids = get_gids(c, target)
     syn_idx = get_syn_idx(c, gids, gids)
     syn_df = get_syn_properties(c, syn_idx, [Synapse.PRE_GID, Synapse.POST_GID, "rho0_GB"])
     syn_df.columns = ["pre_gid", "post_gid", "rho"]
     return syn_df
+
+
+def save_syn_clusters(root_path, assembly_idx, cluster_df, late_assembly=False):
+    """Saves `cluster_df` with synapse clusters for given assembly"""
+    save_dir = os.path.join(root_path, "analyses", "seed%i_syn_clusters" % assembly_idx[1])
+    ensure_dir(save_dir)
+    if not late_assembly:
+        pklf_name = os.path.join(save_dir, "assembly%i.pkl" % assembly_idx[0])
+    else:
+        pklf_name = os.path.join(save_dir, "late_assembly%i.pkl" % assembly_idx[0])
+    cluster_df.sort_index(inplace=True)
+    cluster_df.to_pickle(pklf_name)
 
 
 def read_base_h5_metadata(h5f_name):

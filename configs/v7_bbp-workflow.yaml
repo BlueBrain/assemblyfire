@@ -1,6 +1,7 @@
 root_path: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/LayerWiseOUNoise_Ca1p05_PyramidPatterns"
 
-patterns_fname: "stimulus_stream__start2000__end181501__rate2__seed9.txt"
+input_patterns_fname: "input_spikes/stimulus_stream__start2000__end181501__rate2__seed9.txt"
+pattern_gids_fname: "input_spikes/Thalamocortical_input_VPM__hex_O1__supersample__nc100__pct12__seed9__pattern_gids.pkl"
 
 h5_out:
     file_name: "assemblies.h5"
@@ -14,7 +15,7 @@ h5_out:
 root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures/v7_assemblies"
 
 preprocessing_protocol:
-    target: "hex_O1"
+    target: "hex_O1Excitatory"
     t_start: 1500
     t_end: 182000
     bin_size: 20

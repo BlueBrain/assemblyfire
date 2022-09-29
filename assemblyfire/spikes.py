@@ -24,9 +24,9 @@ SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_
 
 def load_spikes(blueconfig_path, target, t_start, t_end):
     """Loads in spikes from simulations using bluepy"""
-    from assemblyfire.utils import get_bluepy_simulation, get_E_gids, get_spikes
+    from assemblyfire.utils import get_bluepy_simulation, get_gids, get_spikes
     sim = get_bluepy_simulation(blueconfig_path)
-    gids = get_E_gids(sim.circuit, target)
+    gids = get_gids(sim.circuit, target)
     spike_times, spiking_gids = get_spikes(sim, gids, t_start, t_end)
     return spike_times, spiking_gids
 
@@ -175,7 +175,7 @@ class SpikeMatrixGroup(Config):
                 gc.collect()
                 fig_name = os.path.join(self.fig_path, "rate_seed%i.png" % seed)
                 plot_rate(rate, rate_th, t_start, t_end, fig_name)
-        stim_times, patterns = get_stimulus_stream(self.patterns_fname, self.t_start, self.t_end)
+        stim_times, patterns = get_stimulus_stream(self.input_patterns_fname, self.t_start, self.t_end)
         project_metadata = {"root_path": self.root_path, "seeds": seeds, "t": ts,
                             "stim_times": stim_times, "patterns": patterns.tolist()}
         spikes_to_h5(self.h5f_name, spike_matrix_dict, project_metadata, prefix=self.h5_prefix_spikes)

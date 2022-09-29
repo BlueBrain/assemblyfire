@@ -1,6 +1,6 @@
 """
 Config file class
-authors: Thomas Delemontex and András Ecker; last update 01.2022
+authors: Thomas Delemontex and András Ecker; last update 09.2022
 """
 
 import os
@@ -25,8 +25,13 @@ class Config(object):
         return self.config["root_path"]
 
     @property
-    def patterns_fname(self):
-        f_name = self.config["patterns_fname"]
+    def input_patterns_fname(self):
+        f_name = self.config["input_patterns_fname"]
+        return f_name if os.path.isabs(f_name) else os.path.join(self.root_path, f_name)
+
+    @property
+    def pattern_gids_fname(self):
+        f_name = self.config["pattern_gids_fname"]
         return f_name if os.path.isabs(f_name) else os.path.join(self.root_path, f_name)
 
     @property
