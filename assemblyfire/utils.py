@@ -224,9 +224,9 @@ def determine_bins(unique_ns, counts, min_samples):
     return bin_edges, np.array(bin_centers)
 
 
-def save_syn_clusters(root_path, assembly_idx, cluster_df, late_assembly=False):
+def save_syn_clusters(save_dir_root, assembly_idx, cluster_df, late_assembly=False):
     """Saves `cluster_df` with synapse clusters for given assembly"""
-    save_dir = os.path.join(root_path, "analyses", "seed%i_syn_clusters" % assembly_idx[1])
+    save_dir = os.path.join(save_dir_root, "seed%i" % assembly_idx[1])
     ensure_dir(save_dir)
     if not late_assembly:
         pklf_name = os.path.join(save_dir, "assembly%i.pkl" % assembly_idx[0])

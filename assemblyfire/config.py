@@ -164,3 +164,11 @@ class Config(object):
     def syn_clustering_n_neurons_sample(self):
         return self.config["clustering"]["synapses"]["n_neurons_sample"]
 
+    @property
+    def syn_clustering_save_dir(self):
+        h5f_name = self.config["h5_out"]["file_name"].split('.')[0]
+        if h5f_name == "assemblies":
+            return os.path.join(self.root_path, "analyses", "syn_clusters")
+        else:
+            return os.path.join(self.root_path, "analyses", "syn_clusters" + h5f_name.split("assemblies")[1])
+

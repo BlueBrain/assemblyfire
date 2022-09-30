@@ -74,7 +74,7 @@ def run(config_path, debug):
                                               fig_dir=fig_dir, base_assembly_idx=assembly.idx[0], c=sim.circuit)
             else:
                 cluster_df = cluster_synapses(syn_df_gids, single_assembly_grp, target_range, min_nsyns)
-            utils.save_syn_clusters(config.root_path, assembly.idx, cluster_df)
+            utils.save_syn_clusters(config.syn_clustering_save_dir, assembly.idx, cluster_df)
             if assembly.idx[0] == 0:  # late assembly TODO: not hard code this distinction
                 gids = _get_rate_sorted_assembly_gids_within_target(sim, target_gids, assembly.gids, mtypes,
                                                                     n_samples, config.t_start, config.t_end)
@@ -84,7 +84,7 @@ def run(config_path, debug):
                                                        fig_dir=fig_dir, base_assembly_idx=assembly.idx[0], c=sim.circuit)
                 else:
                     late_cluster_df = cluster_synapses(syn_df_gids, assembly_grp, target_range, min_nsyns)
-                utils.save_syn_clusters(config.root_path, assembly.idx, late_cluster_df, late_assembly=True)
+                utils.save_syn_clusters(config.syn_clustering_save_dir, assembly.idx, late_cluster_df, late_assembly=True)
             # some extra plotting
             cluster_df["rho"] = utils.get_syn_properties(sim.circuit, cluster_df.index.to_numpy(),
                                                          ["rho0_GB"])["rho0_GB"]
