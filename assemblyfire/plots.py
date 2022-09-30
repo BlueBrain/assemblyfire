@@ -437,7 +437,7 @@ def plot_single_cell_features(gids, r_spikes, mean_ts, std_ts, ystuff, depths, b
 def plot_efficacy(efficacies, fig_name):
     """Plots efficacies (depressed and potentiated) for synapses within assemblies (within one seed)"""
     plt.rcParams["patch.edgecolor"] = "black"
-    assembly_labels = list(efficacies.keys())
+    assembly_labels = np.sort(list(efficacies.keys()))
     n = len(assembly_labels)
 
     fig = plt.figure(figsize=(20, 8))
@@ -457,7 +457,7 @@ def plot_efficacy(efficacies, fig_name):
 
 def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"):
     """Plots in degrees for assemblies (within one seed) and random controls"""
-    assembly_labels = list(in_degrees.keys())
+    assembly_labels = np.sort(list(in_degrees.keys()))
     n = len(assembly_labels)
     cmap = plt.cm.get_cmap("tab20", np.max([assembly_label[0] for assembly_label in assembly_labels])+1)
 
@@ -484,6 +484,31 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"
     fig.add_subplot(1, 1, 1, frameon=False)
     plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
     plt.xlabel(xlabel)
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_assembly_prob_from_indegree(bin_centers, assembly_probs, fig_name):
+    """Plots assembly membership probability vs. number of connections from pattern"""
+    assembly_labels = np.sort(list(assembly_probs.keys()))
+    n = len(assembly_labels)
+    cmap = plt.cm.get_cmap("tab20", np.max([assembly_label for assembly_label in assembly_labels])+1)
+
+    fig = plt.figure(figsize=(20, 8))
+    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
+    gs = gridspec.GridSpec(n_rows, 5)
+    for i, assembly_label in enumerate(assembly_labels):
+        ax = fig.add_subplot(gs[i])
+        ax.plot(bin_centers[assembly_label], assembly_probs[assembly_label], color=cmap(i))
+        ax.set_title("Assembly %s" % assembly_label)
+        ax.set_xlim([0, bin_centers[assembly_label][-1] + 1])
+        ax.set_ylim([0, 1])
+    sns.despine(trim=True, offset=2)
+    fig.add_subplot(1, 1, 1, frameon=False)
+    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    plt.xlabel("In degree")
+    plt.ylabel("Prob. of assembly membership")
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -533,7 +558,7 @@ def plot_assembly_prob_from_innervation(bin_centers, assembly_probs, fig_name):
         ax = fig.add_subplot(gs[i])
         for j, assembly_label in enumerate(assembly_labels):
             ax.plot(bin_centers[pattern_name], assembly_probs[pattern_name][assembly_label], color=cmap(j))
-        ax.set_title("pattern %s" % pattern_name)
+        ax.set_title("Pattern %s" % pattern_name)
         ax.set_xlim([0, bin_centers[pattern_name][-1] + 1])
         ax.set_ylim([0, 1])
     sns.despine(trim=True, offset=2)

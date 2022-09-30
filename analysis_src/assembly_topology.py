@@ -10,7 +10,8 @@ import numpy as np
 import assemblyfire.utils as utils
 from assemblyfire.config import Config
 from assemblyfire.topology import AssemblyTopology, in_degree_assemblies, simplex_counts_assemblies
-from assemblyfire.plots import plot_efficacy, plot_in_degrees, plot_simplex_counts, plot_assembly_prob_from_innervation
+from assemblyfire.plots import plot_efficacy, plot_in_degrees, plot_assembly_prob_from_indegree,\
+                               plot_simplex_counts, plot_assembly_prob_from_innervation
 
 
 def assembly_efficacy(config):
@@ -47,6 +48,32 @@ def assembly_in_degree(config):
         fig_name = os.path.join(config.fig_path, "cross_assembly_in_degrees_%s.png" % seed)
         plot_in_degrees(in_degree, in_degrees_control[seed], fig_name, xlabel="Cross assembly (any to 0) in degree")
     '''
+
+
+def assembly_prob_from_indegree(config, min_samples=100):
+    """Loads in assemblies and for each of them plots the probabilities of assembly membership
+    vs. in degree (from the assembly neurons)"""
+
+    conn_mat = AssemblyTopology.from_h5(config.h5f_name,
+                                        prefix=config.h5_prefix_connectivity, group_name="full_matrix")
+    all_gids = conn_mat.vertices["gid"].to_numpy()
+    assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+
+    for seed, assembly_grp in tqdm(assembly_grp_dict.items(), desc="Getting prob. vs. in-degrees"):
+        bin_centers_dict, assembly_probs = {}, {}
+        for assembly in assembly_grp.assemblies:
+            in_degrees = conn_mat.degree(assembly.gids, all_gids)
+            bin_edges, bin_centers = utils.determine_bins(*np.unique(in_degrees, return_counts=True), min_samples)
+            bin_idx = np.digitize(in_degrees, bin_edges, right=True)
+            probs = []
+            for i, center in enumerate(bin_centers):
+                idx = np.in1d(all_gids[bin_idx == i + 1], assembly.gids, assume_unique=True)
+                probs.append(idx.sum() / len(idx))
+            bin_centers_dict[assembly.idx[0]] = bin_centers
+            assembly_probs[assembly.idx[0]] = np.array(probs)
+
+        fig_name = os.path.join(config.fig_path, "assembly_prob_from_indegree_%s.png" % seed)
+        plot_assembly_prob_from_indegree(bin_centers_dict, assembly_probs, fig_name)
 
 
 def assembly_simplex_counts(config):
@@ -108,7 +135,7 @@ def assembly_prob_from_innervation(config, min_samples=100):
             for pattern_name, binned_gids_tmp in binned_gids.items():
                 probs = []
                 for bin_center in bin_centers[pattern_name]:
-                    idx = np.in1d(binned_gids_tmp[bin_center], assembly.gids)
+                    idx = np.in1d(binned_gids_tmp[bin_center], assembly.gids, assume_unique=True)
                     probs.append(idx.sum() / len(idx))
                 assembly_probs[pattern_name][assembly.idx[0]] = np.array(probs)
 
@@ -118,7 +145,8 @@ def assembly_prob_from_innervation(config, min_samples=100):
 
 if __name__ == "__main__":
     config = Config("../configs/v7_bbp-workflow.yaml")
-    # assembly_efficacy(config)
-    # assembly_in_degree(config)
-    # assembly_simplex_counts(config)
+    assembly_efficacy(config)
+    assembly_in_degree(config)
+    assembly_prob_from_indegree(config)
+    assembly_simplex_counts(config)
     assembly_prob_from_innervation(config)
