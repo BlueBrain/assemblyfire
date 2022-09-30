@@ -448,7 +448,7 @@ def plot_efficacy(efficacies, fig_name):
         ratios = 100 * sizes / np.sum(sizes)
         ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
         ax.pie(sizes, labels=["%.2f%%" % ratio for ratio in ratios], colors=[BLUE, RED])
-        ax.set_title("Assembly %i\n(nsyns=%.2fM)" % (assembly_label[0], (sizes[0]+sizes[1]) / 1e6))
+        ax.set_title("Assembly %i\n(nsyns=%.2fM)" % (assembly_label, (sizes[0]+sizes[1]) / 1e6))
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -457,7 +457,7 @@ def plot_efficacy(efficacies, fig_name):
 
 def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"):
     """Plots in degrees for assemblies (within one seed) and random controls"""
-    assembly_labels = np.sort(list(in_degrees.keys()))
+    assembly_labels = list(in_degrees.keys())
     n = len(assembly_labels)
     cmap = plt.cm.get_cmap("tab20", np.max([assembly_label[0] for assembly_label in assembly_labels])+1)
 
@@ -866,9 +866,9 @@ def plot_assembly_intersection_corr(intersection_corrs, xlabel, ylabel, fig_name
                   vmin=-abs_max, vmax=abs_max)
     fig.colorbar(i, label="intersection correlation")
     ax.set_xlabel(xlabel)
-    ax.set_xticks([i for i in range(intersection_corrs.shape[0])])
+    # ax.set_xticks([i for i in range(intersection_corrs.shape[0])])
     ax.set_ylabel(ylabel)
-    ax.set_xticks([i for i in range(intersection_corrs.shape[1])])
+    # ax.set_xticks([i for i in range(intersection_corrs.shape[1])])
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 

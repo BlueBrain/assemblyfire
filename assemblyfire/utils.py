@@ -190,14 +190,13 @@ def get_syn_properties(c, syn_idx, properties):
     return c.connectome.synapse_properties(syn_idx, properties)
 
 
-# TODO: save a df and only load that here...
 def get_rho0s(c, target):
     """Get initial efficacies (rho0_GB in the sonata file) for all EXC synapses in the `target`"""
     from bluepy.enums import Synapse
     gids = get_gids(c, target)
     syn_idx = get_syn_idx(c, gids, gids)
     syn_df = get_syn_properties(c, syn_idx, [Synapse.PRE_GID, Synapse.POST_GID, "rho0_GB"])
-    syn_df.columns = ["pre_gid", "post_gid", "rho"]
+    syn_df.rename(columns={Synapse.PRE_GID: "pre_gid", Synapse.POST_GID: "post_gid", "rho0_GB": "rho"}, inplace=True)
     return syn_df
 
 
