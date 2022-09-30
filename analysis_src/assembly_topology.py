@@ -10,7 +10,7 @@ import numpy as np
 import assemblyfire.utils as utils
 from assemblyfire.config import Config
 from assemblyfire.topology import AssemblyTopology, in_degree_assemblies, simplex_counts_assemblies
-from assemblyfire.plots import plot_efficacy, plot_in_degrees, plot_simplex_counts, assembly_prob_from_innervation
+from assemblyfire.plots import plot_efficacy, plot_in_degrees, plot_simplex_counts, plot_assembly_prob_from_innervation
 
 
 def assembly_efficacy(config):
@@ -102,7 +102,7 @@ def assembly_prob_from_innervation(config, min_samples=100):
     pattern_nconns, all_gids = get_pattern_innervation(config)
     binned_gids, bin_centers = _bin_gids_by_innervation(pattern_nconns, all_gids, min_samples)
 
-    for seed, assembly_grp in tqdm(assembly_grp_dict.items()):
+    for seed, assembly_grp in assembly_grp_dict.items():
         assembly_probs = {pattern_name: {} for pattern_name in list(pattern_nconns.keys())}
         for assembly in assembly_grp.assemblies:
             for pattern_name, binned_gids_tmp in binned_gids.items():
