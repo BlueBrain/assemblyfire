@@ -138,6 +138,14 @@ class Config(object):
         return self.config["clustering"]["assemblies"]["method"]
 
     @property
+    def syn_clustering_target(self):
+        return self.config["clustering"]["synapses"]["target"]
+
+    @property
+    def syn_clustering_lookup_df_pklfname(self):
+        return self.config["clustering"]["synapses"]["lookup_df_pklfname"]
+
+    @property
     def syn_clustering_target_range(self):
         return self.config["clustering"]["synapses"]["target_range"]
 

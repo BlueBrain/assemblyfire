@@ -8,13 +8,12 @@ of spike matrix projected to PCA space a la Herzog et al. 2021.
 Then "core-cells" and cell assemblies are detected with correlation
 based methods from (Montijn et al. 2016 and) Herzog et al. 2021
 Assemblies are clustered into consensus assemblies via hierarchical clustering
-authors: András Ecker, Michael Reimann; last modified: 01.2022
+authors: András Ecker, Michael Reimann; last modified: 09.2022
 """
 
 import os
 import logging
 from tqdm import tqdm
-from copy import deepcopy
 import numpy as np
 import multiprocessing as mp
 from scipy.optimize import curve_fit
@@ -382,11 +381,10 @@ def cluster_assemblies(assemblies, n_assemblies, distance_metric, linkage_method
 def _create_lookups(syn_df, assembly_grp):
     """Create dicts with synapse idx and fraction of those (compared to total) for all assemblies
     in the `assembly_grp`. (As neurons can be part of more than 1 assembly, `fracs` won't add up to 1)"""
-    from bluepy.enums import Synapse
     syn_idx, fracs = {}, {}
     all_assembly_syn_idx = np.array([], dtype=int)
     for assembly in assembly_grp:
-        assembly_syns = syn_df[Synapse.PRE_GID].isin(assembly.gids).to_numpy()
+        assembly_syns = syn_df["pre_gid"].isin(assembly.gids).to_numpy()
         assembly_frac = sum(assembly_syns) / len(assembly_syns)
         fracs["assembly%i" % assembly.idx[0]] = assembly_frac
         assembly_syn_idx = np.nonzero(assembly_syns)[0]
@@ -465,49 +463,39 @@ def merge_clusters(clusters):
     return clusters
 
 
-def cluster_synapses(sim, post_gids, assembly_grp, base_assembly_idx,
-                     target_range, min_nsyns, log_sign_th=5.0, fig_dir=None):
+def cluster_synapses(syn_df, assembly_grp, target_range, min_nsyns, log_sign_th=5.0,
+                     fig_dir=None, base_assembly_idx=None, c=None):
     """
     Finds `min_nsyns` sized clusters of synapses within `target_range` (um) and tests their significance
-    against a Poisson model (see `distance_model()` above) on all `post_gids` from the assemblies
+    against a Poisson model (see `distance_model()` above) on all post_gids (passed in `syn_df`) from the assemblies
     passed in the `assembly_grp`
-    :param sim: bleupy simulation object (used only for .circuit and .target)
-    :param post_gids: selected gids from the assembly in which the function will look for synapse clusters
+    :param syn_df: pandas DataFrame with synapse properties: pre-post gid, section id, x,y,z coordinates
     :param assembly_grp: AssemblyGroup object - synapse clusters (on `post_gids`) will be detected
                          from all assemblies passed (and for the remaining non-assembly neurons)
-    :param base_assembly_idx: ID of the base assembly in the group (if more than 1 is passed in `assembly_grp`)
-                              (This is only used for naming figures if `fig_dir` is not None)
     :param target_range: max distance from synapse center to consider for clustering
     :param min_nsyns: minimum number of synapses within one cluster
     :param log_sign_th: significance threshold (after taking log of p-values)
     :param fig_dir: optional debugging - if a proper dir. name is passed figures will be saved there
+    :param base_assembly_idx: ID of the base assembly in the group (if more than 1 is passed in `assembly_grp`)
+                              (This is only used for naming figures if `fig_dir` is not None)
+    :param c: bleupy Circuit object (used only for getting the morphologies if `fig_dir` is not None)
     :return: cluster_df: pandas DataFrame with one row per synapse and one column per 'label'
                          (for labels see `_create_lookups()` above)
                          placeholder: -100, synapse belonging to the label: -1, and synapse cluster idx start at 0
     """
     import pandas as pd
-    import assemblyfire.utils as utils
-    # as a circuit is passed `utils.get_bluepy_circuit()` would have thrown an error if bluepy was not installed...
-    from bluepy.enums import Synapse
-    xyz = [Synapse.POST_X_CENTER, Synapse.POST_Y_CENTER, Synapse.POST_Z_CENTER]
-    syn_properties = [Synapse.PRE_GID, Synapse.POST_GID, Synapse.POST_SECTION_ID] + xyz
-    if fig_dir is not None:
-        utils.ensure_dir(fig_dir)
 
-    c = sim.circuit
-    gids = utils.get_E_gids(c, sim.target)
-    # get all necessary synapse properties in one go (and chunk later in the loop)
-    syn_df = utils.get_syn_properties(c, utils.get_syn_idx(c, gids, post_gids), syn_properties)
+    xyz = ["x", "y", "z"]
     cluster_dfs = []
-    for gid in post_gids:
-        syn_df_gid = syn_df.loc[syn_df[Synapse.POST_GID] == gid]
+    for gid in syn_df["post_gid"].unique():
+        syn_df_gid = syn_df.loc[syn_df["post_gid"] == gid]
         syn_idx_dict, fracs = _create_lookups(syn_df_gid, assembly_grp)
-        dists = syn_distances(syn_df_gid, Synapse.POST_SECTION_ID, xyz)
+        dists = syn_distances(syn_df_gid, "section_id", xyz)
         if fig_dir is not None:
             fig_name = os.path.join(fig_dir, "assembly%i_a%i_synapse_dists.png" % (base_assembly_idx, gid))
-            models = distance_model(deepcopy(dists), fracs, target_range, fig_name=fig_name)
+            models = distance_model(dists.copy(), fracs, target_range, fig_name=fig_name)
         else:
-            models = distance_model(deepcopy(dists), fracs, target_range)
+            models = distance_model(dists.copy(), fracs, target_range)
         labels = list(syn_idx_dict.keys())
         results = -100 * np.ones((dists.shape[0], len(labels)), dtype=int)
         for i, label in enumerate(labels):
@@ -523,7 +511,7 @@ def cluster_synapses(sim, post_gids, assembly_grp, base_assembly_idx,
                 merged_clusters = merge_clusters(raw_clusters)
                 row_idx, col_idx = np.nonzero(merged_clusters)
                 results[syn_idx[row_idx], i] = col_idx  # set cluster labels (starting at 0)
-        data = np.concatenate((syn_df_gid[[Synapse.PRE_GID, Synapse.POST_GID]].to_numpy(), results), axis=1)
+        data = np.concatenate((syn_df_gid[["pre_gid", "post_gid"]].to_numpy(), results), axis=1)
         cluster_df = pd.DataFrame(data=data, index=syn_df_gid.index, columns=["pre_gid", "post_gid"] + labels)
         if fig_dir is not None:
             from assemblyfire.plots import plot_synapse_clusters

@@ -201,6 +201,10 @@ def get_rho0s(c, target):
     return syn_df
 
 
+def load_pkl_df(pklf_name):
+    return pd.read_pickle(pklf_name)
+
+
 def determine_bins(unique_ns, counts, min_samples):
     """Based on the long-tailed distribution of data, determines optimal binning,
     to have minimum `min_samples` datapoints in each bin (used for calculating probabilities from those numbers)"""
