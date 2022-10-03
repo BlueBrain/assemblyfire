@@ -238,7 +238,7 @@ def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
                 sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix, min_n_clusts=overwrite_seeds[seed],
                                                                  max_n_clusts=overwrite_seeds[seed])
             fig_name = os.path.join(fig_path, "similarity_matrix_seed%i.png" % seed)
-            plot_sim_matrix(sim_matrix, t_bins, stim_times[idx], patterns[idx], fig_name)
+            plot_sim_matrix(sim_matrix.copy(), t_bins, stim_times[idx], patterns[idx], fig_name)
             fig_name = os.path.join(fig_path, "ward_clustering_seed%i.png" % seed)
             plot_dendogram_silhouettes(clusters, *plotting, fig_name)
         elif method == "density_based":
@@ -378,13 +378,13 @@ def cluster_assemblies(assemblies, n_assemblies, distance_metric, linkage_method
     return sim_matrix, clusters - 1, plotting
 
 
-def _create_lookups(syn_df, assembly_grp):
+def _create_lookups(loc_df, assembly_grp):
     """Create dicts with synapse idx and fraction of those (compared to total) for all assemblies
     in the `assembly_grp`. (As neurons can be part of more than 1 assembly, `fracs` won't add up to 1)"""
     syn_idx, fracs = {}, {}
     all_assembly_syn_idx = np.array([], dtype=int)
     for assembly in assembly_grp:
-        assembly_syns = syn_df["pre_gid"].isin(assembly.gids).to_numpy()
+        assembly_syns = loc_df["pre_gid"].isin(assembly.gids).to_numpy()
         assembly_frac = sum(assembly_syns) / len(assembly_syns)
         fracs["assembly%i" % assembly.idx[0]] = assembly_frac
         assembly_syn_idx = np.nonzero(assembly_syns)[0]
@@ -392,19 +392,19 @@ def _create_lookups(syn_df, assembly_grp):
         all_assembly_syn_idx = np.concatenate((all_assembly_syn_idx, assembly_syn_idx))
     # finds synapses that aren't coming from any assembly
     all_assembly_syn_idx = np.unique(all_assembly_syn_idx)  # neurons can be part of more than 1 assemblies...
-    non_assembly_syn_idx = np.arange(len(syn_df))
+    non_assembly_syn_idx = np.arange(len(loc_df))
     non_assembly_syn_idx = non_assembly_syn_idx[np.in1d(non_assembly_syn_idx, all_assembly_syn_idx,
                                                         assume_unique=True, invert=True)]
-    assert (len(all_assembly_syn_idx) + len(non_assembly_syn_idx) == len(syn_df)), "Synapse numbers don't add up..."
+    assert (len(all_assembly_syn_idx) + len(non_assembly_syn_idx) == len(loc_df)), "Synapse numbers don't add up..."
     syn_idx["non_assembly"] = non_assembly_syn_idx
-    fracs["non_assembly"] = len(non_assembly_syn_idx) / len(syn_df)
+    fracs["non_assembly"] = len(non_assembly_syn_idx) / len(loc_df)
     return syn_idx, fracs
 
 
-def syn_distances(syn_df, mask_col, xzy_cols):
+def syn_distances(loc_df, mask_col, xzy_cols):
     """Return (Euclidean) distance between synapses on the same section (the rest is masked with nans)"""
-    dists = squareform(pdist(syn_df[xzy_cols].to_numpy()))
-    mask = squareform(pdist(syn_df[mask_col].to_numpy().reshape(-1, 1)))
+    dists = squareform(pdist(loc_df[xzy_cols].to_numpy()))
+    mask = squareform(pdist(loc_df[mask_col].to_numpy().reshape(-1, 1)))
     dists[mask > 0] = np.nan
     np.fill_diagonal(dists, np.nan)
     return dists
@@ -463,13 +463,13 @@ def merge_clusters(clusters):
     return clusters
 
 
-def cluster_synapses(syn_df, assembly_grp, target_range, min_nsyns, log_sign_th=5.0,
+def cluster_synapses(loc_df, assembly_grp, target_range, min_nsyns, log_sign_th=5.0,
                      fig_dir=None, base_assembly_idx=None, c=None):
     """
     Finds `min_nsyns` sized clusters of synapses within `target_range` (um) and tests their significance
-    against a Poisson model (see `distance_model()` above) on all post_gids (passed in `syn_df`) from the assemblies
+    against a Poisson model (see `distance_model()` above) on all post_gids (passed in `loc_df`) from the assemblies
     passed in the `assembly_grp`
-    :param syn_df: pandas DataFrame with synapse properties: pre-post gid, section id, x,y,z coordinates
+    :param loc_df: pandas DataFrame with synapse properties: pre-post gid, section id, x,y,z coordinates
     :param assembly_grp: AssemblyGroup object - synapse clusters (on `post_gids`) will be detected
                          from all assemblies passed (and for the remaining non-assembly neurons)
     :param target_range: max distance from synapse center to consider for clustering
@@ -487,10 +487,10 @@ def cluster_synapses(syn_df, assembly_grp, target_range, min_nsyns, log_sign_th=
 
     xyz = ["x", "y", "z"]
     cluster_dfs = []
-    for gid in syn_df["post_gid"].unique():
-        syn_df_gid = syn_df.loc[syn_df["post_gid"] == gid]
-        syn_idx_dict, fracs = _create_lookups(syn_df_gid, assembly_grp)
-        dists = syn_distances(syn_df_gid, "section_id", xyz)
+    for gid in loc_df["post_gid"].unique():
+        loc_df_gid = loc_df.loc[loc_df["post_gid"] == gid]
+        syn_idx_dict, fracs = _create_lookups(loc_df_gid, assembly_grp)
+        dists = syn_distances(loc_df_gid, "section_id", xyz)
         if fig_dir is not None:
             fig_name = os.path.join(fig_dir, "assembly%i_a%i_synapse_dists.png" % (base_assembly_idx, gid))
             models = distance_model(dists.copy(), fracs, target_range, fig_name=fig_name)
@@ -511,12 +511,12 @@ def cluster_synapses(syn_df, assembly_grp, target_range, min_nsyns, log_sign_th=
                 merged_clusters = merge_clusters(raw_clusters)
                 row_idx, col_idx = np.nonzero(merged_clusters)
                 results[syn_idx[row_idx], i] = col_idx  # set cluster labels (starting at 0)
-        data = np.concatenate((syn_df_gid[["pre_gid", "post_gid"]].to_numpy(), results), axis=1)
-        cluster_df = pd.DataFrame(data=data, index=syn_df_gid.index, columns=["pre_gid", "post_gid"] + labels)
+        data = np.concatenate((loc_df_gid[["pre_gid", "post_gid"]].to_numpy(), results), axis=1)
+        cluster_df = pd.DataFrame(data=data, index=loc_df_gid.index, columns=["pre_gid", "post_gid"] + labels)
         if fig_dir is not None:
             from assemblyfire.plots import plot_synapse_clusters
             morph = c.morph.get(int(gid), transform=True)
             fig_name = os.path.join(fig_dir, "assembly%i_a%i_synapse_clusters.png" % (base_assembly_idx, gid))
-            plot_synapse_clusters(morph, pd.concat((cluster_df[labels], syn_df_gid[xyz]), axis=1), xyz, fig_name)
+            plot_synapse_clusters(morph, pd.concat((cluster_df[labels], loc_df_gid[xyz]), axis=1), xyz, fig_name)
         cluster_dfs.append(cluster_df)
     return pd.concat(cluster_dfs)

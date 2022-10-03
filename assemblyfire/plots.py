@@ -5,7 +5,6 @@ author: András Ecker, last update: 01.2022
 
 import warnings
 import numpy as np
-from copy import deepcopy
 from scipy.cluster.hierarchy import dendrogram, set_link_color_palette
 import matplotlib
 matplotlib.use("Agg")
@@ -37,25 +36,29 @@ def plot_rate(rate, rate_th, t_start, t_end, fig_name):
     plt.close(fig)
 
 
-def _get_pattern_idx(t_bins, stim_times):
-    """Maps stimulus times to column idx in the spike_matrix
-    Note: doesn't guarantee that the time bin is gonna be *after* the stim presentation"""
-    return [np.abs(t_bins - t).argmin() for t in stim_times]
+def _get_pattern_idx(t_bins, stim_times, patterns):
+    """Maps stimulus times to column idx in the spike_matrix"""
+    t_idx, significant_patterns = [], []
+    for pattern, t_start, t_end in zip(patterns, stim_times[:-1], stim_times[1:]):
+        idx = np.where((t_start <= t_bins) & (t_bins < t_end))[0]
+        if len(idx):
+            t_idx.append(idx[t_bins[idx].argmin()])
+            significant_patterns.append(pattern)
+    return t_idx, significant_patterns
 
 
 def plot_sim_matrix(sim_matrix, t_bins, stim_times, patterns, fig_name):
     """Plots similarity matrix"""
-    t_idx = _get_pattern_idx(t_bins, stim_times)
-    sim_mat = deepcopy(sim_matrix)
-    np.fill_diagonal(sim_mat, np.nan)
+    t_idx, sign_patterns = _get_pattern_idx(t_bins, stim_times, patterns)
+    np.fill_diagonal(sim_matrix, np.nan)
     fig = plt.figure(figsize=(10, 9))
     ax = fig.add_subplot(1, 1, 1)
-    i = ax.imshow(sim_mat, cmap="cividis", aspect="auto", interpolation="none")
+    i = ax.imshow(sim_matrix, cmap="cividis", aspect="auto", interpolation="none")
     fig.colorbar(i)
-    ax.set_xticks(t_idx); ax.set_xticklabels(patterns)
+    ax.set_xticks(t_idx); ax.set_xticklabels(sign_patterns)
     ax.xaxis.tick_top()
     ax.set_xlabel("time bins")
-    ax.set_yticks(t_idx); ax.set_yticklabels(patterns)
+    ax.set_yticks(t_idx); ax.set_yticklabels(sign_patterns)
     ax.set_ylabel("time bins")
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -83,13 +86,13 @@ def plot_sims_vs_rate_and_tdiff(sim_matrix, pw_avg_rate, t_offsets, mean_sims, f
 
 def plot_transformed(transformed, t_bins, stim_times, patterns, fig_name):
     """Plots time series in factor analysis/PCA space"""
-    t_idx = _get_pattern_idx(t_bins, stim_times)
+    t_idx, sign_patterns = _get_pattern_idx(t_bins, stim_times, patterns)
     transformed_T = transformed.T
     fig = plt.figure(figsize=(20, 8))
     ax = fig.add_subplot(1, 1, 1)
     ax.imshow(transformed_T, cmap="coolwarm", aspect="auto")
     ax.set_xlabel("time bins")
-    ax.set_xticks(t_idx); ax.set_xticklabels(patterns)
+    ax.set_xticks(t_idx); ax.set_xticklabels(sign_patterns)
     ax.xaxis.tick_top()
     ax.set_ylabel("components")
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
@@ -200,21 +203,21 @@ def _group_by_patterns(clusters, t_bins, stim_times, patterns):
     pattern_names, counts = np.unique(patterns, return_counts=True)
     max_count = np.max(counts)
 
-    pattern_idx = _get_pattern_idx(t_bins, stim_times)
+    t_idx, sign_patterns = _get_pattern_idx(t_bins, stim_times, patterns)
     extended_pattern_idx = []
-    for t_start, t_end in zip(pattern_idx[:-1], pattern_idx[1:]):
+    for t_start, t_end in zip(t_idx[:-1], t_idx[1:]):
         extended_pattern_idx.append(np.arange(t_start, t_end))
-    extended_pattern_idx.append(np.arange(pattern_idx[-1], len(t_bins)-1))
+    extended_pattern_idx.append(np.arange(t_idx[-1], len(t_bins)-1))
     max_len = np.max([len(idx) for idx in extended_pattern_idx])
 
     pattern_matrices = {pattern: np.full((max_count, max_len), np.nan) for pattern in pattern_names}
     row_idx = {pattern: 0 for pattern in pattern_names}
-    for pattern, idx in zip(patterns, extended_pattern_idx):
+    for pattern, idx in zip(sign_patterns, extended_pattern_idx):
         clusters_slice = clusters[idx]
         pattern_matrices[pattern][row_idx[pattern], 0:len(clusters_slice)] = clusters_slice
         row_idx[pattern] += 1
 
-    return pattern_idx, pattern_matrices, row_idx
+    return t_idx, sign_patterns, pattern_matrices, row_idx
 
 
 def update(changed_image):
@@ -229,7 +232,7 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
     """plots sequence of time bins color coded by clusters"""
     cmap = plt.cm.get_cmap("tab20", len(np.unique(clusters)))
     images = []
-    t_idx, pattern_matrices, row_idx = _group_by_patterns(clusters, t_bins, stim_times, patterns)
+    t_idx, sign_patterns, pattern_matrices, row_idx = _group_by_patterns(clusters, t_bins, stim_times, patterns)
     clusters = np.reshape(clusters, (1, len(clusters)))
 
     fig = plt.figure(figsize=(20, 8))
@@ -240,7 +243,7 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
     images.append(i_base)
     cax = divider.new_vertical(size="50%", pad=0.1, pack_start=True)
     fig.add_axes(cax)
-    ax.set_xticks(t_idx); ax.set_xticklabels(patterns)
+    ax.set_xticks(t_idx); ax.set_xticklabels(sign_patterns)
     ax.xaxis.tick_top()
     ax.set_yticks([])
     for i, (name, matrix) in enumerate(pattern_matrices.items()):
@@ -249,7 +252,8 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
         images.append(i)
         ax.set_title(name)
         ax.set_xticks([])
-        ax.set_yticks([0, row_idx[name]-1])
+        y_max = row_idx[name]-1 if row_idx[name] != 0 else 0
+        ax.set_yticks([0, y_max])
     # set one colorbar for all images
     vmin = min(image.get_array().min() for image in images)
     vmax = max(image.get_array().max() for image in images)
@@ -272,7 +276,7 @@ def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, f
     cmap = colors.ListedColormap(cols)
     bounds = np.arange(-1.5, n_clusters)
     norm = colors.BoundaryNorm(bounds, cmap.N)
-    t_idx, pattern_matrices, row_idx = _group_by_patterns(clusters, t_bins, stim_times, patterns)
+    t_idx, sign_patterns, pattern_matrices, row_idx = _group_by_patterns(clusters, t_bins, stim_times, patterns)
     clusters = np.reshape(clusters, (1, len(clusters)))
 
     fig = plt.figure(figsize=(20, 8))
@@ -283,7 +287,7 @@ def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, f
     cax = divider.new_vertical(size="50%", pad=0.1, pack_start=True)
     fig.add_axes(cax)
     fig.colorbar(i_base, cax=cax, orientation="horizontal", ticks=np.arange(-1, n_clusters))
-    ax.set_xticks(t_idx); ax.set_xticklabels(patterns)
+    ax.set_xticks(t_idx); ax.set_xticklabels(sign_patterns)
     ax.xaxis.tick_top()
     ax.set_yticks([])
     for i, (name, matrix) in enumerate(pattern_matrices.items()):
@@ -291,7 +295,8 @@ def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, f
         ax.imshow(matrix, cmap=cmap, norm=norm, aspect="auto")
         ax.set_title(name)
         ax.set_xticks([])
-        ax.set_yticks([0, row_idx[name]-1])
+        y_max = row_idx[name]-1 if row_idx[name] != 0 else 0
+        ax.set_yticks([0, y_max])
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -302,7 +307,7 @@ def plot_pattern_clusters(clusters, t_bins, stim_times, patterns, fig_name):
     n = len(np.unique(clusters))
     cmap = plt.cm.get_cmap("tab20", n)
     cols = [colors.to_hex(cmap(i)) for i in range(n)]
-    _, pattern_matrices, _ = _group_by_patterns(clusters, t_bins, stim_times, patterns)
+    _, _, pattern_matrices, _ = _group_by_patterns(clusters, t_bins, stim_times, patterns)
 
     fig = plt.figure(figsize=(20, 8))
     gs = gridspec.GridSpec(2, 5)
@@ -332,8 +337,8 @@ def plot_pattern_cons_clusters(cons_clusters_dict, t_bins_dict, stim_times_dict,
     patter_names = []
     keys = list(cons_clusters_dict.keys())
     for key in keys:
-        _, pattern_matrices, _ = _group_by_patterns(cons_clusters_dict[key], t_bins_dict[key],
-                                                    stim_times_dict[key], patterns_dict[key])
+        _, _, pattern_matrices, _ = _group_by_patterns(cons_clusters_dict[key], t_bins_dict[key],
+                                                       stim_times_dict[key], patterns_dict[key])
         for pattern_name, matrix in pattern_matrices.items():
             if pattern_name not in heights_dict:
                 heights_dict[pattern_name] = np.zeros(n_clusters)
@@ -595,14 +600,13 @@ def plot_frac_entropy_explained_by_innervation(mi_df, fig_name, xlabel="Innervat
 
 def plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name):
     """Plots similarity matrix of assemblies"""
-    sim_mat = deepcopy(sim_matrix)
-    np.fill_diagonal(sim_mat, np.nan)
+    np.fill_diagonal(sim_matrix, np.nan)
     n_assemblies_cum = [0] + np.cumsum(n_assemblies).tolist()
 
     fig = plt.figure(figsize=(10, 9))
     ax = fig.add_subplot(1, 1, 1)
-    i = ax.imshow(sim_mat, cmap="cividis", aspect="auto", interpolation="none",
-                  extent=(0, sim_mat.shape[1], sim_mat.shape[0], 0))
+    i = ax.imshow(sim_matrix, cmap="cividis", aspect="auto", interpolation="none",
+                  extent=(0, sim_matrix.shape[1], sim_matrix.shape[0], 0))
     fig.colorbar(i)
     ax.set_xticks(n_assemblies_cum)
     ax.set_yticks(n_assemblies_cum)

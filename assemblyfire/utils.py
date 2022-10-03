@@ -161,6 +161,10 @@ def get_spikes(sim, gids, t_start, t_end):
     return spikes.index.to_numpy(), spikes.to_numpy()
 
 
+def load_pkl_df(pklf_name):
+    return pd.read_pickle(pklf_name)
+
+
 def _il_isin(whom, where, parallel):
     """Sirio's in line np.isin() using joblib as parallel backend"""
     if parallel:
@@ -190,6 +194,30 @@ def get_syn_properties(c, syn_idx, properties):
     return c.connectome.synapse_properties(syn_idx, properties)
 
 
+def get_loc_df(loc_pklf_name, c, target, subtarget):
+    """Loads in synapse location related parameters for selected cells
+    (and if the target contains other cells than the selected ones get the values for those on the fly."""
+    loc_df = load_pkl_df(loc_pklf_name)  # load the saved version
+    df_gids = loc_df["post_gid"].unique()
+    target_gids = get_gids(c, subtarget)
+    # check if there are more gids stored than the target and if so, index out target only
+    idx = np.in1d(df_gids, target_gids)
+    if idx.sum() < len(idx):
+        loc_df = loc_df.loc[loc_df["post_gid"].isin(df_gids[idx])]
+    # check if there are any gids missing and if so, get their synapse idx and location related properties
+    extra_gids = np.setdiff1d(target_gids, df_gids)
+    if len(extra_gids):
+        from bluepy.enums import Synapse
+        syn_idx = get_syn_idx(c, get_gids(c, target), extra_gids)
+        extra_loc_df = get_syn_properties(c, syn_idx, [Synapse.PRE_GID, Synapse.POST_GID, Synapse.POST_SECTION_ID,
+                                                       Synapse.POST_X_CENTER, Synapse.POST_Y_CENTER, Synapse.POST_Z_CENTER])
+        extra_loc_df.rename(columns={Synapse.PRE_GID: "pre_gid", Synapse.POST_GID: "post_gid",
+                                     Synapse.POST_SECTION_ID: "section_id", Synapse.POST_X_CENTER: "x",
+                                     Synapse.POST_Y_CENTER: "y", Synapse.POST_Z_CENTER: "z"}, inplace=True)
+        loc_df = pd.concat([loc_df, extra_loc_df]).sort_index()
+    return loc_df
+
+
 def get_rho0s(c, target):
     """Get initial efficacies (rho0_GB in the sonata file) for all EXC synapses in the `target`"""
     from bluepy.enums import Synapse
@@ -198,10 +226,6 @@ def get_rho0s(c, target):
     syn_df = get_syn_properties(c, syn_idx, [Synapse.PRE_GID, Synapse.POST_GID, "rho0_GB"])
     syn_df.rename(columns={Synapse.PRE_GID: "pre_gid", Synapse.POST_GID: "post_gid", "rho0_GB": "rho"}, inplace=True)
     return syn_df
-
-
-def load_pkl_df(pklf_name):
-    return pd.read_pickle(pklf_name)
 
 
 def determine_bins(unique_ns, counts, min_samples):
