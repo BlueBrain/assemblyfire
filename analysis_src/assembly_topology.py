@@ -11,7 +11,7 @@ import assemblyfire.utils as utils
 from assemblyfire.config import Config
 from assemblyfire.topology import AssemblyTopology, in_degree_assemblies, simplex_counts_assemblies
 from assemblyfire.plots import plot_efficacy, plot_in_degrees, plot_assembly_prob_from_indegree,\
-                               plot_simplex_counts, plot_assembly_prob_from_innervation
+                               plot_simplex_counts, plot_assembly_prob_from_innervation, plot_frac_entropy_explained_by_innervation
 
 
 def assembly_efficacy(config):
@@ -143,6 +143,52 @@ def assembly_prob_from_innervation(config, min_samples=100):
         plot_assembly_prob_from_innervation(bin_centers, assembly_probs, fig_name)
 
 
+def _mi_implementation(degree_counts, degree_p):
+    import numpy
+    def entropy(p):
+        return -numpy.log2(p) * p - numpy.log2(1 - p) * (1 - p)
+    
+    def entropy_vec(p_vec):
+        return numpy.nansum(numpy.vstack([
+            -numpy.log2(p_vec) * p_vec,
+            -numpy.log2(1 - p_vec) * (1 - p_vec)
+        ]), axis=0)
+    
+    degree_counts = numpy.array(degree_counts); degree_p = numpy.array(degree_p)
+    
+    overall_p = (degree_counts * degree_p).sum() / degree_counts.sum()
+    membership_entropy = entropy(overall_p)
+    
+    posterior_entropy = (entropy_vec(degree_p) * degree_counts).sum() / degree_counts.sum()
+    
+    return membership_entropy, posterior_entropy
+
+
+def fraction_entropy_explained(config, min_samples=100):
+    """Contributed by MWR. Re-using a lot of assembly_prob_from_innervation. Better implementation possible"""
+    import pandas
+
+    assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+    pattern_nconns, all_gids = get_pattern_innervation(config)
+    binned_gids, bin_centers = _bin_gids_by_innervation(pattern_nconns, all_gids, min_samples)
+
+    for seed, assembly_grp in assembly_grp_dict.items():
+        assembly_mi = {pattern_name: {} for pattern_name in list(pattern_nconns.keys())}
+        
+        for assembly in assembly_grp.assemblies:
+            for pattern_name, binned_gids_tmp in binned_gids.items():
+                probs = []; counts = []
+                for bin_center in bin_centers[pattern_name]:
+                    idx = np.in1d(binned_gids_tmp[bin_center], assembly.gids, assume_unique=True)
+                    probs.append(idx.sum() / len(idx))
+                    counts.append(len(binned_gids_tmp[bin_center]))
+                me, pe = _mi_implementation(counts, probs)
+                assembly_mi[pattern_name][assembly.idx[0]] = 1.0 - pe / me
+        
+        fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_tc_innervation_%s.png" % seed)
+        plot_frac_entropy_explained_by_innervation(pandas.DataFrame(assembly_mi), fig_name)
+
+
 if __name__ == "__main__":
     config = Config("../configs/v7_bbp-workflow.yaml")
     assembly_efficacy(config)
@@ -150,3 +196,4 @@ if __name__ == "__main__":
     assembly_prob_from_indegree(config)
     assembly_simplex_counts(config)
     assembly_prob_from_innervation(config)
+    fraction_entropy_explained(config)

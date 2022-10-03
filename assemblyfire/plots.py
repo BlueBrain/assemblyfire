@@ -571,6 +571,25 @@ def plot_assembly_prob_from_innervation(bin_centers, assembly_probs, fig_name):
     plt.close(fig)
 
 
+def plot_frac_entropy_explained_by_innervation(mi_df, fig_name):
+    fig = plt.figure(figsize=(7, 4))
+    ax = fig.gca()
+
+    plt.colorbar(ax.imshow(mi_df))
+
+    ax.set_xticks(range(len(mi_df.columns)))
+    ax.set_xticklabels(mi_df.columns.values)
+    ax.set_xlabel("Innervation by pattern")
+
+    ax.set_yticks(range(len(mi_df.index)))
+    ax.set_yticklabels(mi_df.index.values)
+    ax.set_ylabel("Assembly membership")
+
+    ax.set_title("Relative loss in entropy")
+
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+
+
 def plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name):
     """Plots similarity matrix of assemblies"""
     sim_mat = deepcopy(sim_matrix)
