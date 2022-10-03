@@ -770,7 +770,7 @@ def consensus_over_seeds_hc(assembly_grp_dict, h5f_name, h5_prefix, fig_path,
                                                         distance_metric, linkage_method)
     # plotting clustering results
     fig_name = os.path.join(fig_path, "simmat_assemblies_%s.png" % distance_metric)
-    plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name)
+    plot_assembly_sim_matrix(sim_matrix.copy(), n_assemblies, fig_name)
     fig_name = os.path.join(fig_path, "%s_clustering_assemblies.png" % linkage_method)
     plot_dendogram_silhouettes(clusters, *plotting, fig_name)
 

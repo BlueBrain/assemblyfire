@@ -238,7 +238,7 @@ def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
                 sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix, min_n_clusts=overwrite_seeds[seed],
                                                                  max_n_clusts=overwrite_seeds[seed])
             fig_name = os.path.join(fig_path, "similarity_matrix_seed%i.png" % seed)
-            plot_sim_matrix(sim_matrix, t_bins, stim_times[idx], patterns[idx], fig_name)
+            plot_sim_matrix(sim_matrix.copy(), t_bins, stim_times[idx], patterns[idx], fig_name)
             fig_name = os.path.join(fig_path, "ward_clustering_seed%i.png" % seed)
             plot_dendogram_silhouettes(clusters, *plotting, fig_name)
         elif method == "density_based":
