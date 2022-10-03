@@ -180,7 +180,7 @@ def _mi_implementation(degree_counts, degree_p):
     return membership_entropy, posterior_entropy
 
 
-def sign_of_correlation(degree_vals, degree_p):
+def _sign_of_correlation(degree_vals, degree_p):
     """
     Analyzes whether the strength of innervation from a given pre-synaptic target (in terms of in-degree) is rather 
     increasing (positive sign) or decreasing (negative sign) the probability that the innervated neuron is member of
@@ -201,7 +201,7 @@ def sign_of_correlation(degree_vals, degree_p):
     return numpy.sign(numpy.polyfit(degree_vals[idxx], degree_p[idxx], 1)[0])
 
 
-def fraction_entropy_explained(config, min_samples=100):
+def fraction_entropy_explained_by_tc(config, min_samples=100):
     """Contributed by MWR. Re-using a lot of assembly_prob_from_innervation. Better implementation possible"""
     import pandas
 
@@ -221,10 +221,45 @@ def fraction_entropy_explained(config, min_samples=100):
                     counts.append(len(binned_gids_tmp[bin_center]))
                     vals.append(bin_center)
                 me, pe = _mi_implementation(counts, probs)
-                assembly_mi[pattern_name][assembly.idx[0]] = (1.0 - pe / me) * sign_of_correlation(vals, probs)
+                assembly_mi[pattern_name][assembly.idx[0]] = (1.0 - pe / me) * _sign_of_correlation(vals, probs)
         
         fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_tc_innervation_%s.png" % seed)
-        plot_frac_entropy_explained_by_innervation(pandas.DataFrame(assembly_mi), fig_name)
+        plot_frac_entropy_explained_by_innervation(pandas.DataFrame(assembly_mi), fig_name, xlabel="Innervation by pattern")
+
+
+def fraction_entropy_explained_by_recursive(config, min_samples=100):
+    import numpy, pandas
+    from conntility.connectivity import ConnectivityMatrix
+
+    conmat = ConnectivityMatrix.from_h5(config.h5f_name, prefix=config.h5_prefix_connectivity,
+                                        group_name="full_matrix")
+    
+    assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+    for seed, assembly_grp in assembly_grp_dict.items():
+
+        assembly_nconns = {}
+
+        for asmbly in assembly_grp.assemblies:
+            asmbly_ncon = numpy.array(conmat.submatrix(asmbly.gids, sub_gids_post=conmat.gids).sum(axis=0))[0]
+            assembly_nconns[asmbly.idx[0]] = asmbly_ncon
+
+        binned_gids, bin_centers = _bin_gids_by_innervation(assembly_nconns, conmat.gids, min_samples)
+
+        assembly_mi = {assembly_deg: {} for assembly_deg in list(assembly_nconns.keys())}
+
+        for assembly_mmbr in assembly_grp.assemblies:
+            for assembly_deg, binned_gids_tmp in binned_gids.items():
+                probs = []; counts = []; vals = []
+                for bin_center in bin_centers[assembly_deg]:
+                    idx = np.in1d(binned_gids_tmp[bin_center], assembly_mmbr.gids, assume_unique=True)
+                    probs.append(idx.sum() / len(idx))
+                    counts.append(len(binned_gids_tmp[bin_center]))
+                    vals.append(bin_center)
+                me, pe = _mi_implementation(counts, probs) # control=True
+                assembly_mi[assembly_deg][assembly_mmbr.idx[0]] = _sign_of_correlation(vals, probs) * (1.0 - pe / me)
+        
+        fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_recursive_innervation_%s.png" % seed)
+        plot_frac_entropy_explained_by_innervation(pandas.DataFrame(assembly_mi), fig_name, xlabel="Innervation by assembly")
 
 
 if __name__ == "__main__":
@@ -234,4 +269,5 @@ if __name__ == "__main__":
     assembly_prob_from_indegree(config)
     assembly_simplex_counts(config)
     assembly_prob_from_innervation(config)
-    fraction_entropy_explained(config)
+    fraction_entropy_explained_by_tc(config)
+    fraction_entropy_explained_by_recursive(config, min_samples=100)
