@@ -144,6 +144,22 @@ def assembly_prob_from_innervation(config, min_samples=100):
 
 
 def _mi_implementation(degree_counts, degree_p):
+    """
+    Analyzes how much of the uncertainty of assembly membership is explained away when one considers the strengths
+    of innervations from a given pre-synaptic target (in terms of in-degree).
+
+    Args:
+        degree_counts (list, or numpy.array): The number of neurons in the simulation that have a given degree. One 
+        entry per degree-bin.
+        degree_p (list, or numpy.array): The probability that neurons with a given degree are members of the assembly
+        in question. Must have same length as degree_counts.
+        Note: Yes, for this analysis the actual _value_ of a degree-bin (which min/max degree does it represent?) is
+        irrelevant.
+
+    Returns:
+        membership_entropy (float): The prior entropy of assembly membership.
+        posterior_entropy (float): The posterior entropy of assembly membership conditional on the innervation degree.
+    """
     import numpy
     def entropy(p):
         return -numpy.log2(p) * p - numpy.log2(1 - p) * (1 - p)
@@ -164,6 +180,27 @@ def _mi_implementation(degree_counts, degree_p):
     return membership_entropy, posterior_entropy
 
 
+def sign_of_correlation(degree_vals, degree_p):
+    """
+    Analyzes whether the strength of innervation from a given pre-synaptic target (in terms of in-degree) is rather 
+    increasing (positive sign) or decreasing (negative sign) the probability that the innervated neuron is member of
+    an assembly.
+
+    Args:
+        degree_vals (list, or numpy.array): The possible values of degrees for the innervated neurons. E.g. the centers
+        of degree-bins.
+        degree_p (list, or numpy.array): The probability that neurons with a given degree are members of the assembly
+        in question. Must have same length as degree_vals.
+    
+    Returns: 
+        sign (int): -1 if stronger innervation decreases probability of membership; 1 if it rather increases it
+    """
+    import numpy
+    degree_vals = numpy.array(degree_vals); degree_p = numpy.array(degree_p)
+    idxx = numpy.argsort(degree_vals)
+    return numpy.sign(numpy.polyfit(degree_vals[idxx], degree_p[idxx], 1)[0])
+
+
 def fraction_entropy_explained(config, min_samples=100):
     """Contributed by MWR. Re-using a lot of assembly_prob_from_innervation. Better implementation possible"""
     import pandas
@@ -177,13 +214,14 @@ def fraction_entropy_explained(config, min_samples=100):
         
         for assembly in assembly_grp.assemblies:
             for pattern_name, binned_gids_tmp in binned_gids.items():
-                probs = []; counts = []
+                probs = []; counts = []; vals = []
                 for bin_center in bin_centers[pattern_name]:
                     idx = np.in1d(binned_gids_tmp[bin_center], assembly.gids, assume_unique=True)
                     probs.append(idx.sum() / len(idx))
                     counts.append(len(binned_gids_tmp[bin_center]))
+                    vals.append(bin_center)
                 me, pe = _mi_implementation(counts, probs)
-                assembly_mi[pattern_name][assembly.idx[0]] = 1.0 - pe / me
+                assembly_mi[pattern_name][assembly.idx[0]] = (1.0 - pe / me) * sign_of_correlation(vals, probs)
         
         fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_tc_innervation_%s.png" % seed)
         plot_frac_entropy_explained_by_innervation(pandas.DataFrame(assembly_mi), fig_name)
