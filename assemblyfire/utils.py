@@ -88,6 +88,11 @@ def get_gids(c, target):
     return c.cells.ids({"$target": target})
 
 
+def get_mtype_gids(c, target, mtype):
+    from bluepy.enums import Cell
+    return c.cells.ids({"$target": target, Cell.MTYPE: mtype})
+
+
 def _get_layer_gids(c, layer, target):
     from bluepy.enums import Cell
     return c.cells.ids({"$target": target, Cell.LAYER: layer})
