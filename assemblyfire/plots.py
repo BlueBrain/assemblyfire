@@ -576,15 +576,18 @@ def plot_assembly_prob_from_innervation(bin_centers, assembly_probs, fig_name):
     plt.close(fig)
 
 
-def plot_frac_entropy_explained_by_innervation(mi_df, fig_name):
+def plot_frac_entropy_explained_by_innervation(mi_df, fig_name, xlabel="Innervating entity"):
+    import numpy
     fig = plt.figure(figsize=(7, 4))
     ax = fig.gca()
 
-    plt.colorbar(ax.imshow(mi_df))
+    img = ax.imshow(mi_df)
+    img.set_clim(numpy.max(img.get_clim()) * numpy.array([-1, 1]))
+    plt.colorbar(img)
 
     ax.set_xticks(range(len(mi_df.columns)))
     ax.set_xticklabels(mi_df.columns.values)
-    ax.set_xlabel("Innervation by pattern")
+    ax.set_xlabel(xlabel)
 
     ax.set_yticks(range(len(mi_df.index)))
     ax.set_yticklabels(mi_df.index.values)
