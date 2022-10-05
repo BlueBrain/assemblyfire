@@ -19,13 +19,13 @@ class AssemblyTopology(ConnectivityMatrix):
         """Return in/out degrees of the (symmetric) subarray specified by `pre_gids`
         (if `post_gids` is given as well, then the subarray will be asymmetric)"""
         if pre_gids is not None:
-            array = self.subarray(pre_gids, sub_gids_post=post_gids)
+            matrix = self.submatrix(pre_gids, sub_gids_post=post_gids)
         else:
-            array = self.array
+            matrix = self.matrix
         if kind == "in":
-            return np.sum(array, axis=0)
+            return np.array(matrix.sum(axis=0)).flatten()
         elif kind == "out":
-            return np.sum(array, axis=1)
+            return np.array(matrix.sum(axis=1)).flatten()
         else:
             ValueError("Need to specify 'in' or 'out' degree!")
 
