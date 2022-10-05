@@ -6,13 +6,12 @@ last modified: András Ecker 09.2022
 import os
 from tqdm import tqdm
 import numpy as np
+import pandas as pd
 
 import assemblyfire.utils as utils
+import assemblyfire.plots as plots
 from assemblyfire.config import Config
 from assemblyfire.topology import AssemblyTopology, in_degree_assemblies, simplex_counts_assemblies
-from assemblyfire.plots import plot_efficacy, plot_in_degrees, plot_assembly_prob_from_indegree,\
-                               plot_simplex_counts, plot_assembly_prob_from_innervation,\
-                               plot_frac_entropy_explained_by_innervation
 
 
 def assembly_efficacy(config):
@@ -27,7 +26,7 @@ def assembly_efficacy(config):
                                                 & rhos["post_gid"].isin(assembly.gids), "rho"].value_counts()
                       for assembly in assembly_grp.assemblies}
         fig_name = os.path.join(config.fig_path, "efficacy_%s.png" % seed)
-        plot_efficacy(efficacies, fig_name)
+        plots.plot_efficacy(efficacies, fig_name)
 
 
 def assembly_in_degree(config):
@@ -41,40 +40,41 @@ def assembly_in_degree(config):
     in_degrees, in_degrees_control = in_degree_assemblies(assembly_grp_dict, conn_mat)
     for seed, in_degree in in_degrees.items():
         fig_name = os.path.join(config.fig_path, "in_degrees_%s.png" % seed)
-        plot_in_degrees(in_degree, in_degrees_control[seed], fig_name)
+        plots.plot_in_degrees(in_degree, in_degrees_control[seed], fig_name)
 
     '''
     in_degrees, in_degrees_control = in_degree_assemblies(assembly_grp_dict, conn_mat, post_id=0)
     for seed, in_degree in in_degrees.items():
         fig_name = os.path.join(config.fig_path, "cross_assembly_in_degrees_%s.png" % seed)
-        plot_in_degrees(in_degree, in_degrees_control[seed], fig_name, xlabel="Cross assembly (any to 0) in degree")
+        plots.plot_in_degrees(in_degree, in_degrees_control[seed], fig_name, xlabel="Cross assembly (any to 0) in degree")
     '''
 
 
-def assembly_prob_from_indegree(config, min_samples=100):
-    """Loads in assemblies and for each of them plots the probabilities of assembly membership
-    vs. in degree (from the assembly neurons)"""
+def assembly_simplex_counts(config):
+    """Loads in assemblies and plots simplex counts (seed by seed
+    and then for all instantiations per consensus assemblies)"""
 
     conn_mat = AssemblyTopology.from_h5(config.h5f_name,
                                         prefix=config.h5_prefix_connectivity, group_name="full_matrix")
-    all_gids = conn_mat.gids
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
 
-    for seed, assembly_grp in tqdm(assembly_grp_dict.items(), desc="Getting prob. vs. in-degrees"):
-        bin_centers_dict, assembly_probs = {}, {}
-        for assembly in assembly_grp.assemblies:
-            in_degrees = conn_mat.degree(assembly.gids, all_gids)
-            bin_edges, bin_centers = utils.determine_bins(*np.unique(in_degrees, return_counts=True), min_samples)
-            bin_idx = np.digitize(in_degrees, bin_edges, right=True)
-            probs = []
-            for i, center in enumerate(bin_centers):
-                idx = np.in1d(all_gids[bin_idx == i + 1], assembly.gids, assume_unique=True)
-                probs.append(idx.sum() / len(idx))
-            bin_centers_dict[assembly.idx[0]] = bin_centers
-            assembly_probs[assembly.idx[0]] = np.array(probs)
+    simplex_counts, simplex_counts_control = simplex_counts_assemblies(assembly_grp_dict, conn_mat)
+    for seed, simplices in simplex_counts.items():
+        fig_name = os.path.join(config.fig_path, "simplex_counts_%s.png" % seed)
+        plots.plot_simplex_counts(simplices, simplex_counts_control[seed], fig_name)
 
-        fig_name = os.path.join(config.fig_path, "assembly_prob_from_indegree_%s.png" % seed)
-        plot_assembly_prob_from_indegree(bin_centers_dict, assembly_probs, fig_name)
+
+def _bin_gids_by_innervation(nconns_dict, gids, min_samples):
+    """Creates lookups of gids in optimal bins for each pattern
+    (optimal bins are determined based on their thalamic innervation profile)"""
+    binned_gids, bin_centers_dict = {key: {} for key in list(nconns_dict.keys())}, {}
+    for key, nconns in nconns_dict.items():
+        bin_edges, bin_centers = utils.determine_bins(*np.unique(nconns, return_counts=True), min_samples)
+        bin_centers_dict[key] = bin_centers
+        bin_idx = np.digitize(nconns, bin_edges, right=True)
+        for i, center in enumerate(bin_centers):
+            binned_gids[key][center] = gids[bin_idx == i+1]
+    return binned_gids, bin_centers_dict
 
 
 def _mi_implementation(degree_counts, degree_p):
@@ -118,8 +118,9 @@ def _sign_of_correlation(degree_vals, degree_p):
 
 
 def frac_entropy_explained_by_indegree(config, min_samples=100):
-    """Loads in assemblies and for each of them plots the (relative) loss in entropy from innervation by the assembly.
-    i.e. How much percent of the uncertainty (in assembly membership) can be explained by pure structural innervation"""
+    """Loads in assemblies and for each of them plots the probabilities of assembly membership
+    vs. in degree (from the assembly neurons) as well as the (relative) loss in entropy. i.e. How much percent
+    of the uncertainty (in assembly membership) can be explained by pure structural innervation"""
 
     conn_mat = AssemblyTopology.from_h5(config.h5f_name,
                                         prefix=config.h5_prefix_connectivity, group_name="full_matrix")
@@ -131,35 +132,24 @@ def frac_entropy_explained_by_indegree(config, min_samples=100):
                            for assembly in assembly_grp.assemblies}
         binned_gids, bin_centers = _bin_gids_by_innervation(assembly_nconns, all_gids, min_samples)
 
-        assembly_mi = {assembly_deg: {} for assembly_deg in list(assembly_nconns.keys())}
+        assembly_probs, assembly_mi = {}, {assembly_deg: {} for assembly_deg in list(assembly_nconns.keys())}
         for assembly in assembly_grp.assemblies:
-            for assembly_deg, binned_gids_tmp in binned_gids.items():
+            for pre_assembly, binned_gids_tmp in binned_gids.items():
                 probs, counts, vals = [], [], []
-                for bin_center in bin_centers[assembly_deg]:
+                for bin_center in bin_centers[pre_assembly]:
                     idx = np.in1d(binned_gids_tmp[bin_center], assembly.gids, assume_unique=True)
                     probs.append(idx.sum() / len(idx))
                     counts.append(len(binned_gids_tmp[bin_center]))
                     vals.append(bin_center)
+                if pre_assembly == assembly.idx[0]:
+                    assembly_probs[assembly.idx[0]] = np.array(probs)
                 me, pe = _mi_implementation(counts, probs)
-                assembly_mi[assembly_deg][assembly.idx[0]] = _sign_of_correlation(vals, probs) * (1.0 - pe / me)
+                assembly_mi[pre_assembly][assembly.idx[0]] = _sign_of_correlation(vals, probs) * (1.0 - pe / me)
 
+        fig_name = os.path.join(config.fig_path, "assembly_prob_from_indegree_%s.png" % seed)
+        plots.plot_assembly_prob_from(bin_centers, assembly_probs, "In degree", fig_name)
         fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_recurrent_innervation_%s.png" % seed)
-        plot_frac_entropy_explained_by_innervation(pd.DataFrame(assembly_mi), fig_name,
-                                                   xlabel="Innervation by assembly")
-
-
-def assembly_simplex_counts(config):
-    """Loads in assemblies and plots simplex counts (seed by seed
-    and then for all instantiations per consensus assemblies)"""
-
-    conn_mat = AssemblyTopology.from_h5(config.h5f_name,
-                                        prefix=config.h5_prefix_connectivity, group_name="full_matrix")
-    assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
-
-    simplex_counts, simplex_counts_control = simplex_counts_assemblies(assembly_grp_dict, conn_mat)
-    for seed, simplices in simplex_counts.items():
-        fig_name = os.path.join(config.fig_path, "simplex_counts_%s.png" % seed)
-        plot_simplex_counts(simplices, simplex_counts_control[seed], fig_name)
+        plots.plot_frac_entropy_explained_by(pd.DataFrame(assembly_mi), "Innervation by assembly", fig_name)
 
 
 def get_pattern_innervation(config):
@@ -180,22 +170,10 @@ def get_pattern_innervation(config):
     return pattern_nconns, post_gids
 
 
-def _bin_gids_by_innervation(nconns_dict, gids, min_samples):
-    """Creates lookups of gids in optimal bins for each pattern
-    (optimal bins are determined based on their thalamic innervation profile)"""
-    binned_gids, bin_centers_dict = {key: {} for key in list(nconns_dict.keys())}, {}
-    for key, nconns in nconns_dict.items():
-        bin_edges, bin_centers = utils.determine_bins(*np.unique(nconns, return_counts=True), min_samples)
-        bin_centers_dict[key] = bin_centers
-        bin_idx = np.digitize(nconns, bin_edges, right=True)
-        for i, center in enumerate(bin_centers):
-            binned_gids[key][center] = gids[bin_idx == i+1]
-    return binned_gids, bin_centers_dict
-
-
-def assembly_prob_from_innervation(config, min_samples=100):
+def frac_entropy_explained_by_patterns(config, min_samples=100):
     """Loads in assemblies and for each of them plots the probabilities of assembly membership
-    vs. purely structural innervation by the input patterns"""
+    vs. purely structural innervation by the input patterns as well as the (relative) loss in entropy i.e. How much
+    percent of the uncertainty (in assembly membership) can be explained by pure structural innervation from VPM"""
 
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
     pattern_nconns, all_gids = get_pattern_innervation(config)
@@ -203,27 +181,6 @@ def assembly_prob_from_innervation(config, min_samples=100):
 
     for seed, assembly_grp in assembly_grp_dict.items():
         assembly_probs = {pattern_name: {} for pattern_name in list(pattern_nconns.keys())}
-        for assembly in assembly_grp.assemblies:
-            for pattern_name, binned_gids_tmp in binned_gids.items():
-                probs = []
-                for bin_center in bin_centers[pattern_name]:
-                    idx = np.in1d(binned_gids_tmp[bin_center], assembly.gids, assume_unique=True)
-                    probs.append(idx.sum() / len(idx))
-                assembly_probs[pattern_name][assembly.idx[0]] = np.array(probs)
-
-        fig_name = os.path.join(config.fig_path, "assembly_prob_from_innervation_%s.png" % seed)
-        plot_assembly_prob_from_innervation(bin_centers, assembly_probs, fig_name)
-
-
-def frac_entropy_explained_by_innervation(config, min_samples=100):
-    """Loads in assemblies and for each of them plots the (relative) loss in entropy from innervation by the patterns
-    i.e. How much percent of the uncertainty (in assembly membership) can be explained by pure structural innervation"""
-
-    assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
-    pattern_nconns, all_gids = get_pattern_innervation(config)
-    binned_gids, bin_centers = _bin_gids_by_innervation(pattern_nconns, all_gids, min_samples)
-
-    for seed, assembly_grp in assembly_grp_dict.items():
         assembly_mi = {pattern_name: {} for pattern_name in list(pattern_nconns.keys())}
         for assembly in assembly_grp.assemblies:
             for pattern_name, binned_gids_tmp in binned_gids.items():
@@ -233,17 +190,21 @@ def frac_entropy_explained_by_innervation(config, min_samples=100):
                     probs.append(idx.sum() / len(idx))
                     counts.append(len(binned_gids_tmp[bin_center]))
                     vals.append(bin_center)
+                assembly_probs[pattern_name][assembly.idx[0]] = np.array(probs)
                 me, pe = _mi_implementation(counts, probs)
                 assembly_mi[pattern_name][assembly.idx[0]] = (1.0 - pe / me) * _sign_of_correlation(vals, probs)
-        
-        fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_tc_innervation_%s.png" % seed)
-        plot_frac_entropy_explained_by_innervation(pd.DataFrame(assembly_mi), fig_name, xlabel="Innervation by pattern")
+
+        fig_name = os.path.join(config.fig_path, "assembly_prob_from_patterns_%s.png" % seed)
+        plots.plot_assembly_prob_from_patterns(bin_centers, assembly_probs, fig_name)
+        fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_patterns_%s.png" % seed)
+        plots.plot_frac_entropy_explained_by(pd.DataFrame(assembly_mi), "Innervation by pattern", fig_name)
 
 
-def assembly_min_syn_dists():
-    """Loads in assemblies and for each (sub)target neurons calculates the (normalized) mean minimum distance
-    between assembly synapses (which is meant to be a parameter free measure of synapse clustering)"""
-    from assemblyfire.clustering import assembly_min_syn_distances
+def assembly_prob_from_syn_nnd(config, min_samples=100):
+    """Loads in assemblies and for each (sub)target neurons calculates the (normalized) nearest neighbour distance
+    for assembly synapses (which is meant to be a parameter free measure of synapse clustering) and plots the prob.
+    of assembly membership vs. this measure"""
+    from assemblyfire.clustering import syn_nearest_neighbour_distances
 
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
     c = utils.get_bluepy_circuit(utils.get_sim_path(config.root_path).iloc[0])
@@ -253,7 +214,27 @@ def assembly_min_syn_dists():
 
     for seed, assembly_grp in assembly_grp_dict.items():
         ctrl_assembly_grp = assembly_grp.random_categorical_controls(mtypes, "mtype")
-        assembly_msd, ctrl_msd = assembly_min_syn_distances(loc_df, assembly_grp, ctrl_assembly_grp)
+        assembly_nnd, ctrl_nnd = syn_nearest_neighbour_distances(loc_df, assembly_grp, ctrl_assembly_grp)
+        all_gids = assembly_nnd.index.to_numpy()
+        all_nnd_ratios = assembly_nnd / ctrl_nnd  # not used atm.
+
+        bin_centers_dict, assembly_probs = {}, {}
+        for assembly in assembly_grp.assemblies:
+            nnd = assembly_nnd["assembly%i" % assembly.idx[0]].to_numpy()
+            # neg. values happen where there aren't enough synapses (on the same section) to define the metric
+            idx = np.where(nnd > 0.)[0]
+            all_gids_tmp, nnd = all_gids[idx], nnd[idx]
+            bin_edges, bin_centers = utils.determine_bins(*np.unique(nnd, return_counts=True), min_samples)
+            bin_idx = np.digitize(nnd, bin_edges, right=True)
+            probs = []
+            for i, center in enumerate(bin_centers):
+                idx = np.in1d(all_gids_tmp[bin_idx == i + 1], assembly.gids, assume_unique=True)
+                probs.append(idx.sum() / len(idx))
+            bin_centers_dict[assembly.idx[0]] = bin_centers
+            assembly_probs[assembly.idx[0]] = np.array(probs)
+
+        fig_name = os.path.join(config.fig_path, "assembly_prob_from_syn_nearest_neighbour_%s.png" % seed)
+        plots.plot_assembly_prob_from(bin_centers_dict, assembly_probs, "Synapse nearest neighbour distance", fig_name)
 
 
 if __name__ == "__main__":
@@ -263,6 +244,6 @@ if __name__ == "__main__":
     assembly_prob_from_indegree(config)
     frac_entropy_explained_by_indegree(config)
     assembly_simplex_counts(config)
-    assembly_prob_from_innervation(config)
-    frac_entropy_explained_by_innervation(config)
+    frac_entropy_explained_by_patterns(config)
+    assembly_prob_from_syn_nnd(config)
 
