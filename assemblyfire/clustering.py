@@ -28,7 +28,6 @@ from sklearn.metrics import pairwise_distances, silhouette_score, silhouette_sam
 
 L = logging.getLogger("assemblyfire")
 XYZ = ["x", "y", "z"]
-EPSILON = 1E-5
 
 
 def cosine_similarity(X):
@@ -413,10 +412,10 @@ def syn_distances(loc_df, mask_col, xzy_cols):
     return dists
 
 
-def assembly_min_syn_distances(loc_df, assembly_grp, ctrl_assembly_grp, agg_fn=np.median):
+def syn_nearest_neighbour_distances(loc_df, assembly_grp, ctrl_assembly_grp, agg_fn=np.median, min_nsyns=10):
     """For each postsynaptic neuron passed in `loc_df` iterate over all assemblies (and their controls)
-    and for each synapse finds the minimum distance to other synapses coming from the same assembly (or control).
-    It returns the aggregated (min, mean, median whatever) value of these min. distances per neuron per assembly."""
+    and for each synapse finds the distance to the nearest neighbouring synapse coming from the same assembly (or control).
+    It returns the aggregated (min, mean, median whatever) value of these nn. distances per neuron per assembly."""
 
     # initialize big arrays for storing data (will be converted to pandas DFs at the end)
     post_gids = loc_df["post_gid"].unique()
@@ -434,16 +433,13 @@ def assembly_min_syn_distances(loc_df, assembly_grp, ctrl_assembly_grp, agg_fn=n
         for j, assembly_label in enumerate(assembly_labels):
             sub_dists = dists[np.ix_(syn_idx[assembly_label], syn_idx[assembly_label])]
             sub_dists = sub_dists[:, ~np.all(np.isnan(sub_dists), axis=1)]
-            if sub_dists.shape[1]:
+            if sub_dists.shape[1] > min_nsyns:
                 data[i, j] = agg_fn(np.nanmin(sub_dists, axis=0))
             ctrl_sub_dists = dists[np.ix_(ctrl_syn_idx[assembly_label], ctrl_syn_idx[assembly_label])]
             ctrl_sub_dists = ctrl_sub_dists[:, ~np.all(np.isnan(ctrl_sub_dists), axis=1)]
-            if ctrl_sub_dists.shape[1]:
+            if ctrl_sub_dists.shape[1] > min_nsyns:
                 ctrl_data[i, j] = agg_fn(np.nanmin(ctrl_sub_dists, axis=0))
         del loc_df_gid, dists
-    # fix the fact that sometimes it happens that synapses are placed at the same location (and their distance is: 0.0)
-    data[data == 0.] = EPSILON
-    ctrl_data[ctrl_data == 0.] = EPSILON
 
     assembly_df = pd.DataFrame(data=data, index=post_gids, columns=assembly_labels)
     ctrl_df = pd.DataFrame(data=ctrl_data, index=post_gids, columns=assembly_labels)
