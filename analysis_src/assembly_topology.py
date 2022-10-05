@@ -11,7 +11,8 @@ import assemblyfire.utils as utils
 from assemblyfire.config import Config
 from assemblyfire.topology import AssemblyTopology, in_degree_assemblies, simplex_counts_assemblies
 from assemblyfire.plots import plot_efficacy, plot_in_degrees, plot_assembly_prob_from_indegree,\
-                               plot_simplex_counts, plot_assembly_prob_from_innervation, plot_frac_entropy_explained_by_innervation
+                               plot_simplex_counts, plot_assembly_prob_from_innervation,\
+                               plot_frac_entropy_explained_by_innervation
 
 
 def assembly_efficacy(config):
@@ -56,7 +57,7 @@ def assembly_prob_from_indegree(config, min_samples=100):
 
     conn_mat = AssemblyTopology.from_h5(config.h5f_name,
                                         prefix=config.h5_prefix_connectivity, group_name="full_matrix")
-    all_gids = conn_mat.vertices["gid"].to_numpy()
+    all_gids = conn_mat.gids
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
 
     for seed, assembly_grp in tqdm(assembly_grp_dict.items(), desc="Getting prob. vs. in-degrees"):
@@ -74,6 +75,77 @@ def assembly_prob_from_indegree(config, min_samples=100):
 
         fig_name = os.path.join(config.fig_path, "assembly_prob_from_indegree_%s.png" % seed)
         plot_assembly_prob_from_indegree(bin_centers_dict, assembly_probs, fig_name)
+
+
+def _mi_implementation(degree_counts, degree_p):
+    """
+    Analyzes how much of the uncertainty of assembly membership is explained away when one considers the strengths
+    of innervation from a given pre-synaptic target (in terms of in-degree).
+    :param degree_counts: The number of neurons in the simulation that have a given degree. One entry per degree-bin.
+    :param degree_p: The probability that neurons with a given degree are members of the assembly in question.
+                     (Must have same length as degree_counts.) Note: Yes, for this analysis the actual _value_
+                     of a degree-bin (which min/max degree does it represent?) is irrelevant. - Michael W.R.
+    :return: membership_entropy: The prior entropy of assembly membership.
+    :return: posterior_entropy: The posterior entropy of assembly membership conditional on the innervation degree.
+    """
+
+    def entropy(p):
+        return -np.log2(p) * p - np.log2(1 - p) * (1 - p)
+
+    def entropy_vec(p_vec):
+        return np.nansum(np.vstack([-np.log2(p_vec) * p_vec, -np.log2(1 - p_vec) * (1 - p_vec)]), axis=0)
+
+    degree_counts, degree_p = np.array(degree_counts), np.array(degree_p)
+    overall_p = (degree_counts * degree_p).sum() / degree_counts.sum()
+    membership_entropy = entropy(overall_p)
+    posterior_entropy = (entropy_vec(degree_p) * degree_counts).sum() / degree_counts.sum()
+    return membership_entropy, posterior_entropy
+
+
+def _sign_of_correlation(degree_vals, degree_p):
+    """
+    Analyzes whether the strength of innervation from a given pre-synaptic target (in terms of in-degree) is rather
+    increasing (positive sign) or decreasing (negative sign) the probability that the innervated neuron is member of
+    an assembly.
+    :param degree_vals: The possible values of degrees for the innervated neurons. e.g. the centers of degree-bins.
+    :param degree_p: The probability that neurons with a given degree are members of the assembly in question.
+                     (Must have same length as degree_counts.)
+    :return: sign: -1 if stronger innervation decreases probability of membership; 1 if it rather increases it
+    """
+    degree_vals, degree_p = np.array(degree_vals), np.array(degree_p)
+    idx = np.argsort(degree_vals)
+    return np.sign(np.polyfit(degree_vals[idx], degree_p[idx], 1)[0])
+
+
+def frac_entropy_explained_by_indegree(config, min_samples=100):
+    """Loads in assemblies and for each of them plots the (relative) loss in entropy from innervation by the assembly.
+    i.e. How much percent of the uncertainty (in assembly membership) can be explained by pure structural innervation"""
+
+    conn_mat = AssemblyTopology.from_h5(config.h5f_name,
+                                        prefix=config.h5_prefix_connectivity, group_name="full_matrix")
+    all_gids = conn_mat.gids
+    assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+
+    for seed, assembly_grp in assembly_grp_dict.items():
+        assembly_nconns = {assembly.idx[0]: conn_mat.degree(assembly.gids, all_gids)
+                           for assembly in assembly_grp.assemblies}
+        binned_gids, bin_centers = _bin_gids_by_innervation(assembly_nconns, all_gids, min_samples)
+
+        assembly_mi = {assembly_deg: {} for assembly_deg in list(assembly_nconns.keys())}
+        for assembly in assembly_grp.assemblies:
+            for assembly_deg, binned_gids_tmp in binned_gids.items():
+                probs, counts, vals = [], [], []
+                for bin_center in bin_centers[assembly_deg]:
+                    idx = np.in1d(binned_gids_tmp[bin_center], assembly.gids, assume_unique=True)
+                    probs.append(idx.sum() / len(idx))
+                    counts.append(len(binned_gids_tmp[bin_center]))
+                    vals.append(bin_center)
+                me, pe = _mi_implementation(counts, probs)
+                assembly_mi[assembly_deg][assembly.idx[0]] = _sign_of_correlation(vals, probs) * (1.0 - pe / me)
+
+        fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_recurrent_innervation_%s.png" % seed)
+        plot_frac_entropy_explained_by_innervation(pd.DataFrame(assembly_mi), fig_name,
+                                                   xlabel="Innervation by assembly")
 
 
 def assembly_simplex_counts(config):
@@ -108,16 +180,16 @@ def get_pattern_innervation(config):
     return pattern_nconns, post_gids
 
 
-def _bin_gids_by_innervation(pattern_nconns, gids, min_samples):
+def _bin_gids_by_innervation(nconns_dict, gids, min_samples):
     """Creates lookups of gids in optimal bins for each pattern
     (optimal bins are determined based on their thalamic innervation profile)"""
-    binned_gids, bin_centers_dict = {pattern_name: {} for pattern_name in list(pattern_nconns.keys())}, {}
-    for pattern_name, nconns in pattern_nconns.items():
+    binned_gids, bin_centers_dict = {key: {} for key in list(nconns_dict.keys())}, {}
+    for key, nconns in nconns_dict.items():
         bin_edges, bin_centers = utils.determine_bins(*np.unique(nconns, return_counts=True), min_samples)
-        bin_centers_dict[pattern_name] = bin_centers
+        bin_centers_dict[key] = bin_centers
         bin_idx = np.digitize(nconns, bin_edges, right=True)
         for i, center in enumerate(bin_centers):
-            binned_gids[pattern_name][center] = gids[bin_idx == i+1]
+            binned_gids[key][center] = gids[bin_idx == i+1]
     return binned_gids, bin_centers_dict
 
 
@@ -143,67 +215,9 @@ def assembly_prob_from_innervation(config, min_samples=100):
         plot_assembly_prob_from_innervation(bin_centers, assembly_probs, fig_name)
 
 
-def _mi_implementation(degree_counts, degree_p):
-    """
-    Analyzes how much of the uncertainty of assembly membership is explained away when one considers the strengths
-    of innervations from a given pre-synaptic target (in terms of in-degree).
-
-    Args:
-        degree_counts (list, or numpy.array): The number of neurons in the simulation that have a given degree. One 
-        entry per degree-bin.
-        degree_p (list, or numpy.array): The probability that neurons with a given degree are members of the assembly
-        in question. Must have same length as degree_counts.
-        Note: Yes, for this analysis the actual _value_ of a degree-bin (which min/max degree does it represent?) is
-        irrelevant.
-
-    Returns:
-        membership_entropy (float): The prior entropy of assembly membership.
-        posterior_entropy (float): The posterior entropy of assembly membership conditional on the innervation degree.
-    """
-    import numpy
-    def entropy(p):
-        return -numpy.log2(p) * p - numpy.log2(1 - p) * (1 - p)
-    
-    def entropy_vec(p_vec):
-        return numpy.nansum(numpy.vstack([
-            -numpy.log2(p_vec) * p_vec,
-            -numpy.log2(1 - p_vec) * (1 - p_vec)
-        ]), axis=0)
-    
-    degree_counts = numpy.array(degree_counts); degree_p = numpy.array(degree_p)
-    
-    overall_p = (degree_counts * degree_p).sum() / degree_counts.sum()
-    membership_entropy = entropy(overall_p)
-    
-    posterior_entropy = (entropy_vec(degree_p) * degree_counts).sum() / degree_counts.sum()
-    
-    return membership_entropy, posterior_entropy
-
-
-def _sign_of_correlation(degree_vals, degree_p):
-    """
-    Analyzes whether the strength of innervation from a given pre-synaptic target (in terms of in-degree) is rather 
-    increasing (positive sign) or decreasing (negative sign) the probability that the innervated neuron is member of
-    an assembly.
-
-    Args:
-        degree_vals (list, or numpy.array): The possible values of degrees for the innervated neurons. E.g. the centers
-        of degree-bins.
-        degree_p (list, or numpy.array): The probability that neurons with a given degree are members of the assembly
-        in question. Must have same length as degree_vals.
-    
-    Returns: 
-        sign (int): -1 if stronger innervation decreases probability of membership; 1 if it rather increases it
-    """
-    import numpy
-    degree_vals = numpy.array(degree_vals); degree_p = numpy.array(degree_p)
-    idxx = numpy.argsort(degree_vals)
-    return numpy.sign(numpy.polyfit(degree_vals[idxx], degree_p[idxx], 1)[0])
-
-
-def fraction_entropy_explained_by_tc(config, min_samples=100):
-    """Contributed by MWR. Re-using a lot of assembly_prob_from_innervation. Better implementation possible"""
-    import pandas
+def frac_entropy_explained_by_innervation(config, min_samples=100):
+    """Loads in assemblies and for each of them plots the (relative) loss in entropy from innervation by the patterns
+    i.e. How much percent of the uncertainty (in assembly membership) can be explained by pure structural innervation"""
 
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
     pattern_nconns, all_gids = get_pattern_innervation(config)
@@ -211,10 +225,9 @@ def fraction_entropy_explained_by_tc(config, min_samples=100):
 
     for seed, assembly_grp in assembly_grp_dict.items():
         assembly_mi = {pattern_name: {} for pattern_name in list(pattern_nconns.keys())}
-        
         for assembly in assembly_grp.assemblies:
             for pattern_name, binned_gids_tmp in binned_gids.items():
-                probs = []; counts = []; vals = []
+                probs, counts, vals = [], [], []
                 for bin_center in bin_centers[pattern_name]:
                     idx = np.in1d(binned_gids_tmp[bin_center], assembly.gids, assume_unique=True)
                     probs.append(idx.sum() / len(idx))
@@ -224,42 +237,23 @@ def fraction_entropy_explained_by_tc(config, min_samples=100):
                 assembly_mi[pattern_name][assembly.idx[0]] = (1.0 - pe / me) * _sign_of_correlation(vals, probs)
         
         fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_tc_innervation_%s.png" % seed)
-        plot_frac_entropy_explained_by_innervation(pandas.DataFrame(assembly_mi), fig_name, xlabel="Innervation by pattern")
+        plot_frac_entropy_explained_by_innervation(pd.DataFrame(assembly_mi), fig_name, xlabel="Innervation by pattern")
 
 
-def fraction_entropy_explained_by_recursive(config, min_samples=100):
-    import numpy, pandas
-    from conntility.connectivity import ConnectivityMatrix
+def assembly_min_syn_dists():
+    """Loads in assemblies and for each (sub)target neurons calculates the (normalized) mean minimum distance
+    between assembly synapses (which is meant to be a parameter free measure of synapse clustering)"""
+    from assemblyfire.clustering import assembly_min_syn_distances
 
-    conmat = ConnectivityMatrix.from_h5(config.h5f_name, prefix=config.h5_prefix_connectivity,
-                                        group_name="full_matrix")
-    
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+    c = utils.get_bluepy_circuit(utils.get_sim_path(config.root_path).iloc[0])
+    loc_df = utils.get_loc_df(config.syn_clustering_lookup_df_pklfname, c, config.target, config.syn_clustering_target)
+    mtypes = utils.get_mtypes(c, utils.get_gids(c, config.target)).reset_index()
+    mtypes.rename(columns={"index": "gid"}, inplace=True)
+
     for seed, assembly_grp in assembly_grp_dict.items():
-
-        assembly_nconns = {}
-
-        for asmbly in assembly_grp.assemblies:
-            asmbly_ncon = numpy.array(conmat.submatrix(asmbly.gids, sub_gids_post=conmat.gids).sum(axis=0))[0]
-            assembly_nconns[asmbly.idx[0]] = asmbly_ncon
-
-        binned_gids, bin_centers = _bin_gids_by_innervation(assembly_nconns, conmat.gids, min_samples)
-
-        assembly_mi = {assembly_deg: {} for assembly_deg in list(assembly_nconns.keys())}
-
-        for assembly_mmbr in assembly_grp.assemblies:
-            for assembly_deg, binned_gids_tmp in binned_gids.items():
-                probs = []; counts = []; vals = []
-                for bin_center in bin_centers[assembly_deg]:
-                    idx = np.in1d(binned_gids_tmp[bin_center], assembly_mmbr.gids, assume_unique=True)
-                    probs.append(idx.sum() / len(idx))
-                    counts.append(len(binned_gids_tmp[bin_center]))
-                    vals.append(bin_center)
-                me, pe = _mi_implementation(counts, probs) # control=True
-                assembly_mi[assembly_deg][assembly_mmbr.idx[0]] = _sign_of_correlation(vals, probs) * (1.0 - pe / me)
-        
-        fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_recursive_innervation_%s.png" % seed)
-        plot_frac_entropy_explained_by_innervation(pandas.DataFrame(assembly_mi), fig_name, xlabel="Innervation by assembly")
+        ctrl_assembly_grp = assembly_grp.random_categorical_controls(mtypes, "mtype")
+        assembly_msd, ctrl_msd = assembly_min_syn_distances(loc_df, assembly_grp, ctrl_assembly_grp)
 
 
 if __name__ == "__main__":
@@ -267,7 +261,8 @@ if __name__ == "__main__":
     assembly_efficacy(config)
     assembly_in_degree(config)
     assembly_prob_from_indegree(config)
+    frac_entropy_explained_by_indegree(config)
     assembly_simplex_counts(config)
     assembly_prob_from_innervation(config)
-    fraction_entropy_explained_by_tc(config)
-    fraction_entropy_explained_by_recursive(config, min_samples=100)
+    frac_entropy_explained_by_innervation(config)
+

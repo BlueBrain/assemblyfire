@@ -6,15 +6,17 @@ density based clustering a la Rodriguez and Laio 2014
 (slightly modified by Yger et al. 2018)
 of spike matrix projected to PCA space a la Herzog et al. 2021.
 Then "core-cells" and cell assemblies are detected with correlation
-based methods from (Montijn et al. 2016 and) Herzog et al. 2021
-Assemblies are clustered into consensus assemblies via hierarchical clustering
-authors: András Ecker, Michael Reimann; last modified: 09.2022
+based methods from (Montijn et al. 2016 and) Herzog et al. 2021.
+Assemblies are clustered into consensus assemblies via hierarchical clustering.
+Also implements methods to cluster synapses based on their location on the dendrites
+authors: András Ecker, Michael W. Reimann; last modified: 10.2022
 """
 
 import os
 import logging
 from tqdm import tqdm
 import numpy as np
+import pandas as pd
 import multiprocessing as mp
 from scipy.optimize import curve_fit
 from scipy.stats import poisson
@@ -25,6 +27,8 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import pairwise_distances, silhouette_score, silhouette_samples, davies_bouldin_score
 
 L = logging.getLogger("assemblyfire")
+XYZ = ["x", "y", "z"]
+EPSILON = 1E-5
 
 
 def cosine_similarity(X):
@@ -379,25 +383,24 @@ def cluster_assemblies(assemblies, n_assemblies, distance_metric, linkage_method
 
 
 def _create_lookups(loc_df, assembly_grp):
-    """Create dicts with synapse idx and fraction of those (compared to total) for all assemblies
+    """Create dicts with synapse idx, and fraction of those (compared to total) for all assemblies
     in the `assembly_grp`. (As neurons can be part of more than 1 assembly, `fracs` won't add up to 1)"""
-    syn_idx, fracs = {}, {}
-    all_assembly_syn_idx = np.array([], dtype=int)
+    syn_idx, fracs, all_assembly_syn_idx = {}, {}, []
+    nsyns, all_pre_gids = len(loc_df), loc_df["pre_gid"].to_numpy()
     for assembly in assembly_grp:
-        assembly_syns = loc_df["pre_gid"].isin(assembly.gids).to_numpy()
-        assembly_frac = sum(assembly_syns) / len(assembly_syns)
+        idx = np.in1d(all_pre_gids, assembly.gids)
+        assembly_frac = idx.sum() / len(idx)
         fracs["assembly%i" % assembly.idx[0]] = assembly_frac
-        assembly_syn_idx = np.nonzero(assembly_syns)[0]
-        syn_idx["assembly%i" % assembly.idx[0]] = assembly_syn_idx
-        all_assembly_syn_idx = np.concatenate((all_assembly_syn_idx, assembly_syn_idx))
+        assembly_idx = np.nonzero(idx)[0]
+        syn_idx["assembly%i" % assembly.idx[0]] = assembly_idx
+        all_assembly_syn_idx.append(assembly_idx)
     # finds synapses that aren't coming from any assembly
-    all_assembly_syn_idx = np.unique(all_assembly_syn_idx)  # neurons can be part of more than 1 assemblies...
-    non_assembly_syn_idx = np.arange(len(loc_df))
-    non_assembly_syn_idx = non_assembly_syn_idx[np.in1d(non_assembly_syn_idx, all_assembly_syn_idx,
-                                                        assume_unique=True, invert=True)]
-    assert (len(all_assembly_syn_idx) + len(non_assembly_syn_idx) == len(loc_df)), "Synapse numbers don't add up..."
+    all_assembly_syn_idx = np.unique(np.concatenate(all_assembly_syn_idx))  # neurons can be part of more than 1 assemblies...
+    tmp = np.arange(nsyns)
+    non_assembly_syn_idx = tmp[np.in1d(tmp, all_assembly_syn_idx, assume_unique=True, invert=True)]
+    assert (len(all_assembly_syn_idx) + len(non_assembly_syn_idx) == nsyns), "Synapse numbers don't add up..."
     syn_idx["non_assembly"] = non_assembly_syn_idx
-    fracs["non_assembly"] = len(non_assembly_syn_idx) / len(loc_df)
+    fracs["non_assembly"] = len(non_assembly_syn_idx) / nsyns
     return syn_idx, fracs
 
 
@@ -408,6 +411,43 @@ def syn_distances(loc_df, mask_col, xzy_cols):
     dists[mask > 0] = np.nan
     np.fill_diagonal(dists, np.nan)
     return dists
+
+
+def assembly_min_syn_distances(loc_df, assembly_grp, ctrl_assembly_grp, agg_fn=np.median):
+    """For each postsynaptic neuron passed in `loc_df` iterate over all assemblies (and their controls)
+    and for each synapse finds the minimum distance to other synapses coming from the same assembly (or control).
+    It returns the aggregated (min, mean, median whatever) value of these min. distances per neuron per assembly."""
+
+    # initialize big arrays for storing data (will be converted to pandas DFs at the end)
+    post_gids = loc_df["post_gid"].unique()
+    assembly_labels = ["assembly%i" % assembly.idx[0] for assembly in assembly_grp]
+    data = -1 * np.ones((len(post_gids), len(assembly_labels)), dtype=np.float32)
+    ctrl_data = -1 * np.ones_like(data)
+
+    for i, gid in enumerate(tqdm(post_gids, desc="Min pairwise syn. dists.", miniters=len(post_gids)/100)):
+        # prepare lookup tables and calculate pairwise distances
+        loc_df_gid = loc_df.loc[loc_df["post_gid"] == gid]
+        syn_idx, _ = _create_lookups(loc_df_gid, assembly_grp)
+        ctrl_syn_idx, _ = _create_lookups(loc_df_gid, ctrl_assembly_grp)
+        dists = syn_distances(loc_df_gid, "section_id", XYZ)
+        # iterate over assemblies and (their controls) and index stuff out
+        for j, assembly_label in enumerate(assembly_labels):
+            sub_dists = dists[np.ix_(syn_idx[assembly_label], syn_idx[assembly_label])]
+            sub_dists = sub_dists[:, ~np.all(np.isnan(sub_dists), axis=1)]
+            if sub_dists.shape[1]:
+                data[i, j] = agg_fn(np.nanmin(sub_dists, axis=0))
+            ctrl_sub_dists = dists[np.ix_(ctrl_syn_idx[assembly_label], ctrl_syn_idx[assembly_label])]
+            ctrl_sub_dists = ctrl_sub_dists[:, ~np.all(np.isnan(ctrl_sub_dists), axis=1)]
+            if ctrl_sub_dists.shape[1]:
+                ctrl_data[i, j] = agg_fn(np.nanmin(ctrl_sub_dists, axis=0))
+        del loc_df_gid, dists
+    # fix the fact that sometimes it happens that synapses are placed at the same location (and their distance is: 0.0)
+    data[data == 0.] = EPSILON
+    ctrl_data[ctrl_data == 0.] = EPSILON
+
+    assembly_df = pd.DataFrame(data=data, index=post_gids, columns=assembly_labels)
+    ctrl_df = pd.DataFrame(data=ctrl_data, index=post_gids, columns=assembly_labels)
+    return assembly_df, ctrl_df
 
 
 def distance_model(dists, fracs, target_range, fig_name=None):
@@ -483,14 +523,12 @@ def cluster_synapses(loc_df, assembly_grp, target_range, min_nsyns, log_sign_th=
                          (for labels see `_create_lookups()` above)
                          placeholder: -100, synapse belonging to the label: -1, and synapse cluster idx start at 0
     """
-    import pandas as pd
 
-    xyz = ["x", "y", "z"]
     cluster_dfs = []
     for gid in loc_df["post_gid"].unique():
         loc_df_gid = loc_df.loc[loc_df["post_gid"] == gid]
         syn_idx_dict, fracs = _create_lookups(loc_df_gid, assembly_grp)
-        dists = syn_distances(loc_df_gid, "section_id", xyz)
+        dists = syn_distances(loc_df_gid, "section_id", XYZ)
         if fig_dir is not None:
             fig_name = os.path.join(fig_dir, "assembly%i_a%i_synapse_dists.png" % (base_assembly_idx, gid))
             models = distance_model(dists.copy(), fracs, target_range, fig_name=fig_name)
@@ -517,6 +555,6 @@ def cluster_synapses(loc_df, assembly_grp, target_range, min_nsyns, log_sign_th=
             from assemblyfire.plots import plot_synapse_clusters
             morph = c.morph.get(int(gid), transform=True)
             fig_name = os.path.join(fig_dir, "assembly%i_a%i_synapse_clusters.png" % (base_assembly_idx, gid))
-            plot_synapse_clusters(morph, pd.concat((cluster_df[labels], loc_df_gid[xyz]), axis=1), xyz, fig_name)
+            plot_synapse_clusters(morph, pd.concat((cluster_df[labels], loc_df_gid[XYZ]), axis=1), XYZ, fig_name)
         cluster_dfs.append(cluster_df)
     return pd.concat(cluster_dfs)

@@ -577,24 +577,18 @@ def plot_assembly_prob_from_innervation(bin_centers, assembly_probs, fig_name):
 
 
 def plot_frac_entropy_explained_by_innervation(mi_df, fig_name, xlabel="Innervating entity"):
-    import numpy
-    fig = plt.figure(figsize=(7, 4))
-    ax = fig.gca()
-
-    img = ax.imshow(mi_df)
-    img.set_clim(numpy.max(img.get_clim()) * numpy.array([-1, 1]))
-    plt.colorbar(img)
-
-    ax.set_xticks(range(len(mi_df.columns)))
-    ax.set_xticklabels(mi_df.columns.values)
+    """Plots matrix of entropy explained by innervation (by patterns or internal connections)"""
+    abs_max = np.max(mi_df.abs().to_numpy())
+    fig = plt.figure(figsize=(10, 9))
+    ax = fig.add_subplot(1, 1, 1)
+    i = ax.imshow(mi_df, cmap="coolwarm", aspect="auto", interpolation="none", vmin=-1*abs_max, vmax=abs_max)
+    fig.colorbar(i, label="Relative loss in entropy")
+    ax.set_xticks(np.arange(len(mi_df.columns)))
+    ax.set_xticklabels(mi_df.columns.to_numpy())
     ax.set_xlabel(xlabel)
-
-    ax.set_yticks(range(len(mi_df.index)))
-    ax.set_yticklabels(mi_df.index.values)
-    ax.set_ylabel("Assembly membership")
-
-    ax.set_title("Relative loss in entropy")
-
+    ax.set_yticks(np.arange(len(mi_df.index)))
+    ax.set_yticklabels(mi_df.index.to_numpy())
+    ax.set_ylabel("Assembly")
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
 
 
@@ -885,7 +879,7 @@ def plot_n_assemblies(stim_times, patterns, n_assemblies, t_chunks, fig_name):
 
 def plot_assembly_intersection_corr(intersection_corrs, xlabel, ylabel, fig_name):
     """Plots similarity matrix of assemblies"""
-    abs_max = np.max(np.abs([np.min(intersection_corrs), np.max(intersection_corrs)]))
+    abs_max = np.max(np.abs(intersection_corrs))
     fig = plt.figure(figsize=(10, 9))
     ax = fig.add_subplot(1, 1, 1)
     i = ax.imshow(intersection_corrs, cmap="coolwarm", aspect="auto", interpolation="none",
