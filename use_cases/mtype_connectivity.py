@@ -27,26 +27,6 @@ def get_indegrees(conn_mat, gids, all_gids):
     return np.array(conn_mat[idx].sum(axis=0)).flatten()
 
 
-def random_numerical_gids(nrn, num_var, ref_gids, n_bins=50):
-    """Quick and dirty reimplementation of conntility's MatrixNodeIndexer functionality"""
-    hist, bin_edges = np.histogram(nrn.loc[nrn["gid"].isin(ref_gids), num_var].to_numpy(), n_bins)
-    bin_idx = np.digitize(nrn[num_var].to_numpy(), bin_edges)
-    all_gids, sample_gids = nrn["gid"].to_numpy(), []
-    for i in range(n_bins):
-        idx = np.where(bin_idx == i + 1)[0]
-        sample_gids.extend(np.random.choice(all_gids[idx], hist[i], replace=False).tolist())
-    return np.array(sample_gids)
-
-
-def random_categorical_gids(nrn, cat_var, ref_gids):
-    """Quick and dirty reimplementation of conntility's MatrixNodeIndexer functionality"""
-    values, counts = np.unique(nrn.loc[nrn["gid"].isin(ref_gids), cat_var].to_numpy(), return_counts=True)
-    all_gids, cat_vals, sample_gids = nrn["gid"].to_numpy(), nrn[cat_var].to_numpy(), []
-    for value, count in zip(values, counts):
-        sample_gids.extend(np.random.choice(all_gids[cat_vals == value], count, replace=False).tolist())
-    return np.array(sample_gids)
-
-
 def get_mtype_indegree(config, post_mtype, plot_txt="PC-MC"):
     """Loads in assemblies and for each of them plots their in degree distr. on selected `post_mtype`"""
 
@@ -67,10 +47,10 @@ def get_mtype_indegree(config, post_mtype, plot_txt="PC-MC"):
         in_degrees[assembly.idx] = get_indegrees(conn_mat, assembly.gids, pre_gids)
         ind_ctrl["n"][assembly.idx] = get_indegrees(conn_mat, np.random.choice(pre_gids, len(assembly.gids),
                                                                                replace=False), pre_gids)
-        ind_ctrl["depths"][assembly.idx] = get_indegrees(conn_mat, random_numerical_gids(pre_nrn, "[PH]y",
-                                                                                         assembly.gids), pre_gids)
-        ind_ctrl["mtypes"][assembly.idx] = get_indegrees(conn_mat, random_categorical_gids(pre_nrn, "mtype",
-                                                                                           assembly.gids), pre_gids)
+        ind_ctrl["depths"][assembly.idx] = get_indegrees(conn_mat,
+                                           assembly.random_numerical_control(pre_nrn, "[PH]y").gids, pre_gids)
+        ind_ctrl["mtypes"][assembly.idx] = get_indegrees(conn_mat,
+                                           assembly.random_categorical_control(pre_nrn, "mtype").gids, pre_gids)
     fig_name = os.path.join(config.fig_path, "%s_in_degrees_%s.png" % (plot_txt, seed))
     plot_in_degrees(in_degrees, ind_ctrl, fig_name, xlabel="%s in degree" % plot_txt)
 

@@ -1,7 +1,7 @@
 """
 Classes to handle cell assemblies detected in the previous step of the pipeline
 authors: Michael Reimann, András Ecker, Daniela Egas Santander
-last modified: 11.2020
+last modified: 10.2022
 """
 
 import os
@@ -192,9 +192,7 @@ class Assembly(object):
             self.idx = index
 
     def __len__(self):
-        """
-        :return: (int) Number of contained neurons
-        """
+        """Returns the number of contained neurons"""
         return len(self.gids)
 
     def __mul__(self, other):
@@ -217,10 +215,8 @@ class Assembly(object):
         return self.gids.__iter__()
 
     def to_dict(self):
-        return {
-            "gids": self.gids,
-            "idx": self.idx
-        }
+        return {"gids": self.gids,
+                "idx": self.idx}
 
     def random_subsample(self, subsample_at, seed=None):
         """
@@ -236,6 +232,57 @@ class Assembly(object):
         elif isinstance(subsample_at, float):
             N = int(len(self) * subsample_at)
         return Assembly(np.random.choice(self.gids, N, replace=False), index=self.idx)
+
+    @staticmethod
+    def random_numerical_gids(nrn, num_var, ref_gids, n_bins, seed):
+        """Quick and dirty reimplementation of conntility's MatrixNodeIndexer functionality"""
+        hist, bin_edges = np.histogram(nrn.loc[nrn["gid"].isin(ref_gids), num_var].to_numpy(), n_bins)
+        bin_idx = np.digitize(nrn[num_var].to_numpy(), bin_edges)
+        all_gids, sample_gids = nrn["gid"].to_numpy(), []
+        for i in range(n_bins):
+            if seed is not None:
+                np.random.seed(seed)
+            idx = np.where(bin_idx == i + 1)[0]
+            sample_gids.extend(np.random.choice(all_gids[idx], hist[i], replace=False).tolist())
+        return np.array(sample_gids)
+
+    def random_numerical_control(self, nrn, num_var, n_bins=50, seed=None):
+        """
+        Generates random control assembly from a bigger group of gids passed,
+        that have the same distribution of a (binned) numerical variable as the assembly gids
+        :param nrn: pandas DataFrame with at least 2 columns: 'gid' and `num_var`
+        :param num_var: numerical variable to use for sampling (has to be present in `nrn`)
+        :param n_bins: number of bins to use to bin assembly `num_var`
+        :param seed: if specified, sets the random seed
+        :return: An Assembly object containing a randomly sampled set of gids
+        """
+        assert np.in1d(self.gids, nrn["gid"].to_numpy(), assume_unique=True).all(), "Not all assembly gids are part" \
+                                                                                    "of the DataFrame passed"
+        return Assembly(self.random_numerical_gids(nrn, num_var, self.gids, n_bins, seed), index=self.idx)
+
+    @staticmethod
+    def random_categorical_gids(nrn, cat_var, ref_gids, seed):
+        """Quick and dirty reimplementation of conntility's MatrixNodeIndexer functionality"""
+        values, counts = np.unique(nrn.loc[nrn["gid"].isin(ref_gids), cat_var].to_numpy(), return_counts=True)
+        all_gids, cat_vals, sample_gids = nrn["gid"].to_numpy(), nrn[cat_var].to_numpy(), []
+        for value, count in zip(values, counts):
+            if seed is not None:
+                np.random.seed(seed)
+            sample_gids.extend(np.random.choice(all_gids[cat_vals == value], count, replace=False).tolist())
+        return np.array(sample_gids)
+
+    def random_categorical_control(self, nrn, cat_var, seed=None):
+        """
+        Generates random control assembly from a bigger group of gids passed,
+        that have the same distribution of a categorical variable as the assembly gids
+        :param nrn: pandas DataFrame with at least 2 columns: 'gid' and `cat_var`
+        :param cat_var: categorical variable to use for sampling (has to be present in `nrn`)
+        :param seed: if specified, sets the random seed
+        :return: An Assembly object containing a randomly sampled set of gids
+        """
+        assert np.in1d(self.gids, nrn["gid"].to_numpy(), assume_unique=True).all(), "Not all assembly gids are part" \
+                                                                                    "of the DataFrame passed"
+        return Assembly(self.random_categorical_gids(nrn, cat_var, self.gids, seed), index=self.idx)
 
 
 class AssemblyGroup(object):
@@ -261,44 +308,12 @@ class AssemblyGroup(object):
         else:
             self.metadata = metadata
 
-    def union(self):
-        """
-        :return: An Assembly object representing the union of all contained assemblies
-        """
-        assert len(self) > 0
-        ret = self.iloc(0)
-        for i in range(1, len(self)):
-            ret = ret + self.iloc(i)
-        return ret
-
-    def random_control_from_union(self):
-        """
-        :return: An AssemblyGroup object that represents a random control. First we get the union of all Assemblies
-        contained in this group. Then we randomly subsample the union, at the sizes of all Assemblies contained.
-        The result is an AssemblyGroup with the same number and sizes of Assemblies as this, but Assembly mambership
-        is shuffled.
-        """
-        union = self.union()
-        lst_random = [union.random_subsample(len(assembly)) for assembly in self]
-        new_metadata = {
-            "parent": {
-                "label": self.label,
-                "metadata": self.metadata.copy()
-            },
-            "operation": "shuffled"
-        }
-        return AssemblyGroup(lst_random, self.all, label=self.label + " -- shuffled", metadata=new_metadata)
-
     def __iter__(self):
-        """
-        :return: iterator over contained Assemblies
-        """
+        """Returns an iterator over contained Assemblies"""
         return self.assemblies.__iter__()
 
     def __len__(self):
-        """
-        :return: number of contained assemblies
-        """
+        """Returns the number of contained assemblies"""
         return len(self.assemblies)
 
     def __add__(self, other):
@@ -307,17 +322,9 @@ class AssemblyGroup(object):
         :param other: another AssemblyGroup object
         :return: An AssemblyGroup that is the concatenation of the Assemblies in this and the other
         """
-        new_meta = {
-            "parent 1": {
-                "label": self.label,
-                "metadata": self.metadata.copy()
-            },
-            "parent 2": {
-                "label": other.label,
-                "metadata": other.metadata.copy()
-            },
-            "operation": "+"
-        }
+        new_meta = {"parent 1": {"label": self.label, "metadata": self.metadata.copy()},
+                    "parent 2": {"label": other.label, "metadata": other.metadata.copy()},
+                    "operation": "+"}
         return AssemblyGroup(self.assemblies + other.assemblies,
                              np.union1d(self.all, other.all),
                              label=str(self.label) + " + " + str(other.label),
@@ -330,6 +337,12 @@ class AssemblyGroup(object):
         :return: the aligned intersections of this with other
         """
         return self.aligned_intersections(other)
+
+    def to_dict(self):
+        return {"label": str(self.label),
+                "all_gids": list(self.all),
+                "assemblies": [_assembly.to_dict() for _assembly in self],
+                "metadata": self.metadata}
 
     def as_bool(self, loc=None, iloc=None):
         """
@@ -357,13 +370,52 @@ class AssemblyGroup(object):
     def iloc(self, idx):
         return self.assemblies[idx]
 
-    def to_dict(self):
-        return {
-            "label": str(self.label),
-            "all_gids": list(self.all),
-            "assemblies": [_assembly.to_dict() for _assembly in self],
-            "metadata": self.metadata
-        }
+    def union(self):
+        """
+        :return: An Assembly object representing the union of all contained assemblies
+        """
+        assert len(self) > 0
+        ret = self.iloc(0)
+        for i in range(1, len(self)):
+            ret = ret + self.iloc(i)
+        return ret
+
+    def lengths(self):
+        """Returns sizes of contained Assembly objects"""
+        return np.array(list(map(len, self)))
+
+    def random_control_from_union(self):
+        """Returns an AssemblyGroup object that represents a random control. First we get the union of all Assemblies
+        contained in this group. Then we randomly subsample the union, at the sizes of all Assemblies contained.
+        The result is an AssemblyGroup with the same number and sizes of Assemblies as this, but Assembly membership
+        is shuffled."""
+        union = self.union()
+        random_lst = [union.random_subsample(len(assembly)) for assembly in self]
+        new_meta = {"parent": {"label": self.label, "metadata": self.metadata.copy()},
+                    "operation": "shuffled"}
+        return AssemblyGroup(random_lst, self.all, label=self.label + " -- shuffled", metadata=new_meta)
+
+    def random_numerical_controls(self, nrn, num_var, n_bins=50, seed=None):
+        """Returns an AssemblyGroup object that represents a random control
+        with the same number and sizes of Assemblies as this, but Assembly membership is random
+        and depends on a (binned) numerical variable (e.g. depth).
+        See `Assembly.random_numerical_control()` above"""
+        ctrl_lst = [assembly.random_numerical_control(nrn, num_var, n_bins, seed) for assembly in self]
+        all_gids = np.unique(np.concatenate([assembly.gids for assembly in self]))
+        new_meta = {"parent": {"label": self.label, "metadata": self.metadata.copy()},
+                    "operation": "numerical random control"}
+        return AssemblyGroup(ctrl_lst, all_gids, label=self.label + " -- num. control", metadata=new_meta)
+
+    def random_categorical_controls(self, nrn, cat_var, seed=None):
+        """Returns an AssemblyGroup object that represents a random control
+        with the same number and sizes of Assemblies as this, but Assembly membership is random
+        and depends on a categorical variable (e.g. layer, mtype etc.).
+        See `Assembly.random_categorical_control()` above"""
+        ctrl_lst = [assembly.random_categorical_control(nrn, cat_var, seed) for assembly in self]
+        all_gids = np.unique(np.concatenate([assembly.gids for assembly in self]))
+        new_meta = {"parent": {"label": self.label, "metadata": self.metadata.copy()},
+                    "operation": "categorical random control"}
+        return AssemblyGroup(ctrl_lst, all_gids, label=self.label + " -- cat. control", metadata=new_meta)
 
     def to_h5(self, filename, prefix=None, version=None):
         """
@@ -383,12 +435,6 @@ class AssemblyGroup(object):
         read_func = cls.h5_read_func[__initialize_h5__(fn, assert_exists=True)]
         with h5py.File(fn, "r") as h5:
             return read_func(h5, group_name, prefix=prefix)
-
-    def lengths(self):
-        """
-        :return: (numpy.array) sizes of contained Assembly objects
-        """
-        return np.array(list(map(len, self)))
 
     def intersection_sizes(self, other=None):
         """
@@ -413,18 +459,9 @@ class AssemblyGroup(object):
         if other is None:
             return self.aligned_intersections(self)
         new_all = np.union1d(self.all, other.all)
-        new_meta = {
-            "parent 1": {
-                "label": self.label,
-                "metadata": self.metadata.copy()
-            },
-            "parent 2": {
-                "label": other.label,
-                "metadata": other.metadata.copy()
-            },
-            "operation": "*"
-        }
-
+        new_meta = {"parent 1": {"label": self.label, "metadata": self.metadata.copy()},
+                    "parent 2": {"label": other.label, "metadata": other.metadata.copy()},
+                    "operation": "*"}
         return AssemblyGroup([a * b for a, b in zip(self, other)],
                              new_all, label=str(self.label) + " * " + str(other.label),
                              metadata=new_meta)
@@ -509,7 +546,6 @@ class AssemblyGroup(object):
         :return: A kind-of optimal alignment, i.e. a permutation of the items in the second group
         that leads to a kind-of optimal alignment
         """
-
         idx1 = list(range(score_matrix.shape[0]))
         idx2 = list(range(score_matrix.shape[1]))
         alignment = -np.ones(len(idx1), dtype=int)
