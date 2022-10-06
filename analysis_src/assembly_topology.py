@@ -69,11 +69,13 @@ def _bin_gids_by_innervation(nconns_dict, gids, min_samples):
     (optimal bins are determined based on their innervation profile)"""
     binned_gids, bin_centers_dict = {key: {} for key in list(nconns_dict.keys())}, {}
     for key, nconns in nconns_dict.items():
+        idx = np.where(nconns > 0.)[0]  # sometimes -1s are used as placeholders...
+        gids_tmp, nconns = all_gids[idx], nconns[idx]
         bin_edges, bin_centers = utils.determine_bins(*np.unique(nconns, return_counts=True), min_samples)
         bin_centers_dict[key] = bin_centers
         bin_idx = np.digitize(nconns, bin_edges, right=True)
         for i, center in enumerate(bin_centers):
-            binned_gids[key][center] = gids[bin_idx == i+1]
+            binned_gids[key][center] = gids_tmp[bin_idx == i+1]
     return binned_gids, bin_centers_dict
 
 
