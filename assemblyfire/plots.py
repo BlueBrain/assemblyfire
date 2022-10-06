@@ -494,7 +494,7 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"
     plt.close(fig)
 
 
-def plot_assembly_prob_from(bin_centers, assembly_probs, xlabel, fig_name):
+def plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, xlabel, fig_name, colors_dict=None):
     """Plots assembly membership probability vs. number of connections from pattern"""
     assembly_labels = np.sort(list(assembly_probs.keys()))
     n = len(assembly_labels)
@@ -505,7 +505,16 @@ def plot_assembly_prob_from(bin_centers, assembly_probs, xlabel, fig_name):
     gs = gridspec.GridSpec(n_rows, 5)
     for i, assembly_label in enumerate(assembly_labels):
         ax = fig.add_subplot(gs[i])
-        ax.plot(bin_centers[assembly_label], assembly_probs[assembly_label], color=cmap(i))
+        ax.axhline(chance_levels[assembly_label], linestyle="--", color="lightgray", label="chance level")
+        if colors_dict is not None:
+            for label_, col in colors_dict.items():
+                color = cmap(i) if col == "assembly_color" else col
+                ax.plot(bin_centers[assembly_label][label_], assembly_probs[assembly_label][label_], color=color,
+                        label=label_)
+            if i == 0:
+                ax.legend(frameon=False)
+        else:
+            ax.plot(bin_centers[assembly_label], assembly_probs[assembly_label], color=cmap(i))
         ax.set_title("Assembly %s" % assembly_label)
         ax.set_xlim(left=0)
         ax.set_ylim([0, 1])
