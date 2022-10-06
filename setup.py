@@ -31,7 +31,7 @@ setup(
                       "cached-property>=1.5.2",
                       "numpy>=1.21.4",
                       "scipy>=1.7.2",
-                      "pandas>=1.3.4",
+                      "pandas>=1.5.0",
                       "scikit-learn>=1.0.1",
                       "libsonata>=0.1.10",
                       "pyflagser>=0.4.4",
