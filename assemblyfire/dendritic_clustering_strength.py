@@ -65,23 +65,35 @@ class DendriticClusteringResults(object):
         return df_in[tgt_order]
 
     @staticmethod
-    def _write_single(df, dset, i):
-        df = DendriticClusteringResults._sorted_df(df)
+    def _append_single(df, dset, i):
         assert dset.shape[0] == i
-        assert len(df) > i
-        dset.resize((len(df), dset.shape[1]))
-        o = len(df) - i
-        dset[-o:] = df.iloc[i:].values
+        o = len(df)
+        if o == 0: return
+
+        dset.resize((dset.shape[0] + o, dset.shape[1]))
+        dset[-o:] = df.values.astype(float)
+    
+    def unwritten_rows(self):
+        write_order = [self.DSET_MEMBER, self.DSET_CLST, self.DSET_PVALUE, self.DSET_DEG]
+        unwritten = {}
+
+        for str_dset in write_order:
+            df = self._df.reorder_levels([1, 0], axis="columns")[["gid", str_dset]].droplevel(0, "columns")
+            df = DendriticClusteringResults._sorted_df(df)
+            assert len(df) >= self._written
+            unwritten[str_dset] = df.iloc[self._written:].values.astype(float)
+        return unwritten
     
     def flush(self):
         """
         Write the clustering data to the underlying hdf5 file. Only writes new data that is not already in the file! 
         """
+        unwritten = self.unwritten_rows()
+
         with h5py.File(self._fn, "a") as h5:
-            for str_dset in [self.DSET_MEMBER, self.DSET_CLST, self.DSET_PVALUE, self.DSET_DEG]:
-                df = self._df.reorder_levels([1, 0], axis="columns")[["gid", str_dset]].droplevel(0, "columns")
+            for str_dset, df in unwritten.items():
                 dset = h5[self.DSET_ROOT][str_dset]
-                self._write_single(df, dset, self._written)
+                self._append_single(df, dset, self._written)
             h5.flush()
         self._written = len(self._df)
     
