@@ -555,7 +555,7 @@ def plot_assembly_prob_from_patterns(bin_centers, assembly_probs, fig_name):
     plt.close(fig)
 
 
-def plot_frac_entropy_explained_by(mi_df, xlabel, fig_name):
+def plot_frac_entropy_explained_by(mi_df, ylabel, fig_name):
     """Plots matrix of entropy explained by innervation (by patterns or internal connections)"""
     abs_max = np.max(mi_df.abs().to_numpy())
     fig = plt.figure(figsize=(10, 9))
@@ -564,10 +564,10 @@ def plot_frac_entropy_explained_by(mi_df, xlabel, fig_name):
     fig.colorbar(i, label="Relative loss in entropy")
     ax.set_xticks(np.arange(len(mi_df.columns)))
     ax.set_xticklabels(mi_df.columns.to_numpy())
-    ax.set_xlabel(xlabel)
+    ax.set_xlabel("Assembly")
     ax.set_yticks(np.arange(len(mi_df.index)))
     ax.set_yticklabels(mi_df.index.to_numpy())
-    ax.set_ylabel("Assembly")
+    ax.set_ylabel(ylabel)
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
 
 

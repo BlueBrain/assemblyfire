@@ -64,16 +64,16 @@ def assembly_simplex_counts(config):
         plots.plot_simplex_counts(simplices, simplex_counts_control[seed], fig_name)
 
 
-def _bin_gids_by_innervation(nconns_dict, gids, min_samples):
+def _bin_gids_by_innervation(indegree_dict, gids, min_samples):
     """Creates lookups of gids in optimal bins for each pattern
     (optimal bins are determined based on their innervation profile)"""
-    binned_gids, bin_centers_dict = {key: {} for key in list(nconns_dict.keys())}, {}
-    for key, nconns in nconns_dict.items():
-        idx = np.where(nconns > 0.)[0]  # sometimes -1s are used as placeholders...
-        gids_tmp, nconns = gids[idx], nconns[idx]
-        bin_edges, bin_centers = utils.determine_bins(*np.unique(nconns, return_counts=True), min_samples)
+    binned_gids, bin_centers_dict = {key: {} for key in list(indegree_dict.keys())}, {}
+    for key, indegrees in indegree_dict.items():
+        idx = np.where(indegrees > 0.)[0]  # sometimes -1s are used as placeholders...
+        gids_tmp, indegrees = gids[idx], indegrees[idx]
+        bin_edges, bin_centers = utils.determine_bins(*np.unique(indegrees, return_counts=True), min_samples)
         bin_centers_dict[key] = bin_centers
-        bin_idx = np.digitize(nconns, bin_edges, right=True)
+        bin_idx = np.digitize(indegrees, bin_edges, right=True)
         for i, center in enumerate(bin_centers):
             binned_gids[key][center] = gids_tmp[bin_idx == i+1]
     return binned_gids, bin_centers_dict
@@ -157,7 +157,7 @@ def frac_entropy_explained_by_indegree(config, min_samples=100):
         fig_name = os.path.join(config.fig_path, "assembly_prob_from_indegree_%s.png" % seed)
         plots.plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, "In degree", fig_name)
         fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_recurrent_innervation_%s.png" % seed)
-        plots.plot_frac_entropy_explained_by(pd.DataFrame(assembly_mi), "Innervation by assembly", fig_name)
+        plots.plot_frac_entropy_explained_by(pd.DataFrame(assembly_mi).transpose(), "Innervation by assembly", fig_name)
 
     return assembly_indegrees_dict
 
@@ -211,7 +211,8 @@ def frac_entropy_explained_by_syn_nnd(config, min_samples=100):
         plots.plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels,
                                       "Synapse nearest neighbour distance", fig_name)
         fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_syn_nearest_neighbour_%s.png" % seed)
-        plots.plot_frac_entropy_explained_by(pd.DataFrame(assembly_mi), "Synapse nearest neighbour from assembly", fig_name)
+        plots.plot_frac_entropy_explained_by(pd.DataFrame(assembly_mi).transpose(),
+                                             "Synapse nearest neighbour from assembly", fig_name)
 
     return assembly_nnds_dict
 
@@ -277,8 +278,8 @@ def frac_entropy_explained_by_patterns(config, min_samples=100):
     percent of the uncertainty (in assembly membership) can be explained by pure structural innervation from VPM"""
 
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
-    pattern_indegrees, all_gids = get_pattern_innervation(config)
-    binned_gids, bin_centers = _bin_gids_by_innervation(pattern_indegrees, all_gids, min_samples)
+    pattern_indegrees, gids = get_pattern_innervation(config)
+    binned_gids, bin_centers = _bin_gids_by_innervation(pattern_indegrees, gids, min_samples)
 
     for seed, assembly_grp in assembly_grp_dict.items():
         assembly_probs = {pattern_name: {} for pattern_name in list(pattern_indegrees.keys())}
@@ -298,7 +299,7 @@ def frac_entropy_explained_by_patterns(config, min_samples=100):
         fig_name = os.path.join(config.fig_path, "assembly_prob_from_patterns_%s.png" % seed)
         plots.plot_assembly_prob_from_patterns(bin_centers, assembly_probs, fig_name)
         fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_patterns_%s.png" % seed)
-        plots.plot_frac_entropy_explained_by(pd.DataFrame(assembly_mi), "Innervation by pattern", fig_name)
+        plots.plot_frac_entropy_explained_by(pd.DataFrame(assembly_mi).transpose(), "Innervation by pattern", fig_name)
 
 
 if __name__ == "__main__":
@@ -309,6 +310,6 @@ if __name__ == "__main__":
     assembly_indegrees = frac_entropy_explained_by_indegree(config)
     assembly_nnds = frac_entropy_explained_by_syn_nnd(config)
     assembly_prob_from_indegree_and_syn_nnd(config, assembly_indegrees, assembly_nnds,
-                                            {"below avg.": "assembly_color", "avg.": "gray", "above avg.": "black"})
+                                           {"below avg.": "assembly_color", "avg.": "gray", "above avg.": "black"})
     # frac_entropy_explained_by_patterns(config)
 
