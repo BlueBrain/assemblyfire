@@ -419,7 +419,7 @@ def syn_nearest_neighbour_distances(loc_df, assembly_grp, ctrl_assembly_grp, agg
 
     # initialize big arrays for storing data (will be converted to pandas DFs at the end)
     post_gids = loc_df["post_gid"].unique()
-    assembly_labels = ["assembly%i" % assembly.idx[0] for assembly in assembly_grp]
+    assembly_labels = [assembly.idx[0] for assembly in assembly_grp]
     data = -1 * np.ones((len(post_gids), len(assembly_labels)), dtype=np.float32)
     ctrl_data = -1 * np.ones_like(data)
 
