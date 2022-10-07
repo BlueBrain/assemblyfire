@@ -494,11 +494,15 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"
     plt.close(fig)
 
 
-def plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, xlabel, fig_name, colors_dict=None):
+def plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, xlabel, palette, fig_name):
     """Plots assembly membership probability vs. number of connections from pattern"""
-    assembly_labels = np.sort(list(assembly_probs.keys()))
+    keys = list(list(assembly_probs.keys()))
+    assembly_labels = list(assembly_probs[keys[0]].keys())
     n = len(assembly_labels)
-    cmap = plt.cm.get_cmap("tab20", np.max([assembly_label for assembly_label in assembly_labels])+1)
+    if palette == "patterns":
+        palette = PATTERN_COLORS
+    else:
+        cmap = plt.cm.get_cmap("tab20", np.max([assembly_label for assembly_label in assembly_labels]) + 1)
 
     fig = plt.figure(figsize=(20, 8))
     n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
@@ -506,15 +510,13 @@ def plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, xlabel, 
     for i, assembly_label in enumerate(assembly_labels):
         ax = fig.add_subplot(gs[i])
         ax.axhline(chance_levels[assembly_label], linestyle="--", color="lightgray", label="chance level")
-        if colors_dict is not None:
-            for label_, col in colors_dict.items():
-                color = cmap(i) if col == "assembly_color" else col
-                ax.plot(bin_centers[assembly_label][label_], assembly_probs[assembly_label][label_], color=color,
-                        label=label_)
+        for j, key in enumerate(keys):
+            # this way of color selection won't always work... but does the trick for the current use cases
+            color = cmap(j) if palette[key] == "assembly_color" else palette[key]
+            ax.plot(bin_centers[key][assembly_label], assembly_probs[key][assembly_label], color=color,
+                    label=key)
             if i == 0:
-                ax.legend(frameon=False)
-        else:
-            ax.plot(bin_centers[assembly_label], assembly_probs[assembly_label], color=cmap(i))
+                ax.legend(frameon=False, ncol=n_rows)
         ax.set_title("Assembly %s" % assembly_label)
         ax.set_xlim(left=0)
         ax.set_ylim([0, 1])
@@ -522,33 +524,6 @@ def plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, xlabel, 
     fig.add_subplot(1, 1, 1, frameon=False)
     plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
     plt.xlabel(xlabel)
-    plt.ylabel("Prob. of assembly membership")
-    fig.tight_layout()
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
-    plt.close(fig)
-
-
-def plot_assembly_prob_from_patterns(bin_centers, assembly_probs, fig_name):
-    """Plots assembly membership probability vs. number of connections from pattern"""
-    pattern_names = np.sort(list(bin_centers.keys()))
-    if len(pattern_names) != len(PATTERN_COLORS):
-        warnings.warn("Not the expected %i pattern names are passed..." % len(PATTERN_COLORS))
-    assembly_labels = np.sort(list(assembly_probs[pattern_names[0]].keys()))
-    cmap = plt.cm.get_cmap("tab20", np.max([assembly_label for assembly_label in assembly_labels])+1)
-
-    fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(2, 5)
-    for i, pattern_name in enumerate(pattern_names):
-        ax = fig.add_subplot(gs[i])
-        for j, assembly_label in enumerate(assembly_labels):
-            ax.plot(bin_centers[pattern_name], assembly_probs[pattern_name][assembly_label], color=cmap(j))
-        ax.set_title("Pattern %s" % pattern_name)
-        ax.set_xlim([0, bin_centers[pattern_name][-1] + 1])
-        ax.set_ylim([0, 1])
-    sns.despine(trim=True, offset=2)
-    fig.add_subplot(1, 1, 1, frameon=False)
-    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
-    plt.xlabel("#Connections from pattern")
     plt.ylabel("Prob. of assembly membership")
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
