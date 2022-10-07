@@ -1,9 +1,8 @@
 """
 Assembly detection related plots
-author: András Ecker, last update: 01.2022
+author: András Ecker, last update: 10.2022
 """
 
-import warnings
 import numpy as np
 from scipy.cluster.hierarchy import dendrogram, set_link_color_palette
 import matplotlib
@@ -13,7 +12,6 @@ from matplotlib import colors
 import matplotlib.gridspec as gridspec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import seaborn as sns
-
 
 sns.set(style="ticks", context="notebook")
 PATTERN_COLORS = {"A": "#234091", "B": "#57B4D0", "C": "#C4A943", "D": "#7E1F19", "E": "#3F7AB3",
@@ -198,26 +196,25 @@ def plot_dendogram_silhouettes(clusters, linkage, silhouettes, fig_name):
 
 
 def _group_by_patterns(clusters, t_bins, stim_times, patterns):
-    """reorders time series (of clusters) based on patterns
-    returns a matrix for each pattern (max n stims * max length)"""
+    """Groups clustered sign. activity based on the patterns presented"""
+    # get basic info (passing them would be difficult...) and initialize empty matrices
     pattern_names, counts = np.unique(patterns, return_counts=True)
-    max_count = np.max(counts)
-
-    t_idx, sign_patterns = _get_pattern_idx(t_bins, stim_times, patterns)
-    extended_pattern_idx = []
-    for t_start, t_end in zip(t_idx[:-1], t_idx[1:]):
-        extended_pattern_idx.append(np.arange(t_start, t_end))
-    extended_pattern_idx.append(np.arange(t_idx[-1], len(t_bins)-1))
-    max_len = np.max([len(idx) for idx in extended_pattern_idx])
-
-    pattern_matrices = {pattern: np.full((max_count, max_len), np.nan) for pattern in pattern_names}
+    isi, bin_size = np.max(np.diff(stim_times)), np.min(np.diff(t_bins))
+    pattern_matrices = {pattern: np.full((np.max(counts), int(isi / bin_size)), np.nan) for pattern in pattern_names}
+    # group sign. activity clusters based on patterns
     row_idx = {pattern: 0 for pattern in pattern_names}
-    for pattern, idx in zip(sign_patterns, extended_pattern_idx):
-        clusters_slice = clusters[idx]
-        pattern_matrices[pattern][row_idx[pattern], 0:len(clusters_slice)] = clusters_slice
+    for pattern, t_start, t_end in zip(patterns, stim_times[:-1], stim_times[1:]):
+        idx = np.where((t_start <= t_bins) & (t_bins < t_end))[0]
+        if len(idx):
+            t_idx = (((t_bins[idx] - t_start) / bin_size) - 1).astype(int)
+            pattern_matrices[pattern][row_idx[pattern], t_idx] = clusters[idx]
         row_idx[pattern] += 1
-
-    return t_idx, sign_patterns, pattern_matrices, row_idx
+    # find max length of sign. activity and cut all matrices there
+    max_tidx = np.max([np.sum(~np.all(np.isnan(pattern_matrix), axis=0))
+                       for _, pattern_matrix in pattern_matrices.items()])
+    pattern_matrices = {pattern_name: pattern_matrix[:, :max_tidx]
+                        for pattern_name, pattern_matrix in pattern_matrices.items()}
+    return bin_size * max_tidx, row_idx, pattern_matrices
 
 
 def update(changed_image):
@@ -232,7 +229,9 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
     """plots sequence of time bins color coded by clusters"""
     cmap = plt.cm.get_cmap("tab20", len(np.unique(clusters)))
     images = []
-    t_idx, sign_patterns, pattern_matrices, row_idx = _group_by_patterns(clusters, t_bins, stim_times, patterns)
+
+    t_idx, sign_patterns = _get_pattern_idx(t_bins, stim_times, patterns)
+    max_t, row_idx, pattern_matrices = _group_by_patterns(clusters, t_bins, stim_times, patterns)
     clusters = np.reshape(clusters, (1, len(clusters)))
 
     fig = plt.figure(figsize=(20, 8))
@@ -251,9 +250,9 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
         i = ax.imshow(matrix, cmap=cmap, aspect="auto")
         images.append(i)
         ax.set_title(name)
-        ax.set_xticks([])
-        y_max = row_idx[name]-1 if row_idx[name] != 0 else 0
-        ax.set_yticks([0, y_max])
+        ax.set_xticks([0, matrix.shape[1] - 1])
+        ax.set_xticklabels([0, max_t])
+        ax.set_yticks([0, row_idx[name]])
     # set one colorbar for all images
     vmin = min(image.get_array().min() for image in images)
     vmax = max(image.get_array().max() for image in images)
@@ -276,7 +275,9 @@ def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, f
     cmap = colors.ListedColormap(cols)
     bounds = np.arange(-1.5, n_clusters)
     norm = colors.BoundaryNorm(bounds, cmap.N)
-    t_idx, sign_patterns, pattern_matrices, row_idx = _group_by_patterns(clusters, t_bins, stim_times, patterns)
+
+    t_idx, sign_patterns = _get_pattern_idx(t_bins, stim_times, patterns)
+    max_t, row_idx, pattern_matrices = _group_by_patterns(clusters, t_bins, stim_times, patterns)
     clusters = np.reshape(clusters, (1, len(clusters)))
 
     fig = plt.figure(figsize=(20, 8))
@@ -294,9 +295,9 @@ def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, f
         ax = fig.add_subplot(gs[1+np.floor_divide(i, 5), np.mod(i, 5)-5])
         ax.imshow(matrix, cmap=cmap, norm=norm, aspect="auto")
         ax.set_title(name)
-        ax.set_xticks([])
-        y_max = row_idx[name]-1 if row_idx[name] != 0 else 0
-        ax.set_yticks([0, y_max])
+        ax.set_xticks([0, matrix.shape[1] - 1])
+        ax.set_xticklabels([0, max_t])
+        ax.set_yticks([0, row_idx[name]])
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -307,7 +308,7 @@ def plot_pattern_clusters(clusters, t_bins, stim_times, patterns, fig_name):
     n = len(np.unique(clusters))
     cmap = plt.cm.get_cmap("tab20", n)
     cols = [colors.to_hex(cmap(i)) for i in range(n)]
-    _, _, pattern_matrices, _ = _group_by_patterns(clusters, t_bins, stim_times, patterns)
+    _, _, pattern_matrices = _group_by_patterns(clusters, t_bins, stim_times, patterns)
 
     fig = plt.figure(figsize=(20, 8))
     gs = gridspec.GridSpec(2, 5)
@@ -337,8 +338,8 @@ def plot_pattern_cons_clusters(cons_clusters_dict, t_bins_dict, stim_times_dict,
     patter_names = []
     keys = list(cons_clusters_dict.keys())
     for key in keys:
-        _, _, pattern_matrices, _ = _group_by_patterns(cons_clusters_dict[key], t_bins_dict[key],
-                                                       stim_times_dict[key], patterns_dict[key])
+        _, _, pattern_matrices = _group_by_patterns(cons_clusters_dict[key], t_bins_dict[key],
+                                                    stim_times_dict[key], patterns_dict[key])
         for pattern_name, matrix in pattern_matrices.items():
             if pattern_name not in heights_dict:
                 heights_dict[pattern_name] = np.zeros(n_clusters)
