@@ -1,7 +1,7 @@
 """
 Advanced network metrics on ConnectivityMatrix (now in `conntility`)
 authors: Daniela Egas Santander, Nicolas Ninin, András Ecker
-last modified: 01.2022
+last modified: 10.2022
 """
 
 import numpy as np
@@ -16,7 +16,7 @@ class AssemblyTopology(ConnectivityMatrix):
     """
 
     def degree(self, pre_gids=None, post_gids=None, kind="in"):
-        """Return in/out degrees of the (symmetric) subarray specified by `pre_gids`
+        """Returns in/out degrees of the (symmetric) subarray specified by `pre_gids`
         (if `post_gids` is given as well, then the subarray will be asymmetric)"""
         if pre_gids is not None:
             matrix = self.submatrix(pre_gids, sub_gids_post=post_gids)
@@ -30,7 +30,7 @@ class AssemblyTopology(ConnectivityMatrix):
             ValueError("Need to specify 'in' or 'out' degree!")
 
     def density(self, sub_gids=None):
-        """Return the density of submatrix specified by `sub_gids`"""
+        """Returns the density of submatrix specified by `sub_gids`"""
         if sub_gids is None:
             matrix = self.matrix
         else:
@@ -38,13 +38,20 @@ class AssemblyTopology(ConnectivityMatrix):
         return matrix.getnnz()/np.prod(matrix.shape)
 
     def simplex_counts(self, sub_gids):
-        """Return the simplex counts of submatrix specified by `sub_gids`"""
+        """Returns the simplex counts of submatrix specified by `sub_gids`"""
         from pyflagser import flagser_count_unweighted
         sub_mat = self.submatrix(sub_gids)
         return flagser_count_unweighted(sub_mat, directed=True)
 
+    def simplex_list(self, sub_gids):
+        """Returns the simplex list of submatrix specified by `sub_gids`"""
+        from pyflagsercount import flagser_count
+        sub_mat = self.submatrix(sub_gids)
+        flagser = flagser_count(sub_mat, return_simplices=True, max_simplices=False)
+        return [np.array(x) for x in flagser["simplices"]]
+
     def betti_counts(self, sub_gids):
-        """Return the betti counts of submatrix specified by `sub_gids`"""
+        """Returns the betti counts of submatrix specified by `sub_gids`"""
         from pyflagser import flagser_unweighted
         sub_mat = self.submatrix(sub_gids)
         return flagser_unweighted(sub_mat, directed=True)["betti"]
@@ -57,10 +64,10 @@ def in_degree_assemblies(assembly_grp_dict, conn_mat, post_id=None):
     :param assembly_grp_dict: dict with seeds as keys and assembly groups as values
     :param conn_mat: AssemblyTopology object for the circuit where the assemblies belong to
     :param post_id: optional ID of postsynaptic assembly for cross-assembly in degrees
-    :return in_degrees: dict with the same keys as `assembly_grp_dict` - within that an other dict
+    :return in_degrees: dict with the same keys as `assembly_grp_dict` - within that another dict
                         with keys as assembly labels and list of in degrees as values
-    :return in_d_control: dict with the same keys as `assembly_grp_dict` - within that an other dict
-                          with keys ['n', 'depths', 'mtype'] and yet an other dict similar to `in_degrees`
+    :return in_d_control: dict with the same keys as `assembly_grp_dict` - within that another dict
+                          with keys ['n', 'depths', 'mtype'] and yet another dict similar to `in_degrees`
                           but values are in degrees of the random controls
     """
     in_degrees = {}
@@ -82,14 +89,14 @@ def in_degree_assemblies(assembly_grp_dict, conn_mat, post_id=None):
 
 def simplex_counts_assemblies(assembly_grp_dict, conn_mat):
     """
-    Computes the simplices of assemblies across seeds
+    Computes the number of simplices of assemblies across seeds
     and a random controls of the same size/depth profile/mtype composition
     :param assembly_grp_dict: dict with seeds as keys and assembly groups as values
     :param conn_mat: AssemblyTopology object for the circuit where the assemblies belong to
-    :return simplex_count: dict with the same keys as `assembly_grp_dict` - within that an other dict
+    :return simplex_count: dict with the same keys as `assembly_grp_dict` - within that another dict
                            with keys as assembly labels and list of simplex counts as values
-    :return simplex_counts_control: dict with the same keys as `assembly_grp_dict` - within that an other dict
-                                    with keys ['n', 'depths', 'mtype'] and yet an other dict similar to `simplex_count`
+    :return simplex_counts_control: dict with the same keys as `assembly_grp_dict` - within that another dict
+                                    with keys ['n', 'depths', 'mtype'] and yet another dict similar to `simplex_count`
                                     but values are simplex counts of the random controls
     """
     simplex_counts = {}
@@ -106,6 +113,21 @@ def simplex_counts_assemblies(assembly_grp_dict, conn_mat):
                                        conn_mat.index("mtype").random_categorical_gids(assembly.gids))
                                        for assembly in assembly_grp.assemblies}
     return simplex_counts, s_c_control
+
+
+def simplex_list_assemblies(assembly_grp_dict, conn_mat):
+    """
+    Returns the simplices (as lists of gids) of assemblies across seeds
+    :param assembly_grp_dict: dict with seeds as keys and assembly groups as values
+    :param conn_mat: AssemblyTopology object for the circuit where the assemblies belong to
+    :return simplex_lists: dict with the same keys as `assembly_grp_dict` - within that another dict
+                           with keys as assembly labels and list of simplices
+    """
+    simplex_lists = {}
+    for seed, assembly_grp in tqdm(assembly_grp_dict.items(), desc="Getting simplex lists"):
+        simplex_lists[seed] = {assembly.idx: conn_mat.simplex_list(assembly.gids)
+                               for assembly in assembly_grp.assemblies}
+    return simplex_lists
 
 
 def simplex_counts_consensus_instantiations(consensus_assemblies_dict, conn_mat):

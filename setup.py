@@ -44,7 +44,8 @@ setup(
     extras_require={
         "docs": ["sphinx", "sphinx-bluebrain-theme"],
         "bluepy": ["bluepy[all]>=2.4.2"],
-        "conntility": ["Connectome-utilities @ https://bbpgitlab.epfl.ch/conn/structural/Connectome-utilities"]
+        "conntility": ["Connectome-utilities @ https://bbpgitlab.epfl.ch/conn/structural/Connectome-utilities"],
+        "pyflagsercount": ["flagser-count @ https://github.com/JasonPSmith/flagser-count"]
     },
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
