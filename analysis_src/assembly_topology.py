@@ -176,7 +176,18 @@ def _sample_simplex_idx(n_simplices, sampling_th=10000, sampling_ratio=0.1, seed
     return simplex_idx
 
 
-def assembly_prob_from_simplices(config):
+def _probs_dict_to_df(assembly_probs):
+    """Converts dict of assembly probs to DataFrame (to be able to use `seaborn` to plot their distributions)"""
+    dfs = []
+    for assembly_id, assembly_probs_tmp in assembly_probs.items():
+        for dim, probs in assembly_probs_tmp.items():
+            data = np.concatenate((np.tile(assembly_id, len(probs)).reshape(-1, 1),
+                                   np.tile(dim, len(probs)).reshape(-1, 1), probs.reshape(-1, 1)), axis=1)
+            dfs.append(pd.DataFrame(data=data, columns=["assembly_id", "dim", "probs"]))
+    return pd.concat(dfs, ignore_index=True).astype({"assembly_id": int, "dim": int})
+
+
+def assembly_prob_from_sinks(config):
     """TODO"""
 
     conn_mat = AssemblyTopology.from_h5(config.h5f_name,
@@ -186,24 +197,27 @@ def assembly_prob_from_simplices(config):
     gids = conn_mat.gids
 
     for seed, assembly_grp in assembly_grp_dict.items():
-        mean_probs = {assembly.idx[0]: {} for assembly in assembly_grp.assemblies}
-        std_probs = {assembly.idx[0]: {} for assembly in assembly_grp.assemblies}
-        for assembly in assembly_grp.assemblies:
+        chance_levels, assembly_probs = {}, {assembly.idx[0]: {} for assembly in assembly_grp.assemblies}
+        for assembly in tqdm(assembly_grp.assemblies, desc="Iterating over assemblies"):
+
             sub_mat = conn_mat.submatrix(assembly.gids, sub_gids_post=gids).tocsr()
             assembly_gid_idx = np.in1d(gids, assembly.gids, assume_unique=True).nonzero()[0]
+            chance_levels[assembly.idx[0]] = len(assembly_gid_idx) / len(gids)
             simplex_list = simplex_lists[seed][assembly.idx]
-            for dim in [4, 5, 6]:  # dim here is the dimension including the sink we're looking for
+            for dim in [4, 5]:  # dim here is the dimension including the sink we're looking for
                 simplices = simplex_list[dim - 1]  # dim-1 dimensional simplices
                 simplex_idx = _sample_simplex_idx(simplices.shape[0])
-                probs = np.zeros_like(simplex_idx, dtype=np.float32)
+                probs = []
                 for i, simplex_id in tqdm(enumerate(simplex_idx), desc="Checking for sinks",
                                           total=len(simplex_idx), miniters=len(simplex_idx) / 100, leave=False):
                     sink_idx = sub_mat[simplices[simplex_id, :]].toarray().all(axis=0).nonzero()[0]
                     if len(sink_idx):
-                        idx = np.in1d(assembly_gid_idx, sink_idx, assume_unique=True)
-                        probs[i] = (idx.sum() / len(idx))
-                mean_probs[assembly.idx[0]][dim] = np.mean(probs)
-                std_probs[assembly.idx[0]][dim] = np.std(probs)
+                        idx = np.in1d(sink_idx, assembly_gid_idx, assume_unique=True)
+                        probs.append(idx.sum() / len(idx))
+                assembly_probs[assembly.idx[0]][dim] = np.array(probs)
+
+        fig_name = os.path.join(config.fig_path, "assembly_prob_from_simplex_dim_%s.png" % seed)
+        plots.plot_assembly_prob_from_sinks(_probs_dict_to_df(assembly_probs), chance_levels, fig_name)
 
 
 def _nnd_df_to_dict(nnd_df):
@@ -357,13 +371,15 @@ def frac_entropy_explained_by_patterns(config, min_samples=100):
 
 
 if __name__ == "__main__":
-    config = Config("../configs/v7_bbp-workflow.yaml")
+    # config = Config("../configs/v7_bbp-workflow.yaml")
+    config = Config("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_bbp-workflow.yaml")
     # assembly_efficacy(config)
     # assembly_in_degree(config)
     # assembly_simplex_counts(config)
-    assembly_indegrees = frac_entropy_explained_by_indegree(config)
-    assembly_nnds = frac_entropy_explained_by_syn_nnd(config)
-    assembly_prob_from_indegree_and_syn_nnd(config, assembly_indegrees, assembly_nnds,
-                                            {"below avg.": "assembly_color", "avg.": "gray", "above avg.": "black"})
+    # assembly_indegrees = frac_entropy_explained_by_indegree(config)
+    assembly_prob_from_sinks(config)
+    # assembly_nnds = frac_entropy_explained_by_syn_nnd(config)
+    # assembly_prob_from_indegree_and_syn_nnd(config, assembly_indegrees, assembly_nnds,
+    #                                         {"below avg.": "assembly_color", "avg.": "gray", "above avg.": "black"})
     # frac_entropy_explained_by_patterns(config)
 

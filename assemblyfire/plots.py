@@ -496,7 +496,7 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"
 
 
 def plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, xlabel, palette, fig_name):
-    """Plots assembly membership probability vs. number of connections from pattern"""
+    """Plots assembly membership probability vs. whatever data `xlabel` is"""
     keys = list(list(assembly_probs.keys()))
     assembly_labels = list(assembly_probs[keys[0]].keys())
     n = len(assembly_labels)
@@ -547,11 +547,36 @@ def plot_frac_entropy_explained_by(mi_df, ylabel, fig_name):
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
 
 
+def plot_assembly_prob_from_sinks(assembly_probs, chance_levels, fig_name):
+    """Plots distribution of assembly membership probabilities vs. simplex dimension"""
+    assembly_labels = assembly_probs["assembly_id"].unique()
+    n = len(assembly_labels)
+    cmap = plt.cm.get_cmap("tab20", np.max([assembly_label for assembly_label in assembly_labels]) + 1)
+
+    fig = plt.figure(figsize=(20, 8))
+    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
+    gs = gridspec.GridSpec(n_rows, 5)
+    for i, assembly_label in enumerate(assembly_labels):
+        ax = fig.add_subplot(gs[i])
+        sns.violinplot(data=assembly_probs.loc[assembly_probs["assembly_id"] == assembly_label], x="dim", y="probs",
+                       color=cmap(i), ax=ax)
+        ax.axhline(chance_levels[assembly_label], linestyle="--", color="lightgray")
+        ax.set_xlabel(""); ax.set_ylabel("")
+    sns.despine(bottom=True, trim=True, offset=2)
+    fig.add_subplot(1, 1, 1, frameon=False)
+    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    plt.xlabel("Simplex dimension")
+    plt.ylabel("Prob. of assembly membership")
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_simplex_counts(simplex_counts, simplex_counts_control, fig_name):
     """Plots simplex counts for assemblies (within one seed) and random controls"""
     assembly_labels = list(simplex_counts.keys())
     n = len(assembly_labels)
-    cmap = plt.cm.get_cmap("tab20", np.max([assembly_label[0] for assembly_label in assembly_labels])+1)
+    cmap = plt.cm.get_cmap("tab20", np.max([assembly_label[0] for assembly_label in assembly_labels]) + 1)
 
     fig = plt.figure(figsize=(20, 8))
     n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
