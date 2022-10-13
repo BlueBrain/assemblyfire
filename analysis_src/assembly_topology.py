@@ -1,6 +1,6 @@
 """
-In degrees, simplex counts, and pot/dep ratios of assemblies
-last modified: András Ecker 09.2022
+In degrees, simplex counts, pot/dep ratios, and membership probabilities of assemblies
+last modified: András Ecker 10.2022
 """
 
 import os
@@ -8,10 +8,11 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 
+from assemblyfire.config import Config
 import assemblyfire.utils as utils
 import assemblyfire.plots as plots
-from assemblyfire.config import Config
-from assemblyfire.topology import AssemblyTopology, in_degree_assemblies, simplex_counts_assemblies
+from assemblyfire.topology import AssemblyTopology, in_degree_assemblies,\
+                                  simplex_counts_assemblies, simplex_list_assemblies
 
 
 def assembly_efficacy(config):
@@ -164,6 +165,45 @@ def frac_entropy_explained_by_indegree(config, min_samples=100):
         plots.plot_frac_entropy_explained_by(pd.DataFrame(assembly_mi).transpose(), "Innervation by assembly", fig_name)
 
     return assembly_indegrees_dict
+
+
+def _sample_simplex_idx(n_simplices, sampling_th=10000, sampling_ratio=0.1, seed=12345):
+    """Downsamples simplex list if it's too long'"""
+    np.random.seed(seed)
+    simplex_idx = np.arange(n_simplices)
+    if len(simplex_idx) > sampling_th:
+        simplex_idx = np.random.choice(simplex_idx, int(len(simplex_idx * sampling_ratio)), replace=False)
+    return simplex_idx
+
+
+def assembly_prob_from_simplices(config):
+    """TODO"""
+
+    conn_mat = AssemblyTopology.from_h5(config.h5f_name,
+                                        prefix=config.h5_prefix_connectivity, group_name="full_matrix")
+    assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+    simplex_lists = simplex_list_assemblies(assembly_grp_dict, conn_mat)
+    gids = conn_mat.gids
+
+    for seed, assembly_grp in assembly_grp_dict.items():
+        mean_probs = {assembly.idx[0]: {} for assembly in assembly_grp.assemblies}
+        std_probs = {assembly.idx[0]: {} for assembly in assembly_grp.assemblies}
+        for assembly in assembly_grp.assemblies:
+            sub_mat = conn_mat.submatrix(assembly.gids, sub_gids_post=gids).tocsr()
+            assembly_gid_idx = np.in1d(gids, assembly.gids, assume_unique=True).nonzero()[0]
+            simplex_list = simplex_lists[seed][assembly.idx]
+            for dim in [4, 5, 6]:  # dim here is the dimension including the sink we're looking for
+                simplices = simplex_list[dim - 1]  # dim-1 dimensional simplices
+                simplex_idx = _sample_simplex_idx(simplices.shape[0])
+                probs = np.zeros_like(simplex_idx, dtype=np.float32)
+                for i, simplex_id in tqdm(enumerate(simplex_idx), desc="Checking for sinks",
+                                          total=len(simplex_idx), miniters=len(simplex_idx) / 100, leave=False):
+                    sink_idx = sub_mat[simplices[simplex_id, :]].toarray().all(axis=0).nonzero()[0]
+                    if len(sink_idx):
+                        idx = np.in1d(assembly_gid_idx, sink_idx, assume_unique=True)
+                        probs[i] = (idx.sum() / len(idx))
+                mean_probs[assembly.idx[0]][dim] = np.mean(probs)
+                std_probs[assembly.idx[0]][dim] = np.std(probs)
 
 
 def _nnd_df_to_dict(nnd_df):
