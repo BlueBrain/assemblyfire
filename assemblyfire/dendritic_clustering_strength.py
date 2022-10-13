@@ -71,7 +71,7 @@ class DendriticClusteringResults(object):
         if o == 0: return
 
         dset.resize((dset.shape[0] + o, dset.shape[1]))
-        dset[-o:] = df.values.astype(float)
+        dset[-o:] = df
     
     def unwritten_rows(self):
         write_order = [self.DSET_MEMBER, self.DSET_CLST, self.DSET_PVALUE, self.DSET_DEG]
