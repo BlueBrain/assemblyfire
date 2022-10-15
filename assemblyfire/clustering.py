@@ -1,10 +1,7 @@
 """
-Functions to run either hierarchical clustering (via Ward's linkage)
+Functions to run hierarchical clustering (via Ward's linkage)
 of the cosine similarity matrix of significant time bins
-a la Perez-Ortega et al. 2021 (see also Carillo-Reid et al. 2015), or
-density based clustering a la Rodriguez and Laio 2014
-(slightly modified by Yger et al. 2018)
-of spike matrix projected to PCA space a la Herzog et al. 2021.
+a la Perez-Ortega et al. 2021 (see also Carillo-Reid et al. 2015)
 Then "core-cells" and cell assemblies are detected with correlation
 based methods from (Montijn et al. 2016 and) Herzog et al. 2021.
 Assemblies are clustered into consensus assemblies via hierarchical clustering.
@@ -17,24 +14,22 @@ import logging
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
-import multiprocessing as mp
-from scipy.optimize import curve_fit
+from joblib import Parallel, delayed
 from scipy.stats import poisson
-from scipy.stats.distributions import t
+from scipy.sparse import csr_matrix
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.cluster.hierarchy import linkage, fcluster
-from sklearn.decomposition import PCA
-from sklearn.metrics import pairwise_distances, silhouette_score, silhouette_samples, davies_bouldin_score
+from sklearn.metrics import silhouette_score, silhouette_samples, davies_bouldin_score
 
 L = logging.getLogger("assemblyfire")
 XYZ = ["x", "y", "z"]
 
 
-def cosine_similarity(X):
-    """Cosine similarity matrix calculation (using only core numpy)
-    much faster then `1-squareform(pdist(X, metrix="cosine"))`"""
-    X_norm = X / np.linalg.norm(X, axis=-1)[:, np.newaxis]
-    return np.dot(X_norm, X_norm.T)
+def cosine_similarity(x):
+    """Cosine similarity between rows of matrix
+    much faster than `1 - squareform(pdist(x, metrix="cosine"))`"""
+    x_norm = x / np.linalg.norm(x, axis=-1)[:, np.newaxis]
+    return np.dot(x_norm, x_norm.T)
 
 
 # hierarchical clustering (using scipy and sklearn)
@@ -67,84 +62,16 @@ def cluster_sim_mat(spike_matrix, min_n_clusts=5, max_n_clusts=20, n_method="DB"
     return sim_matrix, clusters - 1, plotting
 
 
-# density based clustering (built from core numpy and scipy functions)
-def PCA_ncomps(matrix, n_components):
-    """PCA wrapper with fixed number of components"""
-    F = PCA(n_components)
-    transformed = F.fit_transform(matrix)
-    return transformed, F.components_
-
-
-def calc_rho_delta(dists, ratio_to_keep):
-    """Herzog et al. 2021: calculates local density: \rho_i = 1 / (1/N*\sum_{j:d_ij<d_c} d_ij) and
-    minimum distance with points with higher density: \delta_i = min_{j:\rho_j>\rho_i} (d_ij)"""
-    # keep a given % of the neighbours a la Yger et al. 2018
-    # (not constant d_c as in the original Rodrigez and Laio 2014 paper)
-    n2keep = int(ratio_to_keep * dists.shape[1])
-    # taking the mean distance of the closest neighbours
-    mean_min_dists = np.mean(np.sort(dists, axis=1)[:, 0:n2keep], axis=1)
-    # replacing 0s as dividing by 0 would give an error in the next line
-    mean_min_dists[mean_min_dists == 0] = np.min(mean_min_dists[mean_min_dists != 0])
-    # inverse of mean minimum distances -> density
-    rhos = 1 / mean_min_dists
-    max_rho = np.max(rhos)
-
-    deltas = np.zeros_like(rhos, dtype=np.float)
-    for i, rho in enumerate(rhos):
-        if rho != max_rho:
-            idx = np.where(rhos > rho)[0]
-            deltas[i] = np.min(dists[i, idx])
-        else:
-            deltas[i] = np.max(dists[i, :])
-    return rhos, deltas
-
-
-def _fn(x, m, yshift):
-    """Dummy function to be passed to `cure_fit()``"""
-    return x*m + yshift
-
-
-def fit_gammas(gammas, alpha=0.001):
-    """Fits sorted gammas"""
-    tmp_idx = np.arange(0, len(gammas))
-    popt, pcov = curve_fit(_fn, tmp_idx, gammas)
-    dof = len(gammas)-len(popt)
-    t_val = t.ppf(1-alpha/2, dof)
-    stds = t_val * np.sqrt(np.diagonal(pcov))
-    return tmp_idx, popt, stds
-
-
-def db_clustering(matrix, ratio_to_keep=0.02):
-    """Density based clustering a la Rodriguez and Laio 2014"""
-    # calc pairwise_distances
-    dists = squareform(pdist(matrix, metric="euclidean"))
-    np.fill_diagonal(dists, np.max(dists))  # get rid of zero dists in the diagonal
-    # define density
-    rhos, deltas = calc_rho_delta(dists, ratio_to_keep)
-    gammas = rhos * deltas
-    sort_idx = np.argsort(gammas, kind="mergsort")[::-1]
-    sorted_gammas = gammas[sort_idx]
-    # fit gammas to define threshold
-    tmp_idx, popt, stds = fit_gammas(sorted_gammas)
-    fit = _fn(tmp_idx, *popt)
-    lCI = _fn(tmp_idx, *(popt-stds))
-    uCI = _fn(tmp_idx, *(popt+stds))
-    # find cluster centroids
-    centroid_idx = np.where(gammas >= uCI)[0]
-    assert len(centroid_idx) <= 20, "len(centroid_idx)=%i > 20" % len(centroid_idx)
-    plotting = [rhos, deltas, tmp_idx, sorted_gammas, fit, lCI, uCI, centroid_idx]
-    # assign points to centroids
-    clusters = np.argmin(dists[:, centroid_idx], axis=1)
-    clusters[centroid_idx] = np.arange(len(centroid_idx))
-    return clusters, plotting
-
-
 # core-cells and assemblies related functions (mostly calculating correlations)
 def pairwise_correlation_X(x):
-    """Pairwise correlation between rows of a matrix x"""
-    corrs = 1 - pairwise_distances(x, metric="correlation", n_jobs=-1, force_all_finite=False)
-    corrs[np.isnan(corrs)] = 0.
-    return corrs
+    """Pairwise correlation between rows of a matrix `x` (assumed to be sparse)
+    much faster than `1 - squareform(pdist(x, metrix="correlation"))`"""
+    n = x.shape[1]
+    sparse_x = csr_matrix(x)
+    row_sum = sparse_x.sum(axis=1)
+    cov = (sparse_x * sparse_x.T - (np.outer(row_sum, row_sum) / n)) / (n - 1)
+    norm = np.sqrt(np.outer(np.diag(cov), np.diag(cov)))
+    return cov / (norm + 1e-99)
 
 
 def pairwise_correlation_XY(x, y):
@@ -174,19 +101,12 @@ def corr_shuffled_spike_matrix_clusters(spike_matrix, sparse_clusters):
     return corr_spike_matrix_clusters(spike_matrix_rnd, sparse_clusters)
 
 
-def _corr_spikes_clusters_subprocess(inputs):
-    """Subprocess used by multiprocessing pool for setting significance threshold"""
-    return corr_shuffled_spike_matrix_clusters(*inputs)
-
-
-def sign_corr_ths(spike_matrix, sparse_clusters, th_pct, N=1000):
+def sign_corr_ths(spike_matrix, sparse_clusters, th_pct, nreps=1000):
     """Generates `N` surrogate datasets and calculates correlation coefficients
     then takes `th_pct`% percentile of the surrogate datasets as a significance threshold"""
-    n = N if mp.cpu_count()-1 > N else mp.cpu_count()-1
-    pool = mp.Pool(processes=n)
-    corrs = pool.map(_corr_spikes_clusters_subprocess, zip([spike_matrix for _ in range(N)],
-                                                           [sparse_clusters for _ in range(N)]))
-    pool.terminate()
+    nprocs = nreps if os.cpu_count()-1 > nreps else os.cpu_count()-1
+    with Parallel(n_jobs=nprocs, prefer="threads") as p:
+        corrs = p(delayed(corr_shuffled_spike_matrix_clusters)(spike_matrix, sparse_clusters) for _ in range(nreps))
     corrs = np.dstack(corrs)  # shape: ngids x nclusters x N
     # get sign threshold (compare to Monte-Carlo shuffles)
     corr_ths = np.percentile(corrs, th_pct, axis=2, overwrite_input=True)
@@ -198,6 +118,7 @@ def within_cluster_correlations(spike_matrix, core_cell_idx):
     against the avg. correlation in the whole dataset
     if the within cluster correlation it's higher the cluster is an assembly"""
     corrs = pairwise_correlation_X(spike_matrix)
+    del spike_matrix
     np.fill_diagonal(corrs, np.nan)
     mean_corr = np.nanmean(corrs)
 
@@ -209,22 +130,21 @@ def within_cluster_correlations(spike_matrix, core_cell_idx):
     return assembly_idx
 
 
-def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
+def cluster_spikes(spike_matrix_dict, overwrite_seeds, project_metadata, fig_path):
     """
     Cluster spikes either via hierarchical clustering (Ward's linkage)
     of the cosine similarity matrix of significant time bins (see Perez-Ortega et al. 2021), or
     density based clustering of spike matrix projected to PCA space (see Herzog et al. 2021)
     :param spike_matrix_dict: dict with seed as key and SpikeMatrixResult (see `spikes.py`) as value
-    :param method: str - clustering method (read from yaml config file)
     :param overwrite_seeds: dict with seeds as keys and values as desired number of clusters
                            (instead of the optimal cluster number determined with the current heuristics in place)
     :param FigureArgs: plotting related arguments (see `find_assemblies.py`)
     :return: dict with seed as key and clustered (significant) time bins as value
     """
-    from assemblyfire.plots import plot_cluster_seqs, plot_pattern_clusters
+    from assemblyfire.plots import plot_sim_matrix, plot_cluster_seqs, plot_pattern_clusters, plot_dendogram_silhouettes
 
-    fig_path = FigureArgs.fig_path
-    ts, stim_times, patterns,  = FigureArgs.t, FigureArgs.stim_times, np.asarray(FigureArgs.patterns)
+    ts, stim_times = project_metadata["t"], project_metadata["stim_times"]
+    patterns = np.asarray(project_metadata["patterns"])
     clusters_dict = {}
     for seed, SpikeMatrixResult in tqdm(spike_matrix_dict.items(), desc="Clustering"):
         spike_matrix, t_bins = SpikeMatrixResult.spike_matrix, SpikeMatrixResult.t_bins
@@ -233,31 +153,17 @@ def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
         else:
             idx = np.arange(len(stim_times))  # just to not break the code...
 
-        if method == "hierarchical":
-            from assemblyfire.plots import plot_sim_matrix, plot_dendogram_silhouettes
-            if seed not in overwrite_seeds:
-                sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix)
-            else:
-                sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix, min_n_clusts=overwrite_seeds[seed],
-                                                                 max_n_clusts=overwrite_seeds[seed])
-            fig_name = os.path.join(fig_path, "similarity_matrix_seed%i.png" % seed)
-            plot_sim_matrix(sim_matrix.copy(), t_bins, stim_times[idx], patterns[idx], fig_name)
-            fig_name = os.path.join(fig_path, "ward_clustering_seed%i.png" % seed)
-            plot_dendogram_silhouettes(clusters, *plotting, fig_name)
-        elif method == "density_based":
-            from assemblyfire.plots import plot_transformed, plot_components, plot_rhos_deltas
-            pca_transformed, pca_components = PCA_ncomps(spike_matrix.T, 12)
-            # TODO: add overwrite_seeds here as well
-            clusters, plotting = db_clustering(pca_transformed)
-
-            fig_name = os.path.join(fig_path, "PCA_transformed_seed%i.png" % seed)
-            plot_transformed(pca_transformed, t_bins, stim_times[idx], patterns[idx], fig_name)
-            fig_name = os.path.join(fig_path, "PCA_components_seed%i.png" % seed)
-            plot_components(pca_components, SpikeMatrixResult.gids, FigureArgs.depths, fig_name)
-            fig_name = os.path.join(fig_path, "rho_delta_seed%i.png" % seed)
-            plot_rhos_deltas(*plotting, fig_name)
-
+        if seed not in overwrite_seeds:
+            sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix)
+        else:
+            sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix, min_n_clusts=overwrite_seeds[seed],
+                                                             max_n_clusts=overwrite_seeds[seed])
         clusters_dict[seed] = clusters
+
+        fig_name = os.path.join(fig_path, "similarity_matrix_seed%i.png" % seed)
+        plot_sim_matrix(sim_matrix.copy(), t_bins, stim_times[idx], patterns[idx], fig_name)
+        fig_name = os.path.join(fig_path, "ward_clustering_seed%i.png" % seed)
+        plot_dendogram_silhouettes(clusters, *plotting, fig_name)
         fig_name = os.path.join(fig_path, "cluster_seq_seed%i.png" % seed)
         plot_cluster_seqs(clusters, t_bins, stim_times[idx], patterns[idx], fig_name)
         fig_name = os.path.join(fig_path, "clusters_patterns_seed%i.png" % seed)
@@ -265,7 +171,7 @@ def cluster_spikes(spike_matrix_dict, method, overwrite_seeds, FigureArgs):
     return clusters_dict
 
 
-def detect_assemblies(spike_matrix_dict, clusters_dict, core_cell_th_pct, h5f_name, h5_prefix, FigureArgs):
+def detect_assemblies(spike_matrix_dict, clusters_dict, core_cell_th_pct, h5f_name, h5_prefix, nrn_loc_df, fig_path):
     """
     Finds "core cells" - cells which correlate with the activation of (clustered) time bins
     and then checks within group correlations against the mean correlation to decide
@@ -275,7 +181,8 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, core_cell_th_pct, h5f_na
     :param core_cell_th_pct: float - sign. threshold in surrogate dataset for core cell detection
     :param h5f_name: str - name of the HDF5 file (dumping the assemblies and their metadata)
     :param h5_prefix: str - directory name of assemblies within the HDF5 file
-    :param FigureArgs: plotting related arguments (see `cli.py`)
+    :param nrn_loc_df: DataFrame with neuron locations
+    :param fig_path: str - root path for figures
     """
     from assemblyfire.assemblies import Assembly, AssemblyGroup
     from assemblyfire.plots import plot_assemblies
@@ -290,7 +197,8 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, core_cell_th_pct, h5f_na
         corrs = corr_spike_matrix_clusters(spike_matrix, sparse_clusters)
         corr_ths = sign_corr_ths(spike_matrix, sparse_clusters, core_cell_th_pct)
         core_cell_idx = np.zeros_like(corrs, dtype=int)
-        core_cell_idx[np.where(corrs > corr_ths)] = 1
+        core_cell_idx[corrs > corr_ths] = 1
+        del corrs
         # cell assemblies
         assembly_idx = within_cluster_correlations(spike_matrix, core_cell_idx)
 
@@ -301,9 +209,8 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, core_cell_th_pct, h5f_na
         assemblies.to_h5(h5f_name, prefix=h5_prefix)
 
         # plot (only depth profile at this point)
-        fig_name = os.path.join(FigureArgs.fig_path, "assemblies_seed%i.png" % seed)
-        plot_assemblies(core_cell_idx, assembly_idx, gids,
-                        FigureArgs.ystuff, FigureArgs.depths, fig_name)
+        fig_name = os.path.join(fig_path, "assemblies_seed%i.png" % seed)
+        plot_assemblies(core_cell_idx, assembly_idx, gids, nrn_loc_df, fig_name)
 
 
 def _check_seed_separation(clusters, n_assemblies_cum):
