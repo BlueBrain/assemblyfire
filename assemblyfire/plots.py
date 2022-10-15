@@ -25,7 +25,7 @@ def plot_rate(rate, rate_th, t_start, t_end, fig_name):
     ax = fig.add_subplot(1, 1, 1)
     sns.despine()
     ax.plot(np.linspace(t_start, t_end, len(rate)), rate, "k-")
-    ax.axhline(np.mean(rate)+rate_th, color="gray", ls="--")
+    ax.axhline(np.mean(rate) + rate_th, color="gray", ls="--")
     ax.set_xlim([t_start, t_end])
     ax.set_xlabel("Time (ms)")
     ax.set_ylabel("Rate (Hz)")
@@ -77,77 +77,6 @@ def plot_sims_vs_rate_and_tdiff(sim_matrix, pw_avg_rate, t_offsets, mean_sims, f
     ax2.set_xlabel("Pairwise avg. rate (Hz)")
     ax2.set_ylabel("Similarity")
     sns.despine(trim=True)
-    fig.tight_layout()
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
-    plt.close(fig)
-
-
-def plot_transformed(transformed, t_bins, stim_times, patterns, fig_name):
-    """Plots time series in factor analysis/PCA space"""
-    t_idx, sign_patterns = _get_pattern_idx(t_bins, stim_times, patterns)
-    transformed_T = transformed.T
-    fig = plt.figure(figsize=(20, 8))
-    ax = fig.add_subplot(1, 1, 1)
-    ax.imshow(transformed_T, cmap="coolwarm", aspect="auto")
-    ax.set_xlabel("time bins")
-    ax.set_xticks(t_idx); ax.set_xticklabels(sign_patterns)
-    ax.xaxis.tick_top()
-    ax.set_ylabel("components")
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
-    plt.close(fig)
-
-
-def _reorder_gids(row_map, depths):
-    """reorder components by gid depths"""
-    tmp = depths.loc[row_map].to_numpy()
-    return np.argsort(tmp)
-
-
-def plot_components(components, row_map, depths, fig_name):
-    """Plots components of factor analysis/PCA"""
-    gid_idx = _reorder_gids(row_map, depths)[::-1]
-    n = len(gid_idx)
-    fig = plt.figure(figsize=(20, 8))
-    ax = fig.add_subplot(1, 1, 1)
-    i = ax.imshow(components[:, gid_idx], cmap="coolwarm", aspect="auto")
-    ax.set_xlabel("gids (n=%i)" % n)
-    ax.set_xticks([0, n])
-    ax.set_xticklabels(["L2", "L6"])
-    ax.xaxis.tick_top()
-    #ax.set_xlim([0, xstuff["vlines"][-1]])
-    ax.set_ylabel("components")
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
-    plt.close(fig)
-
-
-def plot_rhos_deltas(rhos, deltas, tmp_idx, gammas, fit, lCI, uCI, centroid_idx, fig_name):
-    """Plots rhos vs. deltas a la Rodriguez and Laio 2014"""
-    tmp_centroid_idx = np.arange(len(centroid_idx))
-    fig = plt.figure(figsize=(11, 5))
-    ax = fig.add_subplot(1, 2, 1)
-    ax.scatter(rhos, deltas, c="black", marker='.', s=12)
-    ax.scatter(rhos[centroid_idx], deltas[centroid_idx], c="red", marker='.', s=12)
-    ax.set_xlabel(r"$\rho_i$")
-    ax.set_xticks([np.min(rhos), np.max(rhos)])
-    ax.set_xlim([np.min(rhos), np.max(rhos)])
-    ax.set_ylabel(r"$\delta_i$")
-    ax.set_ylim([np.min(deltas), np.max(deltas)])
-    ax.set_yticks([np.min(deltas), np.max(deltas)])
-    sns.despine(ax=ax, offset=5, trim=True)
-    ax2 = fig.add_subplot(1, 2, 2)
-    ax2.scatter(tmp_idx, gammas, c="black", marker='.', s=12)
-    ax2.scatter(tmp_idx[tmp_centroid_idx], gammas[tmp_centroid_idx], c="red",
-                marker='.', s=12, label="centroids")
-    ax2.plot(tmp_idx, fit, color="gray")
-    ax2.fill_between(tmp_idx, lCI, uCI, color="gray", alpha=0.5, label="99.9% CI")
-    ax2.set_xlabel("n")
-    ax2.set_xticks([tmp_idx[0], tmp_idx[-1]])
-    ax2.set_xlim([tmp_idx[0], tmp_idx[-1]])
-    ax2.set_ylabel(r"$\gamma_i = \rho_i \delta_i$")
-    ax2.set_ylim([np.min(gammas), np.max(gammas)])
-    ax2.set_yticks([np.min(gammas), np.max(gammas)])
-    ax2.legend(frameon=False)
-    sns.despine(ax=ax2, offset=5, trim=True)
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -246,7 +175,7 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
     ax.xaxis.tick_top()
     ax.set_yticks([])
     for i, (name, matrix) in enumerate(pattern_matrices.items()):
-        ax = fig.add_subplot(gs[1+np.floor_divide(i, 5), np.mod(i, 5)-5])
+        ax = fig.add_subplot(gs[1+np.floor_divide(i, 5), np.mod(i, 5)])
         i = ax.imshow(matrix, cmap=cmap, aspect="auto")
         images.append(i)
         ax.set_title(name)
@@ -292,7 +221,7 @@ def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, f
     ax.xaxis.tick_top()
     ax.set_yticks([])
     for i, (name, matrix) in enumerate(pattern_matrices.items()):
-        ax = fig.add_subplot(gs[1+np.floor_divide(i, 5), np.mod(i, 5)-5])
+        ax = fig.add_subplot(gs[1+np.floor_divide(i, 5), np.mod(i, 5)])
         ax.imshow(matrix, cmap=cmap, norm=norm, aspect="auto")
         ax.set_title(name)
         ax.set_xticks([0, matrix.shape[1] - 1])
@@ -318,7 +247,7 @@ def plot_pattern_clusters(clusters, t_bins, stim_times, patterns, fig_name):
         for j in range(n):
             if j in clusts:
                 heights[j] = counts[clusts == j]
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
         x = np.arange(n)
         ax.bar(x, heights, width=0.5, align="center", color=cols)
         ax.set_title(pattern_name)
@@ -353,7 +282,7 @@ def plot_pattern_cons_clusters(cons_clusters_dict, t_bins_dict, stim_times_dict,
     gs = gridspec.GridSpec(2, 5)
     x = np.arange(n_clusters)
     for i, pattern_name in enumerate(np.sort(patter_names)):
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
         ax.bar(x, heights_dict[pattern_name], width=0.5, align="center", color=cols)
         ax.set_title(pattern_name)
         ax.set_xticks(x)
@@ -365,45 +294,51 @@ def plot_pattern_cons_clusters(cons_clusters_dict, t_bins_dict, stim_times_dict,
     plt.close(fig)
 
 
-def _guess_circuit_version(hlines):
-    """The version of the circuit: O1.v5 AKA Markram et al. 2015 or SSCx (v7) determines how to get depth values
-    as it's simply y coordinate in v5, while it has to be derived from the stream lines of the atlas-based SSCx.
-    The layer boundaries are ill-defined in the atlas-based v7 version and thus only the top and bottom are saved in
-    `utils.get_figure_asthetics()`. This helper function guesses the version from the saved `hlines`"""
-    return "v5" if len(hlines) > 2 else "v7"
+def _get_depth_yticks(loc_df):
+    """Gets mean depth for each layer (used for setting ticks for depth based plots)"""
+    gb_locs = loc_df.groupby("layer")
+    yticks = gb_locs["depth"].mean().to_numpy()
+    yticklabels = ["L%i\n(%i)" % (l, n) for l, n in gb_locs.size().items()]
+    return yticks, yticklabels
 
 
-def plot_assemblies(core_cell_idx, assembly_idx, row_map, ystuff, depths, fig_name):
+def plot_assemblies(core_cell_idx, assembly_idx, gids, loc_df, fig_name):
     """Plots depth profile of all assemblies"""
     cmap = plt.cm.get_cmap("tab20", core_cell_idx.shape[1])
     n = len(assembly_idx)
-    yrange = [ystuff["hlines"][-1], ystuff["hlines"][0]]
-    c_version = _guess_circuit_version(ystuff["hlines"])
-    yrange_hist = [yrange[-1], yrange[0]] if c_version == "v7" else yrange
+    yticks, yticklabels = _get_depth_yticks(loc_df)
+    x_range = [loc_df["ss_flat_x"].min(), loc_df["ss_flat_x"].max()]
+    y_range = [loc_df["ss_flat_y"].min(), loc_df["ss_flat_y"].max()]
+    extent = (x_range[0], x_range[1], y_range[0], y_range[1])
+    depth_range = [loc_df["depth"].min(), loc_df["depth"].max()]
 
-    fig = plt.figure(figsize=(20, 8))
+    fig = plt.figure(figsize=(20, 10))
     n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
-    gs = gridspec.GridSpec(n_rows, 5)
+    gs = gridspec.GridSpec(2 * n_rows, 5)
     for i, assembly_id in enumerate(assembly_idx):
-        gids = row_map[np.where(core_cell_idx[:, assembly_id] == 1)[0]]
-        assembly_depths = depths.loc[gids].to_numpy()
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)-5])
-        ax.hist(assembly_depths, bins=50, range=yrange_hist, orientation="horizontal",
-                color=cmap(assembly_id), edgecolor=cmap(assembly_id))
-        if c_version == "v5":
-            for i in range(1, 5):
-                ax.axhline(ystuff["hlines"][i], color="gray", ls="--")
-        ax.set_title("Assembly %i (n=%i)" % (assembly_id, len(assembly_depths)))
-        ax.set_xticks([])
-        ax.set_yticks(ystuff["yticks"])
-        ax.set_ylim(yrange)
-        ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"]])
-        sns.despine(bottom=True, offset=5)
+        assembly_gids = gids[core_cell_idx[:, assembly_id] == 1]
+        ax = fig.add_subplot(gs[2 * np.floor_divide(i, 5), np.mod(i, 5)])
+        ax.hexbin(loc_df.loc[assembly_gids, "ss_flat_x"].to_numpy(), loc_df.loc[assembly_gids, "ss_flat_y"].to_numpy(),
+                  cmap=colors.LinearSegmentedColormap.from_list("assembly", [(1, 1, 1), cmap(i)], N=5),
+                  gridsize=50, bins="log", extent=extent)
+        ax.set_title("Assembly %i (n=%i)" % (assembly_id, len(assembly_gids)))
+        ax.set_xticks([]); ax.set_yticks([])
+        ax.set_xlim(x_range); ax.set_ylim(y_range)
+        ax2 = fig.add_subplot(gs[2 * np.floor_divide(i, 5) + 1, np.mod(i, 5)])
+        ax2.hist(loc_df.loc[assembly_gids, "depth"].to_numpy(), bins=50, range=depth_range, orientation="horizontal",
+                 color=cmap(assembly_id), edgecolor=cmap(assembly_id))
+        ax2.set_xticks([])
+        ax2.set_yticks(yticks)
+        ax2.set_ylim(depth_range[::-1])
+        ax2.set_yticklabels([label[0:2] for label in yticklabels])
+        sns.despine(ax=ax, bottom=True, left=True)
+        sns.despine(ax=ax2, bottom=True, offset=5)
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 
 
+#TODO: fix consensus assembly related plots that still have `ystuff` and `depths` as inputs
 def plot_single_cell_features(gids, r_spikes, mean_ts, std_ts, ystuff, depths, bin_size, fig_name):
     """Plots spike time reliability and mean+/-std(spike time) in bin"""
     gid_depths = depths.loc[gids].to_numpy()
@@ -452,7 +387,7 @@ def plot_efficacy(efficacies, fig_name):
     for i, assembly_label in enumerate(assembly_labels):
         sizes = np.array([efficacies[assembly_label][0], efficacies[assembly_label][1]])
         ratios = 100 * sizes / np.sum(sizes)
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
         ax.pie(sizes, labels=["%.2f%%" % ratio for ratio in ratios], colors=[BLUE, RED])
         ax.set_title("Assembly %i\n(nsyns=%.2fM)" % (assembly_label, (sizes[0]+sizes[1]) / 1e6))
     fig.tight_layout()
@@ -471,7 +406,7 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"
     n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
     gs = gridspec.GridSpec(n_rows, 5)
     for i, assembly_label in enumerate(assembly_labels):
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
         max_in_degree = np.max(in_degrees[assembly_label])
         ax.hist(in_degrees[assembly_label], bins=50, range=(0, max_in_degree),
                 color=cmap(assembly_label[0]), edgecolor=cmap(assembly_label[0]), label="assembly")
@@ -582,7 +517,7 @@ def plot_simplex_counts(simplex_counts, simplex_counts_control, fig_name):
     n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
     gs = gridspec.GridSpec(n_rows, 5)
     for i, assembly_label in enumerate(assembly_labels):
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
         ax.plot(simplex_counts[assembly_label], color=cmap(assembly_label[0]), lw=3, label="assembly")
         ax.plot(simplex_counts_control["n"][assembly_label], color="black", lw=1, ls="--", label="ctrl. n neurons")
         ax.plot(simplex_counts_control["depths"][assembly_label], color="black", lw=1, ls="-.",
@@ -798,7 +733,7 @@ def plot_coreness_r_spike(r_spikes, coreness, fig_name):
     fig = plt.figure(figsize=(20, 8))
     gs = gridspec.GridSpec(np.floor_divide(n, 5)+1, 5)
     for i in range(n):
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)-5])
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
         ax.scatter(coreness[i], r_spikes[i], color=cmap(i), marker='.', s=10, edgecolor="none")
         ax.set_title("union%i\n(n=%i)" % (i+1, coreness[i].shape[0]))
         ax.axvline(4., color="gray", ls="--")
@@ -820,7 +755,7 @@ def plot_coreness_t_in_bin(mean_ts, std_ts, coreness, bin_size, fig_name):
     fig = plt.figure(figsize=(20, 8))
     gs = gridspec.GridSpec(np.floor_divide(n, 5) + 1, 5)
     for i in range(n):
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
         color = colors.to_hex(cmap(i))
         errorevery = 10 if coreness[i].shape[0] > 2000 else 1
         ax.errorbar(coreness[i], mean_ts[i], yerr=std_ts[i], color=color,
@@ -851,7 +786,7 @@ def plot_simplex_counts_consensus(simplex_counts, simplex_counts_control, fig_na
     for i in range(n):
         label = "cluster%i" % i
         simplex_counts_cons = simplex_counts[label]
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5) - 5])
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
         for simlex_count_inst in simplex_counts_cons:
             ax.plot(simlex_count_inst, color=cmap(i))
         for ctrl in simplex_counts_control[label]:

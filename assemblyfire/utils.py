@@ -93,68 +93,16 @@ def get_mtype_gids(c, target, mtype):
     return c.cells.ids({"$target": target, Cell.MTYPE: mtype})
 
 
-def _get_layer_gids(c, layer, target):
-    from bluepy.enums import Cell
-    return c.cells.ids({"$target": target, Cell.LAYER: layer})
-
-
 def get_mtypes(c, gids):
     return c.cells.get(gids)["mtype"]
 
 
-def get_depths(c, gids):
-    """Get depths AKA. y-coordinates for v5 circuits"""
-    return c.cells.get(gids)["y"]
-
-
-def get_depths_SSCx(gids):
-    """Reads depth values from saved file(s) and return bluepy style Series for SSCx (v7 circuit)"""
-    # 1) read András' depths.csv which only has hex_O1
-    depths = pd.read_csv("/gpfs/bbp.cscs.ch/project/proj96/circuits/plastic_v1/hex_O1_depths.csv", index_col=0)
-    if np.isin(gids, depths.index.to_numpy()).all():
-        return depths.loc[gids]
-    else:  # if that doesn't have all `gids` then read Sirio's depths.txt which covers the whole SSCx
-        f_name = "/gpfs/bbp.cscs.ch/data/scratch/proj83/home/bolanos/circuits/Bio_M/20200805/hexgrid/depths.txt"
-        data = np.genfromtxt(f_name)
-        idx = np.searchsorted(data[:, 0], gids)
-        return pd.Series(data[idx, 1], index=gids)
-
-
-def _guess_circuit_version(target):
-    """The version of the circuit: O1.v5 AKA Markram et al. 2015 or SSCx (v7) determines how to get depth values
-    as it's simply y coordinate in v5, while it has to be derived from the stream lines of the atlas-based SSCx.
-    This helper function tries to guess the circuit version from the usual target names we used in those
-    circuit versions... which is not ideal. TODO: hardcode in config or come up with a better approach"""
-    if "_Column" in target:  # probably v5 circuit
-        return "v5"
-    elif "hex" in target:  # probably SSCx
-        return "v7"
-    else:
-        raise RuntimeError("Couldn't figure out circuit version from target name: %s" % target)
-
-
-def get_figure_asthetics(circuit_config, target):
-    """Gets gid depths, layer boundaries and cell numbers for figure asthetics"""
+def get_neuron_locs(circuit_config, target):
+    """Gets neuron locations in (supersampled) flat space"""
+    from conntility.circuit_models.neuron_groups import load_neurons
     c = get_bluepy_circuit(circuit_config)
-    gids = get_gids(c, target)
-    c_version = _guess_circuit_version(target)
-    # get depths
-    assert c_version in ["v5", "v7"], "Circuit version %s is not supported yet..." % c_version
-    if c_version == "v5":
-        depths = get_depths(c, gids)
-    elif c_version == "v7":
-        depths = get_depths_SSCx(gids)
-    # get ystuff
-    yticks, yticklables, hlines = [], [], []
-    for layer in range(2, 7):
-        gids = _get_layer_gids(c, layer, target)
-        if len(gids):
-            yticklables.append("L%i\n(%i)" % (layer, len(gids)))
-            ys = depths.loc[gids].to_numpy()
-            yticks.append(ys.mean())
-            hlines.extend([ys.min(), ys.max()])
-    hlines = [np.min(hlines), np.max(hlines)]  # top and bottom of the circuit
-    return depths, {"yticks": yticks, "yticklabels": yticklables, "hlines": hlines}
+    nrn = load_neurons(c, ["layer", "x", "y", "z", "ss_flat_x", "ss_flat_y", "depth"], target)
+    return nrn.set_index("gid").drop(columns=["x", "y", "z"])
 
 
 def get_spikes(sim, gids, t_start, t_end):
