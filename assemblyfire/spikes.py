@@ -11,7 +11,6 @@ import os
 import gc
 from tqdm import tqdm
 from tqdm.contrib import tzip
-from copy import deepcopy
 from collections import namedtuple, OrderedDict
 import h5py
 import numpy as np
@@ -40,28 +39,6 @@ def spikes2mat(spike_times, spiking_gids, t_start, t_end, bin_size):
     return spike_matrix, gid_bins[:-1], t_bins
 
 
-def get_ts_in_bin(spike_times, spiking_gids, bin_size):
-    """Gets time in bin for all gids"""
-    idx_sort = np.argsort(spiking_gids)
-    spiking_gids = spiking_gids[idx_sort]
-    unique_gids, idx_start, counts = np.unique(spiking_gids, return_index=True, return_counts=True)
-    ts = {}
-    spike_times = spike_times[idx_sort]
-    for gid, id_start, count in zip(unique_gids, idx_start, counts):
-        ts[gid] = np.mod(spike_times[id_start:id_start+count], bin_size)
-    return ts
-
-
-def calc_rate(spike_matrix):
-    """Calculates (non-normalized) firing rate from spike matrix"""
-    return np.sum(spike_matrix, axis=0)
-
-
-def get_rate_norm(N, bin_size):
-    """Rate normalization factor (for the rate to be plotted with proper dimensions)"""
-    return N * 1e-3 * bin_size
-
-
 def shuffle_tbins(spike_times, spiking_gids, t_start, t_end, bin_size):
     """Creates surrogate dataset a la Sasaki et al. 2006 by randomly offsetting every spike
     (thus after discretization see `spike2mat()` they will be in another time bin)"""
@@ -76,16 +53,17 @@ def _shuffle_tbins_subprocess(inputs):
     return np.std(np.sum(surr_spike_matrix, axis=0))
 
 
-def sign_rate_std(spike_times, spiking_gids, t_start, t_end, bin_size, N=100):
+def sign_rate_std(spike_times, spiking_gids, t_start, t_end, bin_size, nreps=100):
     """Generates surrogate datasets, checks the std of rates
     and sets significance threshold to its 95% percentile"""
-    n = N if mp.cpu_count() - 1 > N else mp.cpu_count() - 1
-    pool = mp.Pool(processes=n)
-    tbin_stds = pool.map(_shuffle_tbins_subprocess, zip([deepcopy(spike_times) for _ in range(N)],
-                                                        [spiking_gids for _ in range(N)],
-                                                        [t_start for _ in range(N)],
-                                                        [t_end for _ in range(N)],
-                                                        [bin_size for _ in range(N)]))
+    nprocs = nreps if os.cpu_count() - 1 > nreps else os.cpu_count() - 1
+    # joblib implementation just runs out of memory...
+    pool = mp.Pool(processes=nprocs)
+    tbin_stds = pool.map(_shuffle_tbins_subprocess, zip([spike_times.copy() for _ in range(nreps)],
+                                                        [spiking_gids for _ in range(nreps)],
+                                                        [t_start for _ in range(nreps)],
+                                                        [t_end for _ in range(nreps)],
+                                                        [bin_size for _ in range(nreps)]))
     pool.terminate()
     return np.percentile(tbin_stds, 95)
 
@@ -102,6 +80,18 @@ def convolve_spike_matrix(blueconfig_path, target, t_start, t_end, bin_size=1, s
     for i in range(spike_matrix.shape[0]):
         convolved_spike_matrix[i, :] = np.convolve(spike_matrix[i, :], kernel, mode="same")
     return convolved_spike_matrix, gids
+
+
+def get_ts_in_bin(spike_times, spiking_gids, bin_size):
+    """Gets time in bin for all gids"""
+    idx_sort = np.argsort(spiking_gids)
+    spiking_gids = spiking_gids[idx_sort]
+    unique_gids, idx_start, counts = np.unique(spiking_gids, return_index=True, return_counts=True)
+    ts = {}
+    spike_times = spike_times[idx_sort]
+    for gid, id_start, count in zip(unique_gids, idx_start, counts):
+        ts[gid] = np.mod(spike_times[id_start:id_start+count], bin_size)
+    return ts
 
 
 def spikes_to_h5(h5f_name, spike_matrix_dict, metadata, prefix):
@@ -145,7 +135,7 @@ class SpikeMatrixGroup(Config):
         rate_norm = len(np.unique(spiking_gids)) * 1e-3 * self.bin_size
         return spike_matrix_results, rate / rate_norm, rate_th / rate_norm
 
-    def get_sign_spike_matrices(self):
+    def get_sign_spike_matrices(self, save=True):
         """Looped version of `get_sign_spike_matrix()` above for all conditions in the campaign"""
         from assemblyfire.utils import get_sim_path, get_stimulus_stream
         from assemblyfire.plots import plot_rate
@@ -178,7 +168,8 @@ class SpikeMatrixGroup(Config):
         stim_times, patterns = get_stimulus_stream(self.input_patterns_fname, self.t_start, self.t_end)
         project_metadata = {"root_path": self.root_path, "seeds": seeds, "t": ts,
                             "stim_times": stim_times, "patterns": patterns.tolist()}
-        spikes_to_h5(self.h5f_name, spike_matrix_dict, project_metadata, prefix=self.h5_prefix_spikes)
+        if save:
+            spikes_to_h5(self.h5f_name, spike_matrix_dict, project_metadata, prefix=self.h5_prefix_spikes)
         return spike_matrix_dict, project_metadata
 
     def get_mean_std_ts_in_bin(self):
