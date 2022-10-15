@@ -22,10 +22,7 @@ preprocessing_protocol:
     threshold_rate: True
 
 clustering:
-    spikes:
-        method: "hierarchical"
-    assemblies:
-        method: "hierarchical"
+    overwrite_n_clusters: {1: 5}
     synapses:
         target: "hex_O1Excitatory_Sample10pct"
         lookup_df_pklfname: "/gpfs/bbp.cscs.ch/project/proj96/circuits/plastic_v1/sample10pct_clustering_syn_df.pkl"

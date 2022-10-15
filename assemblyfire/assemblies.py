@@ -490,25 +490,10 @@ class AssemblyGroup(object):
         return np.array([[hypergeom(len(self.all), len(a), len(b)).stats(moment) for b in other]
                           for a in self])
 
-    def expected_aligned_intersection_sizes(self, other=None, moment="m"):
-        """
-        :param other: Another AssemblyGroup object. If none provided, this object is used
-        :param moment: Which statistical moment (see scipy.stats; "m" = mean, "v" = variance)
-        :return: (numpy.array) The matrix of expected values for the size of overlaps between assemblies, based on
-        their respective sizes and the ... Here, for all assemblies in this group and the corresponding one in the other
-        """
-        if other is None:
-            return self.expected_aligned_intersection_sizes(self)
-
-        return np.array([hypergeom(len(self.all), len(a), len(b)).stats(moment)
-                         for a, b in zip(self, other)])
-
     @staticmethod
-    def correlation_func(A, B):
+    def norm_correlation(A, B):
         """
-        Normalized correlations between values in A and B
-        rows: samples / observations
-        columns: variables
+        Normalized correlations between values in A and B; rows: samples/observations; columns: variables
         :param A: A numpy.array of shape N x A
         :param B: A numpy.array of shape N x B, i.e. the same first dimension as A
         :return: numpy.array of shape A x B
@@ -536,72 +521,7 @@ class AssemblyGroup(object):
         else:
             I = self.intersection_sizes()
             O = self.intersection_sizes(other=other)
-        return self.correlation_func(I, O)
-
-    @staticmethod
-    def greedy_alignment(score_matrix):
-        """
-        :param score_matrix: A numpy.array where entry at i, j denotes the quality of an alignment
-        of item i of one group with item j of another group
-        :return: A kind-of optimal alignment, i.e. a permutation of the items in the second group
-        that leads to a kind-of optimal alignment
-        """
-        idx1 = list(range(score_matrix.shape[0]))
-        idx2 = list(range(score_matrix.shape[1]))
-        alignment = -np.ones(len(idx1), dtype=int)
-        while len(idx1) > 0 and len(idx2) > 0:
-            active_submat = score_matrix[np.ix_(idx1, idx2)]
-            i, j = np.nonzero(active_submat == active_submat.max())
-            alignment[idx1[i[0]]] = idx2[j[0]]
-            idx1.remove(idx1[i[0]])
-            idx2.remove(idx2[j[0]])
-            # TODO: Deal with: idx2 is empty but idx1 not yet
-        return alignment
-
-    def align_with(self, other, return_scores=False):
-        """
-        :param other: AssemblyGroup
-        :param return_scores: Default: False. If true, also returns a measure of the quality of alignment
-        :return: An AssemblyGroup with the same Assemblies as the input, but permutated for optimal aligment with
-        the assemblies in this group
-        """
-        new_all = np.union1d(self.all, other.all)
-        M = self.intersection_pattern_correlation(other)
-        alignment = self.greedy_alignment(M)
-        M = M[:, alignment]
-        out_grp = AssemblyGroup([other.assemblies[i] for i in alignment],
-                                new_all, label=other.label, metadata=other.metadata)
-        if return_scores:
-            return out_grp, M
-        return out_grp
-
-    def evaluate_overall_alignment(self, other):
-        """
-        :param other: AssemblyGroup
-        :return: Evaluate how well the Assemblies in this and the other group are aligned. I.e. how similar the two
-        groups are. Assumes that the other AssemblyGroup is already aligned with this
-        """
-        I = self.rel_intersection_sizes()
-        O = self.rel_intersection_sizes(other=other)
-        return pearsonr(I.flatten(), O.flatten())
-
-    def evaluate_individual_alignments(self, other, score_function="overlap"):
-        """
-        :param other: AssemblyGroup
-        :param score_function: (str) one of "overlap" or "correlation"
-        :return: Evaluate how well _each individual_ Assembly in this group is aligned with its corresponding
-        Assembly in the other group. Assumes that the other AssemblyGroup is already aligned with this
-        """
-        if score_function == "overlap":
-            overlap = self.aligned_intersections(other).lengths()
-            expected_overlap_mn = self.expected_aligned_intersection_sizes(other)
-            expected_overlap_sd = np.sqrt(self.expected_aligned_intersection_sizes(other, moment="v"))
-            return (overlap - expected_overlap_mn) / expected_overlap_sd
-        elif score_function == "correlation":
-            M = self.intersection_pattern_correlation(other)
-            return np.diag(M)
-        else:
-            raise Exception("Unknown score function: {0}".format(score_function))
+        return self.norm_correlation(I, O)
 
 
 class WeightedAssembly(Assembly):
@@ -755,20 +675,6 @@ class ConsensusAssembly(Assembly):
             res.append(np.in1d(self.union.gids, assembly.gids))
         return np.vstack(res).sum(axis=0)
 
-    '''
-    def plot(self, angles=None, **kwargs):
-        from matplotlib import pyplot as plt
-        if angles is None:
-            angles = np.random.rand(len(self.union)) * 2 * np.pi
-        if self._core_method == "p-value":
-            r = 10 ** -self.coreness
-        elif self._core_method == "number":
-            r = (1 - self.coreness) / 2.0
-        else:
-            raise Exception()
-        plt.polar(angles, r, **kwargs)
-    '''
-
 
 def build_assembly_group(gids, n_assemblies, assembly_lst, seeds, assembly_grp_dict):
     """
@@ -816,107 +722,4 @@ def consensus_over_seeds_hc(assembly_grp_dict, h5f_name, h5_prefix, fig_path,
         assembly_lst = [assembly_grp.assemblies[i] for i in c_idx]
         cons_assembly = ConsensusAssembly(assembly_lst, index=cluster, label="cluster%i" % cluster)
         cons_assembly.to_h5(h5f_name, prefix=h5_prefix)
-
-
-def evaluate_alignment_over_seeds(assembly_grp_dict, reference, score_function="overlap", return_aligned=False):
-    #TODO Michael: document this and fix .align_with() to work with different number of assemblies per seed
-    assert score_function in ["correlation", "overlap"], "Unknown score function"
-    ref_assembly = assembly_grp_dict[reference]
-    other_assemblies = dict([(k, v) for k, v in assembly_grp_dict.items() if k != reference])
-    aligned = {}; out_idv_scores = {}
-    for k, v in other_assemblies.items():
-        a_result, a_scores = ref_assembly.align_with(v, return_scores=True)
-        aligned[k] = a_result
-        out_idv_scores[k] = a_scores.diagonal()
-
-    #  Relative overlap, normalized by expectation
-    out_overall_scores = {}
-    for group_label, group in aligned.items():
-        if score_function == "overlap":
-           out_idv_scores[group_label] = ref_assembly.evaluate_individual_alignments(group)
-        out_overall_scores[group_label] = ref_assembly.evaluate_overall_alignment(group)[0]
-    if return_aligned:
-        return aligned, out_idv_scores, out_overall_scores
-    return out_idv_scores, out_overall_scores
-
-
-def consensus_over_seeds_greedy(assembly_grp_dict, score_function="correlation", threshold=0.94):
-    """
-    Generate consensus assemblies the following way:
-    1. Perform alignment to a reference AssemblyGroup, using each group once as the reference
-    2. Put the results into a (n_seeds * n_assemblies) x (n_seeds * n_assemblies) matrix as follows:
-       M[a * n_assemblies + i, b * n_assemblies + j] is a quality assessment of how well assembly i of seed a
-       aligns with assembly j of seed b.
-    3. Create graph from M, applying a threshold to it. Nodes of the graph represent assemblies
-    4. Find connected components in the graph. Assemblies in each component are merged into one consensus assembly
-    :param assembly_grp_dict: (dict) containing AssemblyGroups
-    :return: (AssemblyGroup) Consensus assemblies
-    """
-    import networkx
-    from assemblyfire.assemblies import AssemblyGroup
-
-    all_groups = list(assembly_grp_dict.keys())
-    to_idx = {}; from_idx = []
-    i = 0
-    for grp_label in all_groups:
-        for assembly in assembly_grp_dict[grp_label]:
-            to_idx[(grp_label, assembly.idx)] = i
-            from_idx.append((grp_label, assembly.idx))
-            i += 1
-    L = np.max(list(to_idx.values())) + 1
-    M = np.zeros((L, L))
-    all_gids = np.unique(np.hstack([assembly_grp.all for assembly_grp in assembly_grp_dict.values()]))
-
-    for ref_label in all_groups:  # Step 1.
-        #print("Using {0} as reference...".format(ref_label))
-        aligned, aligned_scores, _ = evaluate_alignment_over_seeds(assembly_grp_dict,
-                                                                   ref_label,
-                                                                   score_function=score_function,
-                                                                   return_aligned=True)
-        for aligned_label, aligned_grp in aligned.items():  # Step 2.
-            for row_assembly, col_assembly, scores in zip(assembly_grp_dict[ref_label],
-                                                          aligned_grp,
-                                                          aligned_scores[aligned_label]):
-                row_idx = to_idx[(ref_label, row_assembly.idx)]
-                col_idx = to_idx[(aligned_label, col_assembly.idx)]
-                M[row_idx, col_idx] += scores
-    #  TODO: One thing we can do: Check overall consistency by comparing M to M.transpose()
-
-    G = networkx.from_numpy_array(M > threshold)  # Step 3.
-    components = list(map(list, networkx.connected_components(G)))
-
-    out_lst = []
-    out_lst_core = []
-    consensus_origin = []
-    for i, component in enumerate(components):  # Step 4.
-        grp_label, assembly_index = from_idx[component[0]]
-        new_assembly = assembly_grp_dict[grp_label].assemblies[assembly_index]
-        new_assembly_core = new_assembly
-        consensus_origin.append([(grp_label, assembly_index)])
-        for idx in component[1:]:
-            grp_label, assembly_index = from_idx[idx]
-            new_assembly = new_assembly + assembly_grp_dict[grp_label].assemblies[assembly_index]
-            new_assembly_core = new_assembly_core * assembly_grp_dict[grp_label].assemblies[assembly_index]
-            consensus_origin[-1].append((grp_label, assembly_index))
-        new_assembly.idx = i
-        new_assembly_core.idx = i
-        out_lst.append(new_assembly)
-        out_lst_core.append(new_assembly_core)
-
-    return (AssemblyGroup(out_lst, all_gids, label="Consensus assemblies"),
-            AssemblyGroup(out_lst_core, all_gids, label="Core assemblies"),
-            consensus_origin
-            )
-
-
-def consensus_properties(clusters, cores, origins):
-    #TODO Michael: add docs
-
-    looseness = clusters.lengths() / cores.lengths() - 1
-    stability = []
-    num_labels = len(np.unique(np.hstack([list(zip(*x))[0] for x in origins])))
-    for origin_lst in origins:
-        origin_labels, origin_idx = zip(*origin_lst)
-        stability.append(len(np.unique(origin_labels)) / num_labels)
-    return looseness, stability
 

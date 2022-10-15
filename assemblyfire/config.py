@@ -114,28 +114,18 @@ class Config(object):
             return []
 
     @property
-    def spike_clustering_method(self):
-        assert self.config["clustering"]["spikes"]["method"] in ["hierarchical", "density_based"]
-        return self.config["clustering"]["spikes"]["method"]
-
-    @property
     def core_cell_th_pct(self):
-        if "core_cell_th_pct" in self.config["clustering"]["spikes"]:
-            return self.config["clustering"]["spikes"]["core_cell_th_pct"]
+        if "core_cell_th_pct" in self.config["clustering"]:
+            return self.config["clustering"]["core_cell_th_pct"]
         else:
             return 95  # default hard coded here to 95% percentile as in Herzog et al. 2021
 
     @property
     def overwrite_seeds(self):
-        if "overwrite_n_clusters" in self.config["clustering"]["spikes"]:
-            return self.config["clustering"]["spikes"]["overwrite_n_clusters"]
+        if "overwrite_n_clusters" in self.config["clustering"]:
+            return self.config["clustering"]["overwrite_n_clusters"]
         else:
             return {}
-
-    @property
-    def assembly_clustering_method(self):
-        assert self.config["clustering"]["assemblies"]["method"] in ["hierarchical", "greedy"]
-        return self.config["clustering"]["assemblies"]["method"]
 
     @property
     def syn_clustering_target(self):
