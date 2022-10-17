@@ -312,7 +312,7 @@ def plot_assemblies(core_cell_idx, assembly_idx, gids, loc_df, fig_name):
     extent = (x_range[0], x_range[1], y_range[0], y_range[1])
     depth_range = [loc_df["depth"].min(), loc_df["depth"].max()]
 
-    fig = plt.figure(figsize=(20, 10))
+    fig = plt.figure(figsize=(18, 10))
     n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
     gs = gridspec.GridSpec(2 * n_rows, 5)
     for i, assembly_id in enumerate(assembly_idx):
@@ -321,6 +321,7 @@ def plot_assemblies(core_cell_idx, assembly_idx, gids, loc_df, fig_name):
         ax.hexbin(loc_df.loc[assembly_gids, "ss_flat_x"].to_numpy(), loc_df.loc[assembly_gids, "ss_flat_y"].to_numpy(),
                   cmap=colors.LinearSegmentedColormap.from_list("assembly", [(1, 1, 1), cmap(i)], N=5),
                   gridsize=50, bins="log", extent=extent)
+        ax.set_aspect("equal", "box")
         ax.set_title("Assembly %i (n=%i)" % (assembly_id, len(assembly_gids)))
         ax.set_xticks([]); ax.set_yticks([])
         ax.set_xlim(x_range); ax.set_ylim(y_range)
