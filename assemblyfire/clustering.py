@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from scipy.stats import poisson
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, issparse
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.cluster.hierarchy import linkage, fcluster
 from sklearn.metrics import silhouette_score, silhouette_samples, davies_bouldin_score
@@ -63,19 +63,21 @@ def cluster_sim_mat(spike_matrix, min_n_clusts=5, max_n_clusts=20, n_method="DB"
 
 
 # core-cells and assemblies related functions (mostly calculating correlations)
-def pairwise_correlation_X(x):
+def pairwise_correlation_X(sparse_x):
     """Pairwise correlation between rows of a matrix `x` (assumed to be sparse)
     much faster than `1 - squareform(pdist(x, metrix="correlation"))`"""
-    n = x.shape[1]
-    sparse_x = csr_matrix(x)
-    row_sum = sparse_x.sum(axis=1)
+    assert issparse(sparse_x), "Matrix is expected to be in sparse format"
+    n = sparse_x.shape[1]
+    row_sum = sparse_x.sum(axis=1, dtype=np.float32)
     cov = (sparse_x * sparse_x.T - (np.outer(row_sum, row_sum) / n)) / (n - 1)
     norm = np.sqrt(np.outer(np.diag(cov), np.diag(cov)))
-    return cov / (norm + 1e-99)
+    return cov / (norm + 1e-40)
 
 
 def pairwise_correlation_XY(x, y):
-    """Pairwise correlation between rows of a matrix X and matrix Y"""
+    """Pairwise correlation between rows of a matrix X and matrix Y
+    (Could be done in sparse format as `pairwise_correlation_X()` above but shuffling the columns (for random control)
+    and converting to the shuffled spikes to sparse format takes too much time...)"""
     corrs = 1 - cdist(x, y, metric="correlation")
     corrs[np.isnan(corrs)] = 0.
     return corrs
@@ -118,7 +120,6 @@ def within_cluster_correlations(spike_matrix, core_cell_idx):
     against the avg. correlation in the whole dataset
     if the within cluster correlation it's higher the cluster is an assembly"""
     corrs = pairwise_correlation_X(spike_matrix)
-    del spike_matrix
     np.fill_diagonal(corrs, np.nan)
     mean_corr = np.nanmean(corrs)
 
@@ -198,9 +199,10 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, core_cell_th_pct, h5f_na
         corr_ths = sign_corr_ths(spike_matrix, sparse_clusters, core_cell_th_pct)
         core_cell_idx = np.zeros_like(corrs, dtype=int)
         core_cell_idx[corrs > corr_ths] = 1
-        del corrs
         # cell assemblies
-        assembly_idx = within_cluster_correlations(spike_matrix, core_cell_idx)
+        spike_matrix_csr = csr_matrix(spike_matrix, dtype=np.float32)
+        del corrs, corr_ths, spike_matrix
+        assembly_idx = within_cluster_correlations(spike_matrix_csr, core_cell_idx)
 
         # save to h5
         metadata = {"clusters": clusters}
@@ -208,7 +210,7 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, core_cell_th_pct, h5f_na
         assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=gids, label="seed%i" % seed, metadata=metadata)
         assemblies.to_h5(h5f_name, prefix=h5_prefix)
 
-        # plot (only depth profile at this point)
+        # plot (only spatial location at this point)
         fig_name = os.path.join(fig_path, "assemblies_seed%i.png" % seed)
         plot_assemblies(core_cell_idx, assembly_idx, gids, nrn_loc_df, fig_name)
 
