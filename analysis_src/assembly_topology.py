@@ -11,8 +11,7 @@ import pandas as pd
 from assemblyfire.config import Config
 import assemblyfire.utils as utils
 import assemblyfire.plots as plots
-from assemblyfire.topology import AssemblyTopology, in_degree_assemblies,\
-                                  simplex_counts_assemblies, simplex_list_assemblies
+from assemblyfire.topology import AssemblyTopology, in_degree_assemblies, simplex_counts_assemblies
 
 
 def assembly_efficacy(config):
@@ -31,8 +30,7 @@ def assembly_efficacy(config):
 
 
 def assembly_in_degree(config):
-    """Loads in assemblies and plots in degrees within assemblies and cross assemblies seed-by-seed
-    (for cross assembly in degrees the postsynaptic target assembly is fixed: the late assembly)"""
+    """Loads in assemblies and plots in degrees within the assemblies and in their control models (seed by seed)"""
 
     conn_mat = AssemblyTopology.from_h5(config.h5f_name,
                                         prefix=config.h5_prefix_connectivity, group_name="full_matrix")
@@ -52,8 +50,7 @@ def assembly_in_degree(config):
 
 
 def assembly_simplex_counts(config):
-    """Loads in assemblies and plots simplex counts (seed by seed
-    and then for all instantiations per consensus assemblies)"""
+    """Loads in assemblies and plots simplex counts in assemblies and control models (seed by seed)"""
 
     conn_mat = AssemblyTopology.from_h5(config.h5f_name,
                                         prefix=config.h5_prefix_connectivity, group_name="full_matrix")
@@ -158,66 +155,13 @@ def frac_entropy_explained_by_indegree(config, min_samples=100):
                 assembly_mi[pre_assembly][assembly_id] = _sign_of_correlation(vals, probs) * (1.0 - pe / me)
 
         fig_name = os.path.join(config.fig_path, "assembly_prob_from_indegree_%s.png" % seed)
-        palette = {assembly.idx[0]: "assembly_color" for assembly in assembly_grp.assemblies}
+        palette = {assembly.idx[0]: "pre_assembly_color" for assembly in assembly_grp.assemblies}
         plots.plot_assembly_prob_from(bin_centers_plot, assembly_probs, chance_levels,
                                       "In degree", palette, fig_name)
         fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_recurrent_innervation_%s.png" % seed)
         plots.plot_frac_entropy_explained_by(pd.DataFrame(assembly_mi).transpose(), "Innervation by assembly", fig_name)
 
     return assembly_indegrees_dict
-
-
-def _sample_simplex_idx(n_simplices, sampling_th=10000, sampling_ratio=0.1, seed=12345):
-    """Downsamples simplex list if it's too long'"""
-    np.random.seed(seed)
-    simplex_idx = np.arange(n_simplices)
-    if len(simplex_idx) > sampling_th:
-        simplex_idx = np.random.choice(simplex_idx, int(len(simplex_idx * sampling_ratio)), replace=False)
-    return simplex_idx
-
-
-def _probs_dict_to_df(assembly_probs):
-    """Converts dict of assembly probs to DataFrame (to be able to use `seaborn` to plot their distributions)"""
-    dfs = []
-    for assembly_id, assembly_probs_tmp in assembly_probs.items():
-        for dim, probs in assembly_probs_tmp.items():
-            data = np.concatenate((np.tile(assembly_id, len(probs)).reshape(-1, 1),
-                                   np.tile(dim, len(probs)).reshape(-1, 1), probs.reshape(-1, 1)), axis=1)
-            dfs.append(pd.DataFrame(data=data, columns=["assembly_id", "dim", "probs"]))
-    return pd.concat(dfs, ignore_index=True).astype({"assembly_id": int, "dim": int})
-
-
-def assembly_prob_from_sinks(config):
-    """TODO"""
-
-    conn_mat = AssemblyTopology.from_h5(config.h5f_name,
-                                        prefix=config.h5_prefix_connectivity, group_name="full_matrix")
-    assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
-    simplex_lists = simplex_list_assemblies(assembly_grp_dict, conn_mat)
-    gids = conn_mat.gids
-
-    for seed, assembly_grp in assembly_grp_dict.items():
-        chance_levels, assembly_probs = {}, {assembly.idx[0]: {} for assembly in assembly_grp.assemblies}
-        for assembly in tqdm(assembly_grp.assemblies, desc="Iterating over assemblies"):
-
-            sub_mat = conn_mat.submatrix(assembly.gids, sub_gids_post=gids).tocsr()
-            assembly_gid_idx = np.in1d(gids, assembly.gids, assume_unique=True).nonzero()[0]
-            chance_levels[assembly.idx[0]] = len(assembly_gid_idx) / len(gids)
-            simplex_list = simplex_lists[seed][assembly.idx]
-            for dim in [4, 5]:  # dim here is the dimension including the sink we're looking for
-                simplices = simplex_list[dim - 1]  # dim-1 dimensional simplices
-                simplex_idx = _sample_simplex_idx(simplices.shape[0])
-                probs = []
-                for i, simplex_id in tqdm(enumerate(simplex_idx), desc="Checking for sinks",
-                                          total=len(simplex_idx), miniters=len(simplex_idx) / 100, leave=False):
-                    sink_idx = sub_mat[simplices[simplex_id, :]].toarray().all(axis=0).nonzero()[0]
-                    if len(sink_idx):
-                        idx = np.in1d(sink_idx, assembly_gid_idx, assume_unique=True)
-                        probs.append(idx.sum() / len(idx))
-                assembly_probs[assembly.idx[0]][dim] = np.array(probs)
-
-        fig_name = os.path.join(config.fig_path, "assembly_prob_from_simplex_dim_%s.png" % seed)
-        plots.plot_assembly_prob_from_sinks(_probs_dict_to_df(assembly_probs), chance_levels, fig_name)
 
 
 def _nnd_df_to_dict(nnd_df):
@@ -268,7 +212,7 @@ def frac_entropy_explained_by_syn_nnd(config, min_samples=100):
                 assembly_mi[pre_assembly][assembly_id] = _sign_of_correlation(vals, probs) * (1.0 - pe / me)
 
         fig_name = os.path.join(config.fig_path, "assembly_prob_from_syn_nearest_neighbour_%s.png" % seed)
-        palette = {assembly.idx[0]: "assembly_color" for assembly in assembly_grp.assemblies}
+        palette = {assembly.idx[0]: "pre_assembly_color" for assembly in assembly_grp.assemblies}
         plots.plot_assembly_prob_from(bin_centers_plot, assembly_probs, chance_levels,
                                       "Synapse nearest neighbour distance", palette, fig_name)
         fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_syn_nearest_neighbour_%s.png" % seed)
@@ -313,6 +257,39 @@ def assembly_prob_from_indegree_and_syn_nnd(config, assembly_indegrees_dict, ass
         fig_name = os.path.join(config.fig_path, "assembly_prob_from_indegree_syn_nnd_%s.png" % seed)
         plots.plot_assembly_prob_from(bin_centers_dict, assembly_probs, chance_levels,
                                       "Innervation by assembly (weighted by synapse nnd.)", palette, fig_name)
+
+
+def assembly_prob_from_sinks(config, palette, min_samples=100):
+    """Loads in assemblies and plots generalized in degrees (sinks of high dim. simplices) within the assemblies
+    (seed by seed). Simplices are found in a way that all non-sink neurons are guaranteed to be within the assembly"""
+
+    conn_mat = AssemblyTopology.from_h5(config.h5f_name,
+                                        prefix=config.h5_prefix_connectivity, group_name="full_matrix")
+    assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+    gids = conn_mat.gids
+    dims = list(palette.keys())
+
+    for seed, assembly_grp in assembly_grp_dict.items():
+        chance_levels, bin_centers_dict, assembly_probs = {}, {dim: {} for dim in dims}, {dim: {} for dim in dims}
+        for assembly in tqdm(assembly_grp.assemblies, desc="Iterating over assemblies"):
+            idx = np.in1d(gids, assembly.gids, assume_unique=True)
+            chance_levels[assembly.idx[0]] = idx.sum() / len(idx)
+            simplex_list = conn_mat.simplex_list(assembly.gids, gids)
+            for dim in dims:
+                sink_counts, _ = np.histogram(simplex_list[dim][:, -1], np.arange(len(gids) + 1))
+                bin_edges, bin_centers = utils.determine_bins(*np.unique(sink_counts, return_counts=True), min_samples)
+                bin_edges, bin_centers = np.insert(bin_edges, 0, -1), np.insert(bin_centers, 0, 0)
+                bin_centers_dict[dim][assembly.idx[0]] = bin_centers
+                bin_idx = np.digitize(sink_counts, bin_edges, right=True)
+                probs = []
+                for i, center in enumerate(bin_centers):
+                    idx = np.in1d(gids[bin_idx == i + 1], assembly.gids, assume_unique=True)
+                    probs.append(idx.sum() / len(idx))
+                assembly_probs[dim][assembly.idx[0]] = np.array(probs)
+
+        fig_name = os.path.join(config.fig_path, "assembly_prob_from_simplex_dim_%s.png" % seed)
+        plots.plot_assembly_prob_from(bin_centers_dict, assembly_probs, chance_levels,
+                                      "Generalized in degree (#simplex sinks)", palette, fig_name, True)
 
 
 def get_pattern_innervation(config):
@@ -371,15 +348,14 @@ def frac_entropy_explained_by_patterns(config, min_samples=100):
 
 
 if __name__ == "__main__":
-    # config = Config("../configs/v7_bbp-workflow.yaml")
-    config = Config("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_bbp-workflow.yaml")
+    config = Config("../configs/v7_bbp-workflow.yaml")
     # assembly_efficacy(config)
     # assembly_in_degree(config)
     # assembly_simplex_counts(config)
     # assembly_indegrees = frac_entropy_explained_by_indegree(config)
-    assembly_prob_from_sinks(config)
     # assembly_nnds = frac_entropy_explained_by_syn_nnd(config)
     # assembly_prob_from_indegree_and_syn_nnd(config, assembly_indegrees, assembly_nnds,
     #                                         {"below avg.": "assembly_color", "avg.": "gray", "above avg.": "black"})
+    assembly_prob_from_sinks(config, {2: "lightgray", 3: "gray", 4: "black", 5: "assembly_color"})
     # frac_entropy_explained_by_patterns(config)
 

@@ -18,10 +18,13 @@ class AssemblyTopology(ConnectivityMatrix):
     def degree(self, pre_gids=None, post_gids=None, kind="in"):
         """Returns in/out degrees of the (symmetric) subarray specified by `pre_gids`
         (if `post_gids` is given as well, then the subarray will be asymmetric)"""
-        if pre_gids is not None:
-            matrix = self.submatrix(pre_gids, sub_gids_post=post_gids)
-        else:
+        if pre_gids is None:
             matrix = self.matrix
+        else:
+            if post_gids is None:
+                matrix = self.submatrix(pre_gids)
+            else:
+                matrix = self.submatrix(pre_gids, sub_gids_post=post_gids)
         if kind == "in":
             return np.array(matrix.sum(axis=0)).flatten()
         elif kind == "out":
@@ -31,30 +34,43 @@ class AssemblyTopology(ConnectivityMatrix):
 
     def density(self, sub_gids=None):
         """Returns the density of submatrix specified by `sub_gids`"""
-        if sub_gids is None:
-            matrix = self.matrix
-        else:
-            matrix = self.submatrix(sub_gids)
+        matrix = self.matrix if sub_gids is None else self.submatrix(sub_gids)
         return matrix.getnnz()/np.prod(matrix.shape)
 
-    def simplex_counts(self, sub_gids):
+    def simplex_counts(self, sub_gids=None):
         """Returns the simplex counts of submatrix specified by `sub_gids`"""
         from pyflagser import flagser_count_unweighted
-        sub_mat = self.submatrix(sub_gids)
-        return flagser_count_unweighted(sub_mat, directed=True)
+        matrix = self.matrix if sub_gids is None else self.submatrix(sub_gids)
+        return flagser_count_unweighted(matrix, directed=True)
 
-    def simplex_list(self, sub_gids):
+    def simplex_list(self, pre_gids=None, post_gids=None):
         """Returns the simplex list of submatrix specified by `sub_gids`"""
+        from scipy.sparse import coo_matrix
         from pyflagsercount import flagser_count
-        sub_mat = self.submatrix(sub_gids)
-        flagser = flagser_count(sub_mat, return_simplices=True, max_simplices=False)
+        if pre_gids is None:
+            matrix = self.matrix
+        else:
+            if post_gids is None:
+                matrix = self.submatrix(pre_gids)
+            else:
+                row_gids = self.gids[self._edge_indices["row"].to_numpy()]
+                if (post_gids == self.gids).all():
+                    keep_idx = np.in1d(row_gids, pre_gids)
+                else:
+                    col_gids = self.gids[self._edge_indices["col"].to_numpy()]
+                    keep_idx = np.in1d(row_gids, pre_gids) & np.in1d(col_gids, post_gids)
+                matrix = coo_matrix((self.edges["data"][keep_idx].to_numpy(),
+                                     (self._edge_indices["row"][keep_idx].to_numpy(),
+                                      self._edge_indices["col"][keep_idx].to_numpy())),
+                                    shape=(len(self.gids), len(self.gids)))
+        flagser = flagser_count(matrix, return_simplices=True, max_simplices=False)
         return [np.array(x) for x in flagser["simplices"]]
 
-    def betti_counts(self, sub_gids):
+    def betti_counts(self, sub_gids=None):
         """Returns the betti counts of submatrix specified by `sub_gids`"""
         from pyflagser import flagser_unweighted
-        sub_mat = self.submatrix(sub_gids)
-        return flagser_unweighted(sub_mat, directed=True)["betti"]
+        matrix = self.matrix if sub_gids is None else self.submatrix(sub_gids)
+        return flagser_unweighted(matrix, directed=True)["betti"]
 
 
 def in_degree_assemblies(assembly_grp_dict, conn_mat, post_id=None):
@@ -113,21 +129,6 @@ def simplex_counts_assemblies(assembly_grp_dict, conn_mat):
                                        conn_mat.index("mtype").random_categorical_gids(assembly.gids))
                                        for assembly in assembly_grp.assemblies}
     return simplex_counts, s_c_control
-
-
-def simplex_list_assemblies(assembly_grp_dict, conn_mat):
-    """
-    Returns the simplices (as lists of gids) of assemblies across seeds
-    :param assembly_grp_dict: dict with seeds as keys and assembly groups as values
-    :param conn_mat: AssemblyTopology object for the circuit where the assemblies belong to
-    :return simplex_lists: dict with the same keys as `assembly_grp_dict` - within that another dict
-                           with keys as assembly labels and list of simplices
-    """
-    simplex_lists = {}
-    for seed, assembly_grp in tqdm(assembly_grp_dict.items(), desc="Getting simplex lists"):
-        simplex_lists[seed] = {assembly.idx: conn_mat.simplex_list(assembly.gids)
-                               for assembly in assembly_grp.assemblies}
-    return simplex_lists
 
 
 def simplex_counts_consensus_instantiations(consensus_assemblies_dict, conn_mat):
