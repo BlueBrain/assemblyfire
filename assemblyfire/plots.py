@@ -176,11 +176,14 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
     ax.set_yticks([])
     for i, (name, matrix) in enumerate(pattern_matrices.items()):
         ax = fig.add_subplot(gs[1+np.floor_divide(i, 5), np.mod(i, 5)])
-        i = ax.imshow(matrix, cmap=cmap, aspect="auto")
-        images.append(i)
+        im = ax.imshow(matrix, cmap=cmap, interpolation="nearest", aspect="auto")
+        images.append(im)
         ax.set_title(name)
-        ax.set_xticks([0, matrix.shape[1] - 1])
-        ax.set_xticklabels([0, max_t])
+        if np.floor_divide(i, 5) == 1:
+            ax.set_xticks([0, matrix.shape[1] - 1])
+            ax.set_xticklabels([0, max_t])
+        else:
+            ax.set_xticks([])
         ax.set_yticks([0, row_idx[name]])
     # set one colorbar for all images
     vmin = min(image.get_array().min() for image in images)
@@ -190,7 +193,7 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
         im.set_norm(norm)
     fig.colorbar(i_base, cax=cax, orientation="horizontal", ticks=np.unique(clusters))
     for im in images:
-        im.callbacksSM.connect("changed", update)
+        im.callbacks.connect("changed", update)
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
