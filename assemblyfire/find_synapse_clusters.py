@@ -48,7 +48,7 @@ def run(config_path, debug):
     config = Config(config_path)
     L.info(" Load in assemblies and connectivity matrix from %s" % config.h5f_name)
     sim_paths = utils.get_sim_path(config.root_path)
-    c = utils.get_bluepy_cicruit(sim_paths.iloc[0])
+    c = utils.get_bluepy_circuit(sim_paths.iloc[0])
     loc_df = utils.get_loc_df(config.syn_clustering_lookup_df_pklfname, c, config.target, config.syn_clustering_target)
     target_gids = loc_df["post_gid"].unique()
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
