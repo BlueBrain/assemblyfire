@@ -154,11 +154,11 @@ def cluster_spikes(spike_matrix_dict, overwrite_seeds, project_metadata, fig_pat
         else:
             idx = np.arange(len(stim_times))  # just to not break the code...
 
-        if seed not in overwrite_seeds:
+        if "seed%i" % seed not in overwrite_seeds:
             sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix)
         else:
-            sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix, min_n_clusts=overwrite_seeds[seed],
-                                                             max_n_clusts=overwrite_seeds[seed])
+            sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix, min_n_clusts=overwrite_seeds["seed%i" % seed],
+                                                             max_n_clusts=overwrite_seeds["seed%i" % seed])
         clusters_dict[seed] = clusters
 
         fig_name = os.path.join(fig_path, "similarity_matrix_seed%i.png" % seed)
@@ -340,11 +340,11 @@ def syn_nearest_neighbour_distances(loc_df, assembly_grp, ctrl_assembly_grp, agg
         dists = syn_distances(loc_df_gid, "section_id", XYZ)
         # iterate over assemblies and (their controls) and index stuff out
         for j, assembly_label in enumerate(assembly_labels):
-            sub_dists = dists[np.ix_(syn_idx[assembly_label], syn_idx[assembly_label])]
+            sub_dists = dists[np.ix_(syn_idx["assembly%i" % assembly_label], syn_idx["assembly%i" % assembly_label])]
             sub_dists = sub_dists[:, ~np.all(np.isnan(sub_dists), axis=1)]
             if sub_dists.shape[1] > min_nsyns:
                 data[i, j] = agg_fn(np.nanmin(sub_dists, axis=0))
-            ctrl_sub_dists = dists[np.ix_(ctrl_syn_idx[assembly_label], ctrl_syn_idx[assembly_label])]
+            ctrl_sub_dists = dists[np.ix_(ctrl_syn_idx["assembly%i" % assembly_label], ctrl_syn_idx["assembly%i" % assembly_label])]
             ctrl_sub_dists = ctrl_sub_dists[:, ~np.all(np.isnan(ctrl_sub_dists), axis=1)]
             if ctrl_sub_dists.shape[1] > min_nsyns:
                 ctrl_data[i, j] = agg_fn(np.nanmin(ctrl_sub_dists, axis=0))
