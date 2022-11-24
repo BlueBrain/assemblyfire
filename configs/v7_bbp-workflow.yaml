@@ -22,10 +22,12 @@ preprocessing_protocol:
     threshold_rate: True
 
 clustering:
-    overwrite_n_clusters: {1: 7}
+    overwrite_n_clusters: {"seed1": 7}
     synapses:
         target: "hex_O1Excitatory_Sample10pct"
         lookup_df_pklfname: "/gpfs/bbp.cscs.ch/project/proj96/circuits/plastic_v1/sample10pct_clustering_syn_df.pkl"
         target_range: 10
         min_nsyns: 10
         n_neurons_sample: 10
+        # only put here after visual inspection of the prev. results... (dict key is post assembly value is a list of pre assemblies)
+        cross_assemblies: {"seed1": {0: [4, 5, 6], 4: [3, 2], 5: [1]}}

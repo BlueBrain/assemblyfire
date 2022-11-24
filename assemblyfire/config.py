@@ -162,3 +162,9 @@ class Config(object):
         else:
             return os.path.join(self.root_path, "analyses", "syn_clusters" + h5f_name.split("assemblies")[1])
 
+    @property
+    def syn_clustering_cross_assemblies(self):
+        if "cross_assemblies" in self.config["clustering"]["synapses"]:
+            return self.config["clustering"]["synapses"]["cross_assemblies"]
+        else:
+            return {}

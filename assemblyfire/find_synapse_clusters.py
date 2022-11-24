@@ -18,28 +18,68 @@ from assemblyfire.plots import plot_cond_rhos
 L = logging.getLogger("assemblyfire")
 
 
-def _get_degree_sorted_assembly_gids_within_target(c, target_gids, conn_mat, assembly, mtype_list, n_samples):
-    """Helper function to select in-degree sorted postsynaptic gids from assemblies (and target)"""
-    sorted_assembly_gids = assembly.gids[np.argsort(conn_mat.degree(assembly, kind="in"))[::-1]]
+def _get_degree_sorted_assembly_gids_within_target(c, target_gids, conn_mat, assembly,
+                                                   mtype_list, n_samples, pre_assembly=None):
+    """Helper function to select indegree sorted postsynaptic gids from assemblies (and target)"""
+    if pre_assembly is None:
+        indegrees = conn_mat.degree(assembly.gids, kind="in")
+    else:
+        indegrees = conn_mat.degree(pre_gids=pre_assembly.gids, post_gids=assembly.gids, kind="in")
+    sorted_assembly_gids = assembly.gids[np.argsort(indegrees)[::-1]]
     sorted_target_assembly_gids = sorted_assembly_gids[np.in1d(sorted_assembly_gids, target_gids, assume_unique=True)]
     mtypes = utils.get_mtypes(c, sorted_target_assembly_gids)
     return mtypes.loc[mtypes.isin(mtype_list)].index.to_numpy()[:n_samples]
 
 
-def _get_rate_sorted_assembly_gids_within_target(sim, target_gids, assembly_gids, mtype_list, n_samples, t_start, t_end):
-    """Helper function to select firing rate sorted postsynaptic gids from assemblies (and target)"""
-    target_assembly_gids = assembly_gids[np.in1d(assembly_gids, target_gids, assume_unique=True)]
-    _, spiking_gids = utils.get_spikes(sim, target_assembly_gids, t_start, t_end)
-    gids, spike_counts = np.unique(spiking_gids, return_counts=True)
-    sorted_target_assembly_gids = gids[np.argsort(spike_counts)[::-1]]
-    mtypes = utils.get_mtypes(sim.circuit, sorted_target_assembly_gids)
-    return mtypes.loc[mtypes.isin(mtype_list)].index.to_numpy()[:n_samples]
+def _get_cross_degree_sorted_assembly_gids_within_target(c, target_gids, conn_mat, cross_assembly_grp, assembly,
+                                                         mtype_list, n_samples):
+    """Similar indegree based helper as above, but works for cross-assembly connections"""
+    gids = {}
+    for pre_assembly in cross_assembly_grp.assemblies:
+        gids[pre_assembly.idx[0]] = _get_degree_sorted_assembly_gids_within_target(c, target_gids, conn_mat, assembly,
+                                                                                   mtype_list, n_samples, pre_assembly)
+    if len(gids) > 1:
+        # first check if there are common gids (that have high indegree from more than 1 pre assemblies)
+        all_gids = np.concatenate([gids_tmp for _, gids_tmp in gids.items()])
+        unique_gids, counts = np.unique(all_gids, return_counts=True)
+        selected_gids = unique_gids[counts > 1]
+        if len(selected_gids) >= n_samples:
+            return selected_gids[:n_samples]
+        # then add the unique pre assembly specific ones one-by-one until `n_samples` is reached
+        while len(selected_gids) < n_samples:
+            for pre_assembly, gids_tmp in gids.items():
+                selected_gids = np.append(selected_gids, gids_tmp[0])
+                gids[pre_assembly] = np.delete(gids_tmp, 0)
+        return selected_gids[:n_samples]
+    else:
+        return list(gids.values())[0]
+
+
+def _update_cross_cluster_dfs_for_plotting(cross_cluster_dfs):
+    """For each post assembly concatenates clustered vs. non-clustered results from all pre assemblies
+    and calls it in a way that `plots.py/plot_cond_rhos()` can handle it..."""
+
+    plot_cross_cluster_dfs = {}
+    for post_assembly_id, cross_cluster_df in cross_cluster_dfs.items():
+        df = cross_cluster_df.copy()
+        pre_assemblies = [col_name for col_name in df.columns.to_numpy() if col_name.split("assembly")[0] == '']
+        col_name = "assembly%i" % post_assembly_id
+        df[col_name] = -100  # placeholder (see `clustering.py/cluster_synapses()`)
+        # first overwrite all synapses that are coming from any assemblies
+        df.loc[df["non_assembly"] == -100, col_name] = -1
+        # then overwrite clusters (with a random cluster id: 100,
+        # because plotting only cares if a synapse is part of a cluster but not the identity)
+        for pre_assembly in pre_assemblies:
+            df.loc[df[pre_assembly] >= 0, col_name] = 100
+        # lastly delete all pre assembly columns (since we just made one for the combination of all)
+        df.drop(columns=pre_assemblies, inplace=True)
+        plot_cross_cluster_dfs[post_assembly_id] = df
+    return plot_cross_cluster_dfs
 
 
 def run(config_path, debug):
     """
-    Loads in asssemblies from saved h5 file, and for each assembly samples gids from a given mtype
-    (by in-degree for all assemblies and on top by firing rate for late assemblies),
+    Loads in asssemblies from saved h5 file, and for each assembly samples gids from a given mtype (by indegree)
     looks for synapse clusters on them and saves them to pickle files
     :param config_path: str - path to project config file
     :param debug: bool - to save figures for visual inspection
@@ -56,13 +96,13 @@ def run(config_path, debug):
                                         prefix=config.h5_prefix_connectivity, group_name="full_matrix")
     target_range, min_nsyns = config.syn_clustering_target_range, config.syn_clustering_min_nsyns
     mtypes, n_samples = config.syn_clustering_mtypes, config.syn_clustering_n_neurons_sample
+    cross_assemblies = config.syn_clustering_cross_assemblies
 
     L.info(" Detecting synapse clusters and saving them to files")
     for seed, assembly_grp in tqdm(assembly_grp_dict.items(), desc="Iterating over seeds"):
-        cluster_dfs = {}
+        cluster_dfs, cross_cluster_dfs = {}, {}
         for assembly in tqdm(assembly_grp.assemblies, desc="%s syn. clusters" % seed, leave=False):
-            gids = _get_degree_sorted_assembly_gids_within_target(c, target_gids, conn_mat,
-                                                                  assembly, mtypes, n_samples)
+            gids = _get_degree_sorted_assembly_gids_within_target(c, target_gids, conn_mat, assembly, mtypes, n_samples)
             loc_df_gids = loc_df.loc[loc_df["post_gid"].isin(gids)]
             # create a fake assembly "group" in order to look for *within* assembly clusters only
             single_assembly_grp = AssemblyGroup([assembly], all_gids=assembly.gids)
@@ -75,21 +115,37 @@ def run(config_path, debug):
             else:
                 cluster_df = cluster_synapses(loc_df_gids, single_assembly_grp, target_range, min_nsyns)
             utils.save_syn_clusters(config.syn_clustering_save_dir, assembly.idx, cluster_df)
-
-            sim = utils.get_bluepy_simulation(sim_paths.loc[int(seed.split("seed")[1])])
-            if assembly.idx[0] == 0:  # late assembly TODO: not hard code this distinction
-                gids = _get_rate_sorted_assembly_gids_within_target(sim, target_gids, assembly.gids, mtypes,
-                                                                    n_samples, config.t_start, config.t_end)
-                loc_df_gids = loc_df.loc[loc_df["post_gid"].isin(gids)]
-                if debug:
-                    late_cluster_df = cluster_synapses(loc_df_gids, assembly_grp, target_range, min_nsyns,
-                                                       fig_dir=fig_dir, base_assembly_idx=assembly.idx[0], c=c)
-                else:
-                    late_cluster_df = cluster_synapses(loc_df_gids, assembly_grp, target_range, min_nsyns)
-                utils.save_syn_clusters(config.syn_clustering_save_dir, assembly.idx, late_cluster_df, late_assembly=True)
-            # some extra plotting
+            # some extra stuff for plotting
             cluster_df["rho"] = utils.get_syn_properties(c, cluster_df.index.to_numpy(), ["rho0_GB"])["rho0_GB"]
             cluster_dfs[assembly.idx[0]] = cluster_df
         fig_name = os.path.join(config.fig_path, "rho0_syn_clusts_%s.png" % seed)
         plot_cond_rhos(cluster_dfs, fig_name)
+
+        if seed in cross_assemblies:
+            # not optimal way to find postsynaptic cross assemblies, but better for progress bar...
+            for assembly_id in tqdm(cross_assemblies[seed], desc="%s cross syn. clusters" % seed, leave=False):
+                for assembly in assembly_grp.assemblies:
+                    if assembly.idx[0] == assembly_id:
+                        # create an assembly group with specified assemblies (based on temporal order) only
+                        assembly_lst = [assembly for assembly in assembly_grp.assemblies
+                                        if assembly.idx[0] in cross_assemblies[seed][assembly_id]]
+                        all_gids = np.unique(np.concatenate([assembly.gids for assembly in assembly_lst]))
+                        cross_assembly_grp = AssemblyGroup(assembly_lst, all_gids=all_gids)
+                        # sample gids (slightly differently) to have high indegree from `cross_assembly_grp`
+                        gids = _get_cross_degree_sorted_assembly_gids_within_target(c, target_gids, conn_mat,
+                                                                                    cross_assembly_grp, assembly,
+                                                                                    mtypes, n_samples)
+                        loc_df_gids = loc_df.loc[loc_df["post_gid"].isin(gids)]
+                        if debug:
+                            cross_cluster_df = cluster_synapses(loc_df_gids, cross_assembly_grp, target_range, min_nsyns,
+                                                                fig_dir=fig_dir, base_assembly_idx=assembly_id, c=c)
+                        else:
+                            cross_cluster_df = cluster_synapses(loc_df_gids, cross_assembly_grp, target_range, min_nsyns)
+                        utils.save_syn_clusters(config.syn_clustering_save_dir, assembly.idx, cross_cluster_df,
+                                                cross_assembly=True)
+                        cross_cluster_df["rho"] = utils.get_syn_properties(c, cross_cluster_df.index.to_numpy(),
+                                                                           ["rho0_GB"])["rho0_GB"]
+                        cross_cluster_dfs[assembly_id] = cross_cluster_df
+            fig_name = os.path.join(config.fig_path, "rho0_cross_syn_clusts_%s.png" % seed)
+            plot_cond_rhos(_update_cross_cluster_dfs_for_plotting(cross_cluster_dfs), fig_name)
 
