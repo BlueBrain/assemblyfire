@@ -1,6 +1,6 @@
 """
 Assembly detection related plots
-author: András Ecker, last update: 10.2022
+author: András Ecker, last update: 12.2022
 """
 
 import numpy as np
@@ -155,7 +155,7 @@ def update(changed_image):
 
 
 def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
-    """plots sequence of time bins color coded by clusters"""
+    """Plots sequence of time bins color coded by clusters"""
     cmap = plt.cm.get_cmap("tab20", len(np.unique(clusters)))
     images = []
 
@@ -200,7 +200,7 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
 
 
 def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, fig_name):
-    """plots sequence of time bins color coded by consensus assemblies
+    """Plots sequence of time bins color coded by consensus assemblies
     (+black if the orig cluster didn't become an assembly)"""
     cmap_tmp = plt.cm.get_cmap("tab20", n_clusters)
     cols = [(0.0, 0.0, 0.0, 0.8)] + [cmap_tmp(i) for i in range(n_clusters)]
@@ -436,7 +436,7 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"
 
 def plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, xlabel, palette, fig_name, logx=False):
     """Plots assembly membership probability vs. whatever data `xlabel` is"""
-    keys = list(list(assembly_probs.keys()))
+    keys = list(assembly_probs.keys())
     assembly_labels = list(assembly_probs[keys[0]].keys())
     n = len(assembly_labels)
     if palette == "patterns":
@@ -539,78 +539,42 @@ def plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name):
     plt.close(fig)
 
 
-def plot_consensus_mtypes(union_gids, union_mtypes, consensus_gids, gids, consensus_mtypes, mtypes,
-                          ystuff, depths, fig_name):
-    """Plots depth profile and mtypes for consensus assemblies"""
-    n = len(consensus_gids)
+def plot_consensus_mtypes(mtypes, core_mtypes, union_mtypes, fig_name):
+    """Plots mtype composition of consensus assemblies' core and union"""
+    n = len(core_mtypes)
     cmap = plt.cm.get_cmap("tab20", n)
-    mtypes_lst = np.unique(mtypes)[::-1]  # commented out for toposample use case...
+    mtypes_lst = np.unique(mtypes)[::-1]
     mtypes_ypos = np.arange(len(mtypes_lst))
-    yrange = [ystuff["hlines"][-1], ystuff["hlines"][0]]
-    c_version = _guess_circuit_version(ystuff["hlines"])
-    yrange_hist = [yrange[-1], yrange[0]] if c_version == "v7" else yrange
 
     fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(2, n+1)
+    gs = gridspec.GridSpec(1, n+1)
     for i in range(n):
-        ax = fig.add_subplot(gs[0, i])
-        gid_depths = depths.loc[consensus_gids[i]].to_numpy()
+        ax = fig.add_subplot(gs[i])
         color = colors.to_hex(cmap(i))
-        ax.hist(gid_depths, bins=50, range=yrange_hist, orientation="horizontal",
-                color=color, edgecolor=color, label="core")
-        union_depths = depths.loc[union_gids[i]].to_numpy()
-        ax.hist(union_depths, bins=50, range=yrange_hist, orientation="horizontal",
-                color="black", histtype="step", label="union")
-        if c_version == "v5":
-            for j in range(1, 5):
-                ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
-        ax.set_title("cons%s\n(n=%i)" % (i, consensus_gids[i].shape[0]))
-        ax.set_xlim(left=5)  # for purely viz. purposes
-        ax.set_ylim(yrange)
-        ax2 = fig.add_subplot(gs[1, i])
-        mtypes_plot = [np.where(consensus_mtypes[i] == mtype)[0].shape[0] for mtype in mtypes_lst]
-        ax2.barh(mtypes_ypos, mtypes_plot, color=color, edgecolor=color)
+        mtypes_plot = [np.where(core_mtypes[i] == mtype)[0].shape[0] for mtype in mtypes_lst]
+        ax.barh(mtypes_ypos, mtypes_plot, color=color, edgecolor=color)
         mtypes_plot = [np.where(union_mtypes[i] == mtype)[0].shape[0] for mtype in mtypes_lst]
-        ax2.barh(mtypes_ypos, mtypes_plot, color="none", edgecolor="black")
-        ax2.set_xlim(left=5)
+        ax.barh(mtypes_ypos, mtypes_plot, color="none", edgecolor="black")
+        ax.set_title("cons%s\n(n=%i)" % (i, core_mtypes[i].shape[0]))
+        # ax.set_xlim(left=5)
         if i == 0:
             ax.set_xticks([])
-            ax.set_yticks(ystuff["yticks"])
-            ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"]])
-            ax.legend(frameon=False)
-            ax2.set_xticks([])
-            ax2.set_yticks(mtypes_ypos)
-            ax2.set_yticklabels(mtypes_lst)
+            ax.set_yticks(mtypes_ypos)
+            ax.set_yticklabels(mtypes_lst)
             sns.despine(ax=ax, bottom=True, offset=5)
-            sns.despine(ax=ax2, bottom=True, offset=5)
         else:
             ax.set_xticks([])
             ax.set_yticks([])
-            ax2.set_xticks([])
-            ax2.set_yticks([])
             sns.despine(ax=ax, left=True, bottom=True)
-            sns.despine(ax=ax2, left=True, bottom=True)
 
-    ax = fig.add_subplot(gs[0, -1])
-    gid_depths = depths.loc[gids].to_numpy()
-    ax.hist(gid_depths, bins=50, range=yrange_hist, orientation="horizontal",
-            color="gray", edgecolor="gray")
-    if c_version == "v5":
-        for i in range(1, 5):
-            ax.axhline(ystuff["hlines"][i], color="gray", ls="--")
-    ax.set_title("all_gids\n(n=%i)" % gids.shape[0])
-    ax.set_xlim(left=5)
-    ax.set_xticks([])
-    ax.set_ylim(yrange)
-    ax.set_yticks([])
-    ax2 = fig.add_subplot(gs[1, -1])
+    ax = fig.add_subplot(gs[-1])
     mtypes_plot = [np.where(mtypes == mtype)[0].shape[0] for mtype in mtypes_lst]
-    ax2.barh(mtypes_ypos, mtypes_plot, color="gray", edgecolor="gray")
-    ax2.set_xlim(left=5)
-    ax2.set_xticks([])
-    ax2.set_yticks([])
+    ax.barh(mtypes_ypos, mtypes_plot, color="gray", edgecolor="gray")
+    ax.set_title("all gids\n(n=%i)" % mtypes.shape[0])
+    # ax.set_xlim(left=5)
+    ax.set_xticks([])
+    ax.set_yticks([])
     sns.despine(ax=ax, left=True, bottom=True)
-    sns.despine(ax=ax2, left=True, bottom=True)
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -883,7 +847,7 @@ def get_michelson_contrast(cluster_dfs):
     """
     Groups efficacies (initial rhos) in sample neurons from assemblies based on
     2 criteria: 1) synapse is coming from assembly neuron vs. non-assembly neuron (fist +/-)
-                2) synapse is part of a synapse cluster (clustering done in `assemblyfire`) vs. not (second +/-)
+                2) synapse is part of a synapse cluster vs. not (second +/-)
     and gets Michelson contrasts (aka. visibility) defined as:
     P(pot/dep | condition) - P(pot/dep) / (P(pot/dep | condition) + P(pot/dep))
     """
