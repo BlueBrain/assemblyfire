@@ -95,7 +95,7 @@ def in_degree_assemblies(assembly_grp_dict, conn_mat, post_id=None):
         in_d_control[seed]["n"] = {assembly.idx: conn_mat.degree(conn_mat.random_n_gids(assembly.gids), post_gids,
                                    kind="in") for assembly in assembly_grp.assemblies}
         in_d_control[seed]["depths"] = {assembly.idx: conn_mat.degree(
-                                        conn_mat.index("[PH]y").random_numerical_gids(assembly.gids), post_gids,
+                                        conn_mat.index("depth").random_numerical_gids(assembly.gids), post_gids,
                                         kind="in") for assembly in assembly_grp.assemblies}
         in_d_control[seed]["mtypes"] = {assembly.idx: conn_mat.degree(
                                         conn_mat.index("mtype").random_categorical_gids(assembly.gids), post_gids,
@@ -123,7 +123,7 @@ def simplex_counts_assemblies(assembly_grp_dict, conn_mat):
         s_c_control[seed]["n"] = {assembly.idx: conn_mat.simplex_counts(conn_mat.random_n_gids(assembly.gids))
                                   for assembly in assembly_grp.assemblies}
         s_c_control[seed]["depths"] = {assembly.idx: conn_mat.simplex_counts(
-                                       conn_mat.index("[PH]y").random_numerical_gids(assembly.gids))
+                                       conn_mat.index("depth").random_numerical_gids(assembly.gids))
                                        for assembly in assembly_grp.assemblies}
         s_c_control[seed]["mtypes"] = {assembly.idx: conn_mat.simplex_counts(
                                        conn_mat.index("mtype").random_categorical_gids(assembly.gids))
