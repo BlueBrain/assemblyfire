@@ -693,8 +693,8 @@ def build_assembly_group(gids, n_assemblies, assembly_lst, seeds, assembly_grp_d
     return gids, n_assemblies, assembly_lst, assembly_grp
 
 
-def consensus_over_seeds_hc(assembly_grp_dict, h5f_name, h5_prefix, fig_path,
-                            distance_metric="jaccard", linkage_method="ward"):
+def consensus_over_seeds(assembly_grp_dict, h5f_name, h5_prefix, fig_path,
+                         distance_metric="jaccard", linkage_method="ward"):
     """
     Hierarhichal clustering of assemblies from different seeds based on specified distance metric
     :param assembly_grp_dict: dict with seeds as keys and AssemblyGroup object as values
