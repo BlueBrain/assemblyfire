@@ -41,13 +41,6 @@ def assembly_in_degree(config):
         fig_name = os.path.join(config.fig_path, "in_degrees_%s.png" % seed)
         plots.plot_in_degrees(in_degree, in_degrees_control[seed], fig_name)
 
-    '''
-    in_degrees, in_degrees_control = in_degree_assemblies(assembly_grp_dict, conn_mat, post_id=0)
-    for seed, in_degree in in_degrees.items():
-        fig_name = os.path.join(config.fig_path, "cross_assembly_in_degrees_%s.png" % seed)
-        plots.plot_in_degrees(in_degree, in_degrees_control[seed], fig_name, xlabel="Cross assembly (any to 0) in degree")
-    '''
-
 
 def assembly_simplex_counts(config):
     """Loads in assemblies and plots simplex counts in assemblies and control models (seed by seed)"""
@@ -63,7 +56,7 @@ def assembly_simplex_counts(config):
 
 
 def _bin_gids_by_innervation(indegree_dict, gids, min_samples):
-    """Creates lookups of gids in optimal bins for each pattern
+    """Creates lookups of gids in optimal bins for each pre-synaptic group (in terms of in-degree)
     (optimal bins are determined based on their innervation profile)"""
     binned_gids, bin_centers_dict = {key: {} for key in list(indegree_dict.keys())}, {}
     for key, indegrees in indegree_dict.items():
@@ -341,21 +334,21 @@ def frac_entropy_explained_by_patterns(config, min_samples=100):
                 assembly_mi[pattern_name][assembly_id] = (1.0 - pe / me) * _sign_of_correlation(vals, probs)
 
         fig_name = os.path.join(config.fig_path, "assembly_prob_from_patterns_%s.png" % seed)
-        plots.plot_assembly_prob_from(chance_levels, bin_centers_plot, assembly_probs,
+        plots.plot_assembly_prob_from(bin_centers_plot, assembly_probs, chance_levels,
                                       "In degree from patterns", "patterns", fig_name)
         fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_patterns_%s.png" % seed)
         plots.plot_frac_entropy_explained_by(pd.DataFrame(assembly_mi).transpose(), "Innervation by pattern", fig_name)
 
 
 if __name__ == "__main__":
-    config = Config("../configs/v7_bbp-workflow.yaml")
+    config = Config("../configs/v7_10seeds_np.yaml")
     # assembly_efficacy(config)
-    # assembly_in_degree(config)
-    # assembly_simplex_counts(config)
-    # assembly_indegrees = frac_entropy_explained_by_indegree(config)
+    assembly_in_degree(config)
+    assembly_simplex_counts(config)
+    assembly_indegrees = frac_entropy_explained_by_indegree(config)
     # assembly_nnds = frac_entropy_explained_by_syn_nnd(config)
     # assembly_prob_from_indegree_and_syn_nnd(config, assembly_indegrees, assembly_nnds,
     #                                         {"below avg.": "assembly_color", "avg.": "gray", "above avg.": "black"})
     assembly_prob_from_sinks(config, {2: "lightgray", 3: "gray", 4: "black", 5: "assembly_color"})
-    # frac_entropy_explained_by_patterns(config)
+    frac_entropy_explained_by_patterns(config)
 
