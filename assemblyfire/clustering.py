@@ -231,7 +231,7 @@ def _update_block_diagonal_dists(dists, n_assemblies_cum):
     between different assemblies from the same seed and return scipy's condensed distance representation
     which can be passed to hierarhichal clustering in the next step
     """
-    inf_dist = np.max(dists) * 5
+    inf_dist = np.max(dists) * 2
     for i, j in zip(n_assemblies_cum[:-1], n_assemblies_cum[1:]):
         dists[i:j, i:j] = inf_dist
     np.fill_diagonal(dists, 0)
@@ -239,7 +239,7 @@ def _update_block_diagonal_dists(dists, n_assemblies_cum):
 
 
 def cluster_assemblies(assemblies, n_assemblies, distance_metric, linkage_method,
-                       update_block_diagonals=False, n_method="min"):
+                       update_block_diagonals=True, n_method="min"):
     """
     Hieararchical (Ward linkage) clustering of hamming similarity matrix of assemblies from different seeds
     :param assemblies: assemblies x gids boolean array representing all assemblies across seeds
