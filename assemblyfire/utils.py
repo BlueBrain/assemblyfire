@@ -259,9 +259,9 @@ def load_spikes_from_h5(h5f_name, prefix="spikes"):
     prefix_grp = h5f[prefix]
     spike_matrix_dict = {}
     for seed in seeds:
-        spike_matrix_dict[int(seed[4:])] = SpikeMatrixResult(prefix_grp[seed]["spike_matrix"][:],
-                                                             prefix_grp[seed]["gids"][:],
-                                                             prefix_grp[seed]["t_bins"][:])
+        spike_matrix_dict[seed] = SpikeMatrixResult(prefix_grp[seed]["spike_matrix"][:],
+                                                    prefix_grp[seed]["gids"][:],
+                                                    prefix_grp[seed]["t_bins"][:])
     h5f.close()
     return spike_matrix_dict, project_metadata
 
@@ -275,3 +275,17 @@ def load_single_cell_features_from_h5(h5f_name, prefix="single_cell"):
                                               prefix_grp["mean_ts_in_bin"][:], prefix_grp["std_ts_in_bin"][:])
     h5f.close()
     return single_cell_features, project_metadata
+
+
+def read_cluster_seq_data(h5f_name):
+    """Load metadata needed (stored under diff. prefixes) for re-plotting cluster (of time bin) sequences"""
+    h5f = h5py.File(h5f_name, "r")
+    spikes_metadata = _read_h5_metadata(h5f, prefix="spikes")
+    seeds = ["seed%i" % seed for seed in spikes_metadata["seeds"]]
+    assemblies_metadata = {seed: _read_h5_metadata(h5f, seed, "assemblies") for seed in seeds}
+    metadata = {"clusters": {seed: assemblies_metadata[seed]["clusters"] for seed in seeds},
+                "t_bins": {seed: h5f["spikes"][seed]["t_bins"][:] for seed in seeds},
+                "stim_times": spikes_metadata["stim_times"],
+                "patterns": spikes_metadata["patterns"]}
+    h5f.close()
+    return metadata
