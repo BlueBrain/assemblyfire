@@ -167,24 +167,24 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
     gs = gridspec.GridSpec(3, 5, height_ratios=[1, 4, 4])
     ax = fig.add_subplot(gs[0, :])
     divider = make_axes_locatable(ax)
-    i_base = ax.imshow(clusters, cmap=cmap, aspect="auto")
+    i_base = ax.imshow(clusters, cmap=cmap, interpolation="nearest", aspect="auto")
     images.append(i_base)
     cax = divider.new_vertical(size="50%", pad=0.1, pack_start=True)
     fig.add_axes(cax)
     ax.set_xticks(t_idx); ax.set_xticklabels(sign_patterns)
     ax.xaxis.tick_top()
     ax.set_yticks([])
-    for i, (name, matrix) in enumerate(pattern_matrices.items()):
+    for i, (pattern, matrix) in enumerate(pattern_matrices.items()):
         ax = fig.add_subplot(gs[1+np.floor_divide(i, 5), np.mod(i, 5)])
         im = ax.imshow(matrix, cmap=cmap, interpolation="nearest", aspect="auto")
         images.append(im)
-        ax.set_title(name)
+        ax.set_title(pattern)
         if np.floor_divide(i, 5) == 1:
             ax.set_xticks([0, matrix.shape[1] - 1])
             ax.set_xticklabels([0, max_t])
         else:
             ax.set_xticks([])
-        ax.set_yticks([0, row_idx[name]])
+        ax.set_yticks([0, row_idx[pattern]])
     # set one colorbar for all images
     vmin = min(image.get_array().min() for image in images)
     vmax = max(image.get_array().max() for image in images)
@@ -194,6 +194,10 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
     fig.colorbar(i_base, cax=cax, orientation="horizontal", ticks=np.unique(clusters))
     for im in images:
         im.callbacks.connect("changed", update)
+    fig.add_subplot(1, 1, 1, frameon=False)
+    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    plt.xlabel("Binned time (ms)")
+    plt.ylabel("Pattern presentation")
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -216,20 +220,70 @@ def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, f
     gs = gridspec.GridSpec(3, 5, height_ratios=[1, 4, 4])
     ax = fig.add_subplot(gs[0, :])
     divider = make_axes_locatable(ax)
-    i_base = ax.imshow(clusters, cmap=cmap, norm=norm, aspect="auto")
+    i_base = ax.imshow(clusters, cmap=cmap, norm=norm, interpolation="nearest", aspect="auto")
     cax = divider.new_vertical(size="50%", pad=0.1, pack_start=True)
     fig.add_axes(cax)
     fig.colorbar(i_base, cax=cax, orientation="horizontal", ticks=np.arange(-1, n_clusters))
     ax.set_xticks(t_idx); ax.set_xticklabels(sign_patterns)
     ax.xaxis.tick_top()
     ax.set_yticks([])
-    for i, (name, matrix) in enumerate(pattern_matrices.items()):
+    for i, (pattern, matrix) in enumerate(pattern_matrices.items()):
         ax = fig.add_subplot(gs[1+np.floor_divide(i, 5), np.mod(i, 5)])
-        ax.imshow(matrix, cmap=cmap, norm=norm, aspect="auto")
-        ax.set_title(name)
-        ax.set_xticks([0, matrix.shape[1] - 1])
-        ax.set_xticklabels([0, max_t])
-        ax.set_yticks([0, row_idx[name]])
+        ax.imshow(matrix, cmap=cmap, norm=norm, interpolation="nearest", aspect="auto")
+        ax.set_title(pattern)
+        if np.floor_divide(i, 5) == 1:
+            ax.set_xticks([0, matrix.shape[1] - 1])
+            ax.set_xticklabels([0, max_t])
+        else:
+            ax.set_xticks([])
+        ax.set_yticks([0, row_idx[pattern]])
+    fig.add_subplot(1, 1, 1, frameon=False)
+    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    plt.xlabel("Binned time (ms)")
+    plt.ylabel("Pattern presentation")
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _count_by_patterns_across_seeds(all_clusters, t_bins, stim_times, patterns, n_clusters):
+    """Counts consensus assemblies across seeds based on the patterns presented"""
+    count_matrices = {pattern: np.zeros((len(all_clusters), n_clusters+1), dtype=int) for pattern in np.unique(patterns)}
+    seeds = []
+    for i, (seed, clusters) in enumerate(all_clusters.items()):
+        seeds.append(seed)
+        _, _, pattern_matrices = _group_by_patterns(clusters, t_bins[seed], stim_times, patterns)
+        for pattern, matrix in pattern_matrices.items():
+            cons_assembly_idx, counts = np.unique(matrix, return_counts=True)
+            mask = ~np.isnan(cons_assembly_idx)
+            for cons_assembly_id, count in zip(cons_assembly_idx[mask], counts[mask]):
+                count_matrices[pattern][i, int(cons_assembly_id+1)] = count
+    return count_matrices, seeds, np.array([-1] + [i for i in range(n_clusters)])
+
+
+def plot_cons_cluster_seqs_all_seeds(clusters, t_bins, stim_times, patterns, n_clusters, fig_name):
+    """Plots heatmaps of consensus assembly counts across seeds"""
+
+    count_matrices, seeds, cons_assembly_idx = _count_by_patterns_across_seeds(clusters, t_bins,
+                                                                               stim_times, patterns, n_clusters)
+    vmax = np.max([np.max(count_matrix) for _, count_matrix in count_matrices.items()])
+
+    fig = plt.figure(figsize=(20, 8))
+    gs = gridspec.GridSpec(2, 5)
+    for i, (pattern, matrix) in enumerate(count_matrices.items()):
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
+        im = sns.heatmap(matrix, cmap="inferno", mask=matrix == 0, ax=ax,
+                         vmin=1, vmax=vmax, annot=True, cbar=False, xticklabels=cons_assembly_idx, yticklabels=seeds)
+        for _, spine in im.spines.items():
+            spine.set_visible(True)
+        ax.set_title(pattern)
+        if np.floor_divide(i, 5) == 0:
+            ax.set_xticks([])
+        if np.mod(i, 5) != 0:
+            ax.set_yticks([])
+    fig.add_subplot(1, 1, 1, frameon=False)
+    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    plt.xlabel("Consensus assembly id")
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -256,41 +310,6 @@ def plot_pattern_clusters(clusters, t_bins, stim_times, patterns, fig_name):
         ax.set_title(pattern_name)
         ax.set_xticks(x)
         ax.set_xlim([-0.5, n-0.5])
-    sns.despine()
-    fig.tight_layout()
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
-    plt.close(fig)
-
-
-def plot_pattern_cons_clusters(cons_clusters_dict, t_bins_dict, stim_times_dict, patterns_dict, n_clusters, fig_name):
-    """Plots counts of consensus clusters for every pattern"""
-    cmap = plt.cm.get_cmap("tab20", n_clusters)
-    cols = [colors.to_hex(cmap(i)) for i in range(n_clusters)]
-    heights_dict = {}
-    patter_names = []
-    keys = list(cons_clusters_dict.keys())
-    for key in keys:
-        _, _, pattern_matrices = _group_by_patterns(cons_clusters_dict[key], t_bins_dict[key],
-                                                    stim_times_dict[key], patterns_dict[key])
-        for pattern_name, matrix in pattern_matrices.items():
-            if pattern_name not in heights_dict:
-                heights_dict[pattern_name] = np.zeros(n_clusters)
-                patter_names.append(pattern_name)
-            clusts, counts = np.unique(matrix[~np.isnan(matrix)], return_counts=True)
-            for i in range(n_clusters):
-                if i in clusts:
-                    heights_dict[pattern_name][i] += counts[clusts == i]
-
-    fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(2, 5)
-    x = np.arange(n_clusters)
-    for i, pattern_name in enumerate(np.sort(patter_names)):
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
-        ax.bar(x, heights_dict[pattern_name], width=0.5, align="center", color=cols)
-        ax.set_title(pattern_name)
-        ax.set_xticks(x)
-        ax.set_xlim([-0.5, n_clusters - 0.5])
-        ax.set_yscale("log")
     sns.despine()
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
