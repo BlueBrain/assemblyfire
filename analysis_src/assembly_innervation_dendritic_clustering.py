@@ -7,6 +7,7 @@ from conntility import subcellular
 from conntility.connectivity import ConnectivityMatrix
 import morphio
 from assemblyfire.config import Config
+from assemblyfire.assemblies import AssemblyGroup
 from assemblyfire.dendritic_clustering_strength import DendriticClusteringResults as ClusteringResults
 from assemblyfire.dendritic_clustering_strength import calculate_dendritic_clustering_strength as synapse_clustering_from_assemblies
 
@@ -63,22 +64,42 @@ def innervation_clustering(circ, conmat, assembly_grp, fn_out, dset_root=None):
             buf = []
             obj.flush()
 
+def assembly_group_for(config, asmbly_grp_name):
+    if asmbly_grp_name == "consensus":
+        assembly_grp_dict = utils.load_consensus_assemblies_from_h5(config.h5f_name, config.h5_prefix_consensus_assemblies)
+        all_gids = []
+        for cons in assembly_grp_dict.values():
+            all_gids = numpy.union1d(all_gids, cons.union.gids)
+
+        kk = sorted(assembly_grp_dict.keys())
+        for _k in kk:
+            assembly_grp_dict[_k].idx = (assembly_grp_dict[_k].idx, "consensus")
+            
+        cons_grp = AssemblyGroup([assembly_grp_dict[_k] for _k in kk], all_gids, label="ConsensusGroup")
+        return cons_grp
+    else:
+        assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+        return assembly_grp_dict[asmbly_grp_name]
+
+
 if __name__ == "__main__":
     import sys
     import bluepy
+    import glob
     import assemblyfire.utils as utils
 
-    asmbly_grp = "seed1"
     fn_out = sys.argv[1]
+    asmbly_grp_name = sys.argv[2]
 
-    config = Config("../configs/v7_bbp-workflow.yaml")
+
+    config = Config("../configs/v7_10seeds_np.yaml")
     conmat = ConnectivityMatrix.from_h5(config.h5f_name, prefix=config.h5_prefix_connectivity,
                                     group_name="full_matrix")
-    sim = bluepy.Simulation(os.path.join(config.root_path, "BlueConfig"))
+    sim_cfgs = glob.glob(os.path.join(config.root_path, "*/BlueConfig"))
+    assert len(sim_cfgs) > 0, "No simulations found!?"
+    sim = bluepy.Simulation(sim_cfgs[0])  # Just taking the first one, assuming they all use the same Circuit
     circ = sim.circuit
-    assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
-    assembly_grp = assembly_grp_dict[asmbly_grp]
 
-    tgt_gids = numpy.intersect1d(conmat.gids, circ.cells.ids("Excitatory"))
+    assembly_grp = assembly_group_for(config, asmbly_grp_name)
 
-    innervation_clustering(circ, conmat, assembly_grp, fn_out, dset_root=asmbly_grp)
+    innervation_clustering(circ, conmat, assembly_grp, fn_out, dset_root=asmbly_grp_name)
