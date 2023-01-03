@@ -5,6 +5,7 @@ author: András Ecker, last update: 12.2022
 
 import numpy as np
 from scipy.cluster.hierarchy import dendrogram, set_link_color_palette
+from assemblyfire.utils import group_clusters_by_patterns, count_clusters_by_patterns_across_seeds
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -124,28 +125,6 @@ def plot_dendogram_silhouettes(clusters, linkage, silhouettes, fig_name):
     plt.close(fig)
 
 
-def _group_by_patterns(clusters, t_bins, stim_times, patterns):
-    """Groups clustered sign. activity based on the patterns presented"""
-    # get basic info (passing them would be difficult...) and initialize empty matrices
-    pattern_names, counts = np.unique(patterns, return_counts=True)
-    isi, bin_size = np.max(np.diff(stim_times)), np.min(np.diff(t_bins))
-    pattern_matrices = {pattern: np.full((np.max(counts), int(isi / bin_size)), np.nan) for pattern in pattern_names}
-    # group sign. activity clusters based on patterns
-    row_idx = {pattern: 0 for pattern in pattern_names}
-    for pattern, t_start, t_end in zip(patterns, stim_times[:-1], stim_times[1:]):
-        idx = np.where((t_start <= t_bins) & (t_bins < t_end))[0]
-        if len(idx):
-            t_idx = (((t_bins[idx] - t_start) / bin_size) - 1).astype(int)
-            pattern_matrices[pattern][row_idx[pattern], t_idx] = clusters[idx]
-        row_idx[pattern] += 1
-    # find max length of sign. activity and cut all matrices there
-    max_tidx = np.max([np.sum(~np.all(np.isnan(pattern_matrix), axis=0))
-                       for _, pattern_matrix in pattern_matrices.items()])
-    pattern_matrices = {pattern_name: pattern_matrix[:, :max_tidx]
-                        for pattern_name, pattern_matrix in pattern_matrices.items()}
-    return bin_size * max_tidx, row_idx, pattern_matrices
-
-
 def update(changed_image):
     """mpl hack to set 1 colorbar for multiple images"""
     for im in images:
@@ -160,7 +139,7 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
     images = []
 
     t_idx, sign_patterns = _get_pattern_idx(t_bins, stim_times, patterns)
-    max_t, row_idx, pattern_matrices = _group_by_patterns(clusters, t_bins, stim_times, patterns)
+    max_t, row_idx, pattern_matrices, _ = group_clusters_by_patterns(clusters, t_bins, stim_times, patterns)
     clusters = np.reshape(clusters, (1, len(clusters)))
 
     fig = plt.figure(figsize=(20, 8))
@@ -213,7 +192,7 @@ def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, f
     norm = colors.BoundaryNorm(bounds, cmap.N)
 
     t_idx, sign_patterns = _get_pattern_idx(t_bins, stim_times, patterns)
-    max_t, row_idx, pattern_matrices = _group_by_patterns(clusters, t_bins, stim_times, patterns)
+    max_t, row_idx, pattern_matrices, _ = group_clusters_by_patterns(clusters, t_bins, stim_times, patterns)
     clusters = np.reshape(clusters, (1, len(clusters)))
 
     fig = plt.figure(figsize=(20, 8))
@@ -246,26 +225,10 @@ def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, f
     plt.close(fig)
 
 
-def _count_by_patterns_across_seeds(all_clusters, t_bins, stim_times, patterns, n_clusters):
-    """Counts consensus assemblies across seeds based on the patterns presented"""
-    count_matrices = {pattern: np.zeros((len(all_clusters), n_clusters+1), dtype=int) for pattern in np.unique(patterns)}
-    seeds = []
-    for i, (seed, clusters) in enumerate(all_clusters.items()):
-        seeds.append(seed)
-        _, _, pattern_matrices = _group_by_patterns(clusters, t_bins[seed], stim_times, patterns)
-        for pattern, matrix in pattern_matrices.items():
-            cons_assembly_idx, counts = np.unique(matrix, return_counts=True)
-            mask = ~np.isnan(cons_assembly_idx)
-            for cons_assembly_id, count in zip(cons_assembly_idx[mask], counts[mask]):
-                count_matrices[pattern][i, int(cons_assembly_id+1)] = count
-    return count_matrices, seeds, np.array([-1] + [i for i in range(n_clusters)])
-
-
 def plot_cons_cluster_seqs_all_seeds(clusters, t_bins, stim_times, patterns, n_clusters, fig_name):
     """Plots heatmaps of consensus assembly counts across seeds"""
-
-    count_matrices, seeds, cons_assembly_idx = _count_by_patterns_across_seeds(clusters, t_bins,
-                                                                               stim_times, patterns, n_clusters)
+    count_matrices, seeds, cons_assembly_idx, _ = count_clusters_by_patterns_across_seeds(clusters, t_bins,
+                                                                                          stim_times, patterns, n_clusters)
     vmax = np.max([np.max(count_matrix) for _, count_matrix in count_matrices.items()])
 
     fig = plt.figure(figsize=(20, 8))
@@ -292,21 +255,16 @@ def plot_cons_cluster_seqs_all_seeds(clusters, t_bins, stim_times, patterns, n_c
 def plot_pattern_clusters(clusters, t_bins, stim_times, patterns, fig_name):
     """Plots counts of clusters for every pattern"""
     n = len(np.unique(clusters))
+    x = np.arange(n)
     cmap = plt.cm.get_cmap("tab20", n)
     cols = [colors.to_hex(cmap(i)) for i in range(n)]
-    _, _, pattern_matrices = _group_by_patterns(clusters, t_bins, stim_times, patterns)
+    _, _, _, pattern_counts = group_clusters_by_patterns(clusters, t_bins, stim_times, patterns)
 
     fig = plt.figure(figsize=(20, 8))
     gs = gridspec.GridSpec(2, 5)
-    for i, (pattern_name, matrix) in enumerate(pattern_matrices.items()):
-        clusts, counts = np.unique(matrix[~np.isnan(matrix)], return_counts=True)
-        heights = np.zeros(n)
-        for j in range(n):
-            if j in clusts:
-                heights[j] = counts[clusts == j]
+    for i, (pattern_name, counts) in enumerate(pattern_counts.items()):
         ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
-        x = np.arange(n)
-        ax.bar(x, heights, width=0.5, align="center", color=cols)
+        ax.bar(x, counts, width=0.5, align="center", color=cols)
         ax.set_title(pattern_name)
         ax.set_xticks(x)
         ax.set_xlim([-0.5, n-0.5])
