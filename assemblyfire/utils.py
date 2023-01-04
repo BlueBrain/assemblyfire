@@ -1,6 +1,6 @@
 """
 Assembly detection related utility functions (mostly loading simulation related stuff)
-author: András Ecker, last update: 09.2022
+author: András Ecker, last update: 01.2023
 """
 
 import os
@@ -84,6 +84,14 @@ def get_pattern_gids(pklf_name):
     return pattern_gids
 
 
+def get_pattern_vectors(pklf_name):
+    """Loads pattern gids and returns boolean vectors with equal lengths"""
+    pattern_gids = get_pattern_gids(pklf_name)
+    all_gids = np.unique(np.concatenate([gids for pattern_name, gids in pattern_gids.items()]))
+    pattern_vectors = {pattern_name: np.in1d(all_gids, gids).astype(int) for pattern_name, gids in pattern_gids.items()}
+    return all_gids, pattern_vectors
+
+
 def get_gids(c, target):
     return c.cells.ids({"$target": target})
 
@@ -151,7 +159,7 @@ def count_clusters_by_patterns_across_seeds(all_clusters, t_bins, stim_times, pa
     seeds = []
     for i, (seed, clusters) in enumerate(all_clusters.items()):
         seeds.append(seed)
-        _, _, pattern_matrices = group_clusters_by_patterns(clusters, t_bins[seed], stim_times, patterns)
+        _, _, pattern_matrices, _ = group_clusters_by_patterns(clusters, t_bins[seed], stim_times, patterns)
         for pattern, matrix in pattern_matrices.items():
             cons_assembly_idx, counts = np.unique(matrix, return_counts=True)
             mask = ~np.isnan(cons_assembly_idx)
