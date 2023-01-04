@@ -133,7 +133,16 @@ def group_clusters_by_patterns(clusters, t_bins, stim_times, patterns):
                        for _, pattern_matrix in pattern_matrices.items()])
     pattern_matrices = {pattern_name: pattern_matrix[:, :max_tidx]
                         for pattern_name, pattern_matrix in pattern_matrices.items()}
-    return bin_size * max_tidx, row_idx, pattern_matrices
+    # count nr. of clusters per patterns
+    pattern_counts, n_clusters = {}, len(np.unique(clusters))
+    for pattern_name, matrix in pattern_matrices.items():
+        cluster_idx, cluster_counts = np.unique(matrix[~np.isnan(matrix)], return_counts=True)
+        counts = np.zeros(n_clusters, dtype=int)
+        for i in range(n_clusters):
+            if i in cluster_idx:
+                counts[i] = cluster_counts[cluster_idx == i]
+        pattern_counts[pattern_name] = counts
+    return bin_size * max_tidx, row_idx, pattern_matrices, pattern_counts
 
 
 def count_clusters_by_patterns_across_seeds(all_clusters, t_bins, stim_times, patterns, n_clusters):

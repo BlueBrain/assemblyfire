@@ -139,7 +139,7 @@ def plot_cluster_seqs(clusters, t_bins, stim_times, patterns, fig_name):
     images = []
 
     t_idx, sign_patterns = _get_pattern_idx(t_bins, stim_times, patterns)
-    max_t, row_idx, pattern_matrices = group_clusters_by_patterns(clusters, t_bins, stim_times, patterns)
+    max_t, row_idx, pattern_matrices, _ = group_clusters_by_patterns(clusters, t_bins, stim_times, patterns)
     clusters = np.reshape(clusters, (1, len(clusters)))
 
     fig = plt.figure(figsize=(20, 8))
@@ -192,7 +192,7 @@ def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, f
     norm = colors.BoundaryNorm(bounds, cmap.N)
 
     t_idx, sign_patterns = _get_pattern_idx(t_bins, stim_times, patterns)
-    max_t, row_idx, pattern_matrices = group_clusters_by_patterns(clusters, t_bins, stim_times, patterns)
+    max_t, row_idx, pattern_matrices, _ = group_clusters_by_patterns(clusters, t_bins, stim_times, patterns)
     clusters = np.reshape(clusters, (1, len(clusters)))
 
     fig = plt.figure(figsize=(20, 8))
@@ -255,21 +255,16 @@ def plot_cons_cluster_seqs_all_seeds(clusters, t_bins, stim_times, patterns, n_c
 def plot_pattern_clusters(clusters, t_bins, stim_times, patterns, fig_name):
     """Plots counts of clusters for every pattern"""
     n = len(np.unique(clusters))
+    x = np.arange(n)
     cmap = plt.cm.get_cmap("tab20", n)
     cols = [colors.to_hex(cmap(i)) for i in range(n)]
-    _, _, pattern_matrices = _group_by_patterns(clusters, t_bins, stim_times, patterns)
+    _, _, _, pattern_counts = group_clusters_by_patterns(clusters, t_bins, stim_times, patterns)
 
     fig = plt.figure(figsize=(20, 8))
     gs = gridspec.GridSpec(2, 5)
-    for i, (pattern_name, matrix) in enumerate(pattern_matrices.items()):
-        clusts, counts = np.unique(matrix[~np.isnan(matrix)], return_counts=True)
-        heights = np.zeros(n)
-        for j in range(n):
-            if j in clusts:
-                heights[j] = counts[clusts == j]
+    for i, (pattern_name, counts) in enumerate(pattern_counts.items()):
         ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
-        x = np.arange(n)
-        ax.bar(x, heights, width=0.5, align="center", color=cols)
+        ax.bar(x, counts, width=0.5, align="center", color=cols)
         ax.set_title(pattern_name)
         ax.set_xticks(x)
         ax.set_xlim([-0.5, n-0.5])
