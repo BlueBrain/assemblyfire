@@ -114,6 +114,43 @@ def get_spikes(sim, gids, t_start, t_end):
     return spikes.index.to_numpy(), spikes.to_numpy()
 
 
+def group_clusters_by_patterns(clusters, t_bins, stim_times, patterns):
+    """Groups clustered sign. activity based on the patterns presented"""
+    # get basic info (passing them would be difficult...) and initialize empty matrices
+    pattern_names, counts = np.unique(patterns, return_counts=True)
+    isi, bin_size = np.max(np.diff(stim_times)), np.min(np.diff(t_bins))
+    pattern_matrices = {pattern: np.full((np.max(counts), int(isi / bin_size)), np.nan) for pattern in pattern_names}
+    # group sign. activity clusters based on patterns
+    row_idx = {pattern: 0 for pattern in pattern_names}
+    for pattern, t_start, t_end in zip(patterns, stim_times[:-1], stim_times[1:]):
+        idx = np.where((t_start <= t_bins) & (t_bins < t_end))[0]
+        if len(idx):
+            t_idx = (((t_bins[idx] - t_start) / bin_size) - 1).astype(int)
+            pattern_matrices[pattern][row_idx[pattern], t_idx] = clusters[idx]
+        row_idx[pattern] += 1
+    # find max length of sign. activity and cut all matrices there
+    max_tidx = np.max([np.sum(~np.all(np.isnan(pattern_matrix), axis=0))
+                       for _, pattern_matrix in pattern_matrices.items()])
+    pattern_matrices = {pattern_name: pattern_matrix[:, :max_tidx]
+                        for pattern_name, pattern_matrix in pattern_matrices.items()}
+    return bin_size * max_tidx, row_idx, pattern_matrices
+
+
+def count_clusters_by_patterns_across_seeds(all_clusters, t_bins, stim_times, patterns, n_clusters):
+    """Counts consensus assemblies across seeds based on the patterns presented"""
+    count_matrices = {pattern: np.zeros((len(all_clusters), n_clusters+1), dtype=int) for pattern in np.unique(patterns)}
+    seeds = []
+    for i, (seed, clusters) in enumerate(all_clusters.items()):
+        seeds.append(seed)
+        _, _, pattern_matrices = group_clusters_by_patterns(clusters, t_bins[seed], stim_times, patterns)
+        for pattern, matrix in pattern_matrices.items():
+            cons_assembly_idx, counts = np.unique(matrix, return_counts=True)
+            mask = ~np.isnan(cons_assembly_idx)
+            for cons_assembly_id, count in zip(cons_assembly_idx[mask], counts[mask]):
+                count_matrices[pattern][i, int(cons_assembly_id+1)] = count
+    return count_matrices, seeds, np.array([-1] + [i for i in range(n_clusters)])
+
+
 def load_pkl_df(pklf_name):
     return pd.read_pickle(pklf_name)
 
