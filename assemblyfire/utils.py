@@ -122,6 +122,51 @@ def get_spikes(sim, gids, t_start, t_end):
     return spikes.index.to_numpy(), spikes.to_numpy()
 
 
+def _get_spikef_name(sim_config):
+    """Gets the name of the SpikeFile from bluepy.Simulation.config object"""
+    f_name = None
+    stims = sim_config.typed_sections("Stimulus")
+    for stim in stims:
+        if hasattr(stim, "SpikeFile"):
+            f_name = stim.SpikeFile
+            break  # atm. it handles only a single (the first in order) SpikeFile... TODO: extend this
+    if f_name is not None:
+        f_name = f_name if os.path.isabs(f_name) else os.path.join(sim_config.Run["CurrentDir"], f_name)
+    return f_name
+
+
+def get_tc_spikes(sim_config, t_start, t_end):
+    """Loads in input spikes (on projections) using the bluepy.Simulation.config object.
+    Returns the format used for plotting rasters and population rates"""
+    f_name = _get_spikef_name(sim_config)
+    if f_name is not None:
+        tmp = np.loadtxt(f_name, skiprows=1)
+        spike_times, spiking_gids = tmp[:, 0], tmp[:, 1].astype(int)
+        idx = np.where((t_start < spike_times) & (spike_times < t_end))[0]
+        return spike_times[idx], spiking_gids[idx]
+    else:
+        warnings.warn("No SpikeFile found in the BlueConfig, returning empty arrays.")
+        return np.array([]), np.array([], dtype=int)
+
+
+def get_grouped_tc_spikes(pklf_name, sim_config, t_start, t_end):
+    """Loads in input spikes (on projections) and groups them by pattern (and POm)"""
+    spike_times, spiking_gids = get_tc_spikes(sim_config, t_start, t_end)
+    pattern_gids = get_pattern_gids(pklf_name)
+    tc_spikes = {pattern_name: {} for pattern_name, _ in pattern_gids.items()}
+    tc_spikes["POm"] = {}
+    patterns_mask = np.zeros_like(spiking_gids).astype(bool)
+    for pattern_name, gids in pattern_gids.items():
+        mask = np.in1d(spiking_gids, gids)
+        if mask.sum() > 0:
+            patterns_mask += mask
+            tc_spikes[pattern_name] = {"spike_times": spike_times[mask], "spiking_gids": spiking_gids[mask]}
+    pom_mask = ~patterns_mask
+    if pom_mask.sum() > 0:
+        tc_spikes["POm"] = {"spike_times": spike_times[pom_mask], "spiking_gids": spiking_gids[pom_mask]}
+    return tc_spikes
+
+
 def group_clusters_by_patterns(clusters, t_bins, stim_times, patterns):
     """Groups clustered sign. activity based on the patterns presented"""
     # get basic info (passing them would be difficult...) and initialize empty matrices
