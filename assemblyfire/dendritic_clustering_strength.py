@@ -108,6 +108,7 @@ class DendriticClusteringResults(object):
         self._df = pandas.concat([self._df, other], axis=0)
 
     def _initialize_file(self, n_assemblies):
+        # TODO: URGENT: Save / restore column names in file, instead of this implicit encoding!
         h5 = h5py.File(self._fn, "a")
 
         grp = h5.require_group(self.DSET_ROOT)
@@ -122,8 +123,9 @@ class DendriticClusteringResults(object):
                     assert numpy.all(existing_dict[("gid", "gid")] == dset[:, 0])
                 else:
                     existing_dict[("gid", "gid")] = dset[:, 0].astype(int)
-                for i in range(n_assemblies):
-                    existing_dict[("assembly{0}".format(i), dset_str)] = dset[:, i + 1]
+                assembly_names = sorted(["assembly{0}".format(i) for i in range(n_assemblies)])
+                for i, assembly_name in zip(range(n_assemblies), assembly_names):
+                    existing_dict[(assembly_name, dset_str)] = dset[:, i + 1]
         self.append(pandas.DataFrame.from_records(existing_dict))
         self._written = len(self._df)
 
