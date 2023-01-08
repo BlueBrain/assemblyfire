@@ -612,6 +612,9 @@ class ConsensusAssembly(Assembly):
             core_method = self._core_method
         return ConsensusAssembly(self.instantiations, index=self.idx,
                                  core_method=core_method, core_threshold=new_thresh)
+    
+    def at_size_preserving_threshold(self):
+        return self.at_threshold(self.__size_preserving_threshold__())
 
     @staticmethod
     def calculate_coreness(vec_num_contained, expected_n=None, expected_distribution=None, epsilon=1E-5):
@@ -640,6 +643,11 @@ class ConsensusAssembly(Assembly):
         read_func = cls.h5_read_func[__initialize_h5__(fn, assert_exists=True)]
         with h5py.File(fn, "r") as h5:
             return read_func(h5, group_name, prefix=prefix)
+    
+    def __size_preserving_threshold__(self):
+        L = np.mean(list(map(len, self.instantiations)))
+        P = 100 - 100 * L / len(self.union)
+        return np.percentile(self.coreness, P)
 
     def __union_of_instantiations__(self):
         """
