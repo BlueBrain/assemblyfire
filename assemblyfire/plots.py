@@ -567,40 +567,30 @@ def plot_r_spikes(gids, r_spikes, loc_df, fig_name):
     plt.close(fig)
 
 
-def plot_consensus_r_spike(consenus_r_spikes, union_r_spikes, r_spikes, fig_name):
+def plot_consensus_r_spikes(df, fig_name):
     """Plots spike time reliability for consensus assemblies"""
-    n = len(consenus_r_spikes)
-    n_all = r_spikes.shape[0]
-    r_spikes = r_spikes[~np.isnan(r_spikes)]
-    yrange = [np.min(r_spikes), np.percentile(r_spikes, 99.9)]
-    cmap = plt.cm.get_cmap("tab20", n)
+    yrange = [df["r_spike"].min(), df["r_spike"].max()]
+    df_cons_assembly = df.loc[df["consensus assembly id"] != "non assembly"]
+    order = np.sort(df_cons_assembly["consensus assembly id"].unique().astype(int))
+    cmap = plt.cm.get_cmap("tab20", len(order))
+    palette = [colors.to_rgb(cmap(i)) for i in order]
+    order = order.astype(str)
 
     fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(1, n+1)
-    for i in range(n):
-        ax = fig.add_subplot(gs[i])
-        color = colors.to_hex(cmap(i))
-        ax.hist(consenus_r_spikes[i], bins=50, range=yrange, orientation="horizontal",
-                color=color, edgecolor=color, label="core")
-        ax.hist(union_r_spikes[i], bins=50, range=yrange, orientation="horizontal",
-                color="black", histtype="step", label="union")
-        ax.set_title("cons%s\n(n=%i)" % (i, consenus_r_spikes[i].shape[0]))
-        ax.set_ylim(yrange)
-        ax.set_xscale("log")
-        if i == 0:
-            ax.set_ylabel("r_spike")
-            sns.despine(ax=ax, offset=5, trim=True)
-            ax.legend(frameon=False)
-        else:
-            ax.set_yticks([])
-            sns.despine(ax=ax, left=True, offset=5, trim=True)
-    ax2 = fig.add_subplot(gs[-1])
-    ax2.hist(r_spikes, bins=50, range=yrange, orientation="horizontal", color="gray", edgecolor="gray")
-    ax2.set_title("all_gids\n(n=%i)" % n_all)
+    gs = gridspec.GridSpec(1, 2, width_ratios=[len(order), 1])
+    ax = fig.add_subplot(gs[0])
+    sns.violinplot(x="consensus assembly id", y="r_spike", order=order,
+                   scale="count", bw="silverman", cut=1, inner=None, palette=palette, data=df_cons_assembly, ax=ax)
+    ax.legend([], [], frameon=False)
+    ax.set_xlabel('')
+    ax.set_ylim(yrange)
+    ax2 = fig.add_subplot(gs[1])
+    sns.violinplot(x="consensus assembly id", y="r_spike", scale="count", bw="silverman", cut=1, inner=None,
+                   color="black", data=df.loc[df["consensus assembly id"] == "non assembly"], ax=ax2)
+    ax2.legend([], [], frameon=False)
+    ax2.set_xlabel('')
     ax2.set_ylim(yrange)
-    ax2.set_yticks([])
-    ax2.set_xscale("log")
-    sns.despine(ax=ax2, left=True, offset=5, trim=True)
+    sns.despine(bottom=True, trim=True)
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -610,7 +600,7 @@ def plot_coreness_r_spike(r_spikes, coreness, fig_name):
     """Plots corenss vs. spike time reliability"""
     n = len(coreness)
     cmap = plt.cm.get_cmap("tab20", n)
-    max_r = np.max([np.nanmax(r_spikes_) for r_spikes_ in r_spikes])
+    max_r = np.max([np.max(r_spikes_) for r_spikes_ in r_spikes])
 
     fig = plt.figure(figsize=(20, 8))
     gs = gridspec.GridSpec(np.floor_divide(n, 5)+1, 5)
@@ -625,6 +615,10 @@ def plot_coreness_r_spike(r_spikes, coreness, fig_name):
         ax.set_ylim([0, max_r])
         sns.despine(ax=ax, offset=True, trim=True)
     fig.tight_layout()
+    # fig.add_subplot(1, 1, 1, frameon=False)
+    # plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    # plt.xlabel("Coreness")
+    # plt.ylabel("r_spike")
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 

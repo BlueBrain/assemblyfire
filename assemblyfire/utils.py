@@ -13,7 +13,6 @@ import pandas as pd
 from libsonata import EdgeStorage
 
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
-SingleCellFeatures = namedtuple("SingleCellFeatures", ["gids", "r_spikes", "mean_ts", "std_ts"])
 
 
 def get_bluepy_circuit(circuitconfig_path):
@@ -384,8 +383,7 @@ def load_single_cell_features_from_h5(h5f_name, prefix="single_cell"):
     h5f = h5py.File(h5f_name, "r")
     project_metadata = _read_h5_metadata(h5f, prefix=prefix)
     prefix_grp = h5f[prefix]
-    single_cell_features = SingleCellFeatures(prefix_grp["gids"][:], prefix_grp["r_spikes"][:],
-                                              prefix_grp["mean_ts_in_bin"][:], prefix_grp["std_ts_in_bin"][:])
+    single_cell_features = {"gids": prefix_grp["gids"][:], "r_spikes": prefix_grp["r_spikes"][:]}
     h5f.close()
     return single_cell_features, project_metadata
 
