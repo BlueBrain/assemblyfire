@@ -6,6 +6,7 @@ author: András Ecker, last update: 01.2023
 import os
 import pickle
 import h5py
+import warnings
 from collections import namedtuple
 import numpy as np
 import pandas as pd
@@ -122,6 +123,16 @@ def get_spikes(sim, gids, t_start, t_end):
     return spikes.index.to_numpy(), spikes.to_numpy()
 
 
+def get_projf_names(sim_config):
+    """Gets the name and edge file path of projections from bluepy.Simulation.config object"""
+    projf_names = {}
+    projs = sim_config.typed_sections("Projection")
+    for proj in projs:
+        if hasattr(proj, "Path"):
+            projf_names[proj.name] = proj.Path
+    return projf_names
+
+
 def _get_spikef_name(sim_config):
     """Gets the name of the SpikeFile from bluepy.Simulation.config object"""
     f_name = None
@@ -229,11 +240,10 @@ def _il_isin(whom, where, parallel):
         return np.isin(whom, where)
 
 
-def get_syn_idx(c, pre_gids, post_gids, parallel=True):
+def get_syn_idx(edgef_name, pre_gids, post_gids, parallel=True):
     """Returns syn IDs between `pre_gids` and `post_gids`
     (~1000x faster than c.connectome.pathway_synapses(pre_gids, post_gids))"""
-    edge_fname = c.config["connectome"]
-    edges = EdgeStorage(edge_fname)
+    edges = EdgeStorage(edgef_name)
     edge_pop = edges.open_population(list(edges.population_names)[0])
     # sonata nodes are 0 based (and the functions expect lists of ints)
     afferents_edges = edge_pop.afferent_edges((post_gids.astype(int) - 1).tolist())
@@ -244,6 +254,10 @@ def get_syn_idx(c, pre_gids, post_gids, parallel=True):
 
 def get_syn_properties(c, syn_idx, properties):
     return c.connectome.synapse_properties(syn_idx, properties)
+
+
+def get_proj_properties(c, proj_name, syn_idx, properties):
+    return c.projection(proj_name).synapse_properties(syn_idx, properties)
 
 
 def get_loc_df(loc_pklf_name, c, target, subtarget):
@@ -260,7 +274,7 @@ def get_loc_df(loc_pklf_name, c, target, subtarget):
     extra_gids = np.setdiff1d(target_gids, df_gids)
     if len(extra_gids):
         from bluepy.enums import Synapse
-        syn_idx = get_syn_idx(c, get_gids(c, target), extra_gids)
+        syn_idx = get_syn_idx(c.config["connectome"], get_gids(c, target), extra_gids)
         extra_loc_df = get_syn_properties(c, syn_idx, [Synapse.PRE_GID, Synapse.POST_GID, Synapse.POST_SECTION_ID,
                                                        Synapse.POST_X_CENTER, Synapse.POST_Y_CENTER, Synapse.POST_Z_CENTER])
         extra_loc_df.rename(columns={Synapse.PRE_GID: "pre_gid", Synapse.POST_GID: "post_gid",
@@ -274,7 +288,7 @@ def get_rho0s(c, target):
     """Get initial efficacies (rho0_GB in the sonata file) for all EXC synapses in the `target`"""
     from bluepy.enums import Synapse
     gids = get_gids(c, target)
-    syn_idx = get_syn_idx(c, gids, gids)
+    syn_idx = get_syn_idx(c.config["connectome"], gids, gids)
     syn_df = get_syn_properties(c, syn_idx, [Synapse.PRE_GID, Synapse.POST_GID, "rho0_GB"])
     syn_df.rename(columns={Synapse.PRE_GID: "pre_gid", Synapse.POST_GID: "post_gid", "rho0_GB": "rho"}, inplace=True)
     return syn_df
