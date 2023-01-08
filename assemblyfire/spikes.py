@@ -170,7 +170,7 @@ class SpikeMatrixGroup(Config):
         # one can't simply np.dstack() them because it's not guaranteed that all gids spike in all trials
         gid_dict, convolved_spike_matrix_dict = {}, {}
         sim_paths = get_sim_path(self.root_path)
-        for seed, blueconfig_path in tqdm(sim_paths.iteritems(), desc="Loading in simulation results"):
+        for seed, blueconfig_path in tqdm(sim_paths.items(), desc="Loading in simulation results"):
             if seed in self.ignore_seeds:
                 pass
             convolved_spike_matrix, gids = convolve_spike_matrix(blueconfig_path, self.target, self.t_start, self.t_end)
