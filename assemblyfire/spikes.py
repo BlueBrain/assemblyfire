@@ -4,7 +4,7 @@ a la (Sasaki et al. 2006 and) Carillo-Reid et al. 2015:
 Bin spikes and threshold activity by population firing rate
 + SpikeMatrixGroup has some extra functionality to calculate
 spike time reliability across seeds
-authors: Thomas Delemontex and András Ecker; last update 01.2022
+authors: Thomas Delemontex and András Ecker; last update 01.2023
 """
 
 import os
@@ -14,7 +14,10 @@ from tqdm.contrib import tzip
 from collections import namedtuple, OrderedDict
 import h5py
 import numpy as np
+from scipy.ndimage import gaussian_filter1d
+from scipy.spatial.distance import squareform
 import multiprocessing as mp
+from joblib import Parallel, delayed
 
 from assemblyfire.config import Config
 
@@ -68,30 +71,19 @@ def sign_rate_std(spike_times, spiking_gids, t_start, t_end, bin_size, nreps=100
     return np.percentile(tbin_stds, 95)
 
 
-def convolve_spike_matrix(blueconfig_path, target, t_start, t_end, bin_size=1, std=0.5):
+def convolve_spike_matrix(blueconfig_path, target, t_start, t_end, bin_size=1, std=10):
     """Bins spikes and convolves it with a 1D Gaussian kernel row-by-row
-    (default bin size = 1 ms and kernel's std = 0.5 ms comes from Nolte et al. 2019)"""
+    (default bin size = 1 ms comes from Nolte et al. 2019 but the kernel's std = 10 ms is set by Daniela's tests)"""
     spike_times, spiking_gids = load_spikes(blueconfig_path, target, t_start, t_end)
     spike_matrix, gids, _ = spikes2mat(spike_times, spiking_gids, t_start, t_end, bin_size)
     assert (spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1)))
-    x = np.linspace(0, 10 * std, 11)  # 11 is hard coded... feel free to find a better number
-    kernel = np.exp(-np.power(x - 5 * std, 2) / (2 * std ** 2))
-    convolved_spike_matrix = np.zeros_like(spike_matrix, dtype=np.float32)
-    for i in range(spike_matrix.shape[0]):
-        convolved_spike_matrix[i, :] = np.convolve(spike_matrix[i, :], kernel, mode="same")
-    return convolved_spike_matrix, gids
-
-
-def get_ts_in_bin(spike_times, spiking_gids, bin_size):
-    """Gets time in bin for all gids"""
-    idx_sort = np.argsort(spiking_gids)
-    spiking_gids = spiking_gids[idx_sort]
-    unique_gids, idx_start, counts = np.unique(spiking_gids, return_index=True, return_counts=True)
-    ts = {}
-    spike_times = spike_times[idx_sort]
-    for gid, id_start, count in zip(unique_gids, idx_start, counts):
-        ts[gid] = np.mod(spike_times[id_start:id_start+count], bin_size)
-    return ts
+    nprocs = spike_matrix.shape[0] if os.cpu_count() - 1 > spike_matrix.shape[0] else os.cpu_count() - 1
+    with Parallel(n_jobs=nprocs, prefer="threads") as p:
+        convolved_spike_trains = p(delayed(gaussian_filter1d)(spike_matrix[i, :], std/bin_size, output=np.float32)
+                                   for i in range(spike_matrix.shape[0]))
+    del spike_matrix
+    gc.collect()
+    return np.vstack(convolved_spike_trains), gids
 
 
 def spikes_to_h5(h5f_name, spike_matrix_dict, metadata, prefix):
@@ -107,14 +99,12 @@ def spikes_to_h5(h5f_name, spike_matrix_dict, metadata, prefix):
             grp_out.create_dataset("t_bins", data=SpikeMatrixResult.t_bins)
 
 
-def single_cell_features_to_h5(h5f_name, gids, r_spikes, mean_ts_in_bin, std_ts_in_bin, prefix):
+def single_cell_features_to_h5(h5f_name, gids, r_spikes, prefix):
     """Saves single cell features to HDF5 file"""
     with h5py.File(h5f_name, "a") as h5f:
         grp = h5f.require_group(prefix)
         grp.create_dataset("gids", data=gids)
         grp.create_dataset("r_spikes", data=r_spikes)
-        grp.create_dataset("mean_ts_in_bin", data=mean_ts_in_bin)
-        grp.create_dataset("std_ts_in_bin", data=std_ts_in_bin)
 
 
 class SpikeMatrixGroup(Config):
@@ -172,36 +162,10 @@ class SpikeMatrixGroup(Config):
             spikes_to_h5(self.h5f_name, spike_matrix_dict, project_metadata, prefix=self.h5_prefix_spikes)
         return spike_matrix_dict, project_metadata
 
-    def get_mean_std_ts_in_bin(self):
-        """Gets mean and std of spike times within the bins for all gids across seeds"""
-        from assemblyfire.utils import get_sim_path
-
-        # load in spikes and get times in bin per seed
-        indiv_gids, ts_in_bin = [], {}
-        sim_paths = get_sim_path(self.root_path)
-        for seed, blueconfig_path in tqdm(sim_paths.iteritems(), desc="Loading in simulation results"):
-            if seed in self.ignore_seeds:
-                pass
-            spike_times, spiking_gids = load_spikes(blueconfig_path, self.target, self.t_start, self.t_end)
-            indiv_gids.extend(np.unique(spiking_gids).tolist())
-            ts_in_bin[seed] = get_ts_in_bin(spike_times, spiking_gids, self.bin_size)
-        # iterate over all gids, concatenate the results and return mean and std
-        mean_ts = []
-        std_ts = []
-        all_gids = np.unique(indiv_gids)
-        for gid in tqdm(all_gids, desc="Concatenating results for all gids", miniters=len(all_gids) / 100):
-            ts_in_bin_gid = []
-            for _, ts_in_bin_seed in ts_in_bin.items():
-                if gid in ts_in_bin_seed:
-                    ts_in_bin_gid.extend(ts_in_bin_seed[gid].tolist())
-            mean_ts.append(np.mean(ts_in_bin_gid))
-            std_ts.append(np.std(ts_in_bin_gid))
-        return all_gids, np.asarray(mean_ts), np.asarray(std_ts)
-
     def get_spike_time_reliability(self):
         """Convolution based spike time reliability (`r_spike`) measure from Schreiber et al. 2003"""
-        from scipy.spatial.distance import pdist
         from assemblyfire.utils import get_sim_path
+        from assemblyfire.clustering import cosine_similarity
 
         # one can't simply np.dstack() them because it's not guaranteed that all gids spike in all trials
         gid_dict, convolved_spike_matrix_dict = {}, {}
@@ -218,18 +182,16 @@ class SpikeMatrixGroup(Config):
         for _, gids in gid_dict.items():
             indiv_gids.extend(gids)
         all_gids = np.unique(indiv_gids)
-        r_spikes = []
-        for gid in tqdm(all_gids, desc="Concatenating results for all gids", miniters=len(all_gids) / 100):
+        r_spikes = np.zeros_like(all_gids, dtype=np.float32)
+        for i, gid in enumerate(tqdm(all_gids, desc="Concatenating results for all gids", miniters=len(all_gids) / 100)):
             # array of single neuron across trials with <=len(seed) rows
-            gid_trials_convolved = np.stack(convolved_spike_matrix_dict[seed][(gids == gid), :][0]
-                                            for seed, gids in gid_dict.items()
-                                            if len(convolved_spike_matrix_dict[seed][(gids == gid), :]))
-            n_trials = gid_trials_convolved.shape[0]
-            if n_trials > 1:
-                # lambda is the metric defined in Schreiber et al. 2003 (and used e.g. in Nolte et al. 2019)
-                r_spike = np.sum(pdist(gid_trials_convolved,
-                                       lambda u, v: np.dot(u, v) / (np.linalg.norm(u) * np.linalg.norm(v))))
-                r_spikes.append(r_spike * 2 / (n_trials * (n_trials - 1)))
-            else:
-                r_spikes.append(0)
-        return all_gids, np.asarray(r_spikes)
+            gid_trials_convolved = np.stack([convolved_spike_matrix_dict[seed][(gids == gid), :][0]
+                                             for seed, gids in gid_dict.items()
+                                             if len(convolved_spike_matrix_dict[seed][(gids == gid), :])])
+            if gid_trials_convolved.shape[0] > 1:
+                gid_trials_convolved -= np.mean(gid_trials_convolved, axis=1).reshape(-1, 1)  # mean center trials
+                sim_matrix = cosine_similarity(gid_trials_convolved)
+                # squareform implements its inverse if the input is a square matrix (but the diagonal has to be 0.)
+                np.fill_diagonal(sim_matrix, 0)  # stupid numpy...
+                r_spikes[i] = np.mean(squareform(sim_matrix))
+        return all_gids, r_spikes
