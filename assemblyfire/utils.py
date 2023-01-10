@@ -293,26 +293,6 @@ def get_rho0s(c, target):
     return syn_df
 
 
-def determine_bins(unique_ns, counts, min_samples):
-    """Based on the long-tailed distribution of data, determines optimal binning,
-    to have minimum `min_samples` datapoints in each bin (used for calculating probabilities from those numbers)"""
-    cumsum, bin_edges = 0, [unique_ns[-1]]
-    for i, count in enumerate(counts[::-1]):  # assumes long tail (towards higher values)
-        cumsum += count
-        if cumsum > min_samples:
-            bin_edges.append(unique_ns[-(i+1)])
-            cumsum = 0
-    bin_edges = np.array(bin_edges[::-1])
-    diffs = np.diff(bin_edges)
-    bin_centers = []
-    for i, diff in enumerate(diffs):
-        if diff == 1:
-            bin_centers.append(bin_edges[i + 1])
-        else:
-            bin_centers.append(np.mean([bin_edges[i], bin_edges[i + 1]]))
-    return bin_edges, np.array(bin_centers)
-
-
 def save_syn_clusters(save_dir_root, assembly_idx, cluster_df, cross_assembly=True):
     """Saves `cluster_df` with synapse clusters for given assembly"""
     save_dir = os.path.join(save_dir_root, "seed%i" % assembly_idx[1])

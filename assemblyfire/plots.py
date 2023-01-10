@@ -17,6 +17,7 @@ import seaborn as sns
 sns.set(style="ticks", context="notebook")
 PATTERN_COLORS = {"A": "#234091", "B": "#57B4D0", "C": "#C4A943", "D": "#7E1F19", "E": "#3F7AB3",
                   "F": "#8CAD8A", "G": "#A1632E", "H": "#66939D", "I": "#66939D", "J": "#665869"}
+PROJ_COLORS = {"Thalamocortical_input_VPM": "tab:purple", "Thalamocortical_input_POM": "black"}
 RED, BLUE = "#e32b14", "#3271b8"
 
 
@@ -409,13 +410,18 @@ def plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, xlabel, 
     keys = list(assembly_probs.keys())
     assembly_labels = list(assembly_probs[keys[0]].keys())
     n = len(assembly_labels)
+    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n / 5)
     if palette == "patterns":
         palette = PATTERN_COLORS
+        ncol = 2
+    elif palette == "projections":
+        palette = PROJ_COLORS
+        ncol = 1
     else:
         cmap = plt.cm.get_cmap("tab20", np.max([assembly_label for assembly_label in assembly_labels]) + 1)
+        ncol = n_rows
 
     fig = plt.figure(figsize=(20, 8))
-    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
     gs = gridspec.GridSpec(n_rows, 5)
     for i, assembly_label in enumerate(assembly_labels):
         ax = fig.add_subplot(gs[i])
@@ -430,7 +436,7 @@ def plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, xlabel, 
             ax.plot(bin_centers[key][assembly_label], assembly_probs[key][assembly_label], color=color,
                     label=key)
             if i == 0:
-                ax.legend(frameon=False, ncol=n_rows)
+                ax.legend(frameon=False, ncol=ncol)
         ax.set_title("Assembly %s" % assembly_label)
         if logx:
             ax.set_xscale("log")
