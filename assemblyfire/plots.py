@@ -405,7 +405,8 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"
     plt.close(fig)
 
 
-def plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, xlabel, palette, fig_name, logx=False):
+def plot_assembly_prob_from(bin_centers, assembly_probs, assembly_probs_low, assembly_probs_high, chance_levels,
+                            xlabel, palette, fig_name, logx=False):
     """Plots assembly membership probability vs. whatever data `xlabel` is"""
     keys = list(assembly_probs.keys())
     assembly_labels = list(assembly_probs[keys[0]].keys())
@@ -433,8 +434,9 @@ def plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, xlabel, 
                 color = cmap(j)
             else:
                 color = palette[key]
-            ax.plot(bin_centers[key][assembly_label], assembly_probs[key][assembly_label], color=color,
-                    label=key)
+            ax.plot(bin_centers[key][assembly_label], assembly_probs[key][assembly_label], color=color, label=key)
+            ax.fill_between(bin_centers[key][assembly_label], assembly_probs_low[key][assembly_label],
+                            assembly_probs_high[key][assembly_label], color=color, alpha=0.1)
             if i == 0:
                 ax.legend(frameon=False, ncol=ncol)
         ax.set_title("Assembly %s" % assembly_label)
