@@ -1,7 +1,7 @@
 """
 Advanced network metrics on ConnectivityMatrix (now in `conntility`)
 authors: Daniela Egas Santander, Nicolas Ninin, András Ecker
-last modified: 10.2022
+last modified: 01.2023
 """
 
 from tqdm import tqdm
@@ -232,7 +232,7 @@ def _sign(bin_centers, probs, counts=None):
     return np.sign(np.polyfit(bin_centers, probs, 1, w=counts)[0])
 
 
-def assembly_rel_frac_entropy_explained(gids, assembly_grp, bin_centers, bin_idx, seed, sign_th):
+def assembly_rel_frac_entropy_explained(gids, assembly_grp, bin_centers, bin_idx, seed, bin_min_n, sign_th):
     """Gets mutual information between assembly membership and structural innervation (using pre-binned indegrees)"""
     if isinstance(seed, str):
         seed = int(seed.split("seed")[1])
@@ -253,7 +253,8 @@ def assembly_rel_frac_entropy_explained(gids, assembly_grp, bin_centers, bin_idx
             for k, center in enumerate(bin_centers[key]):
                 tmp = idx[bin_idx_ == k + 1]
                 counts[k], probs[k] = len(tmp), np.mean(tmp)
-            mi_sign = _sign(bin_centers[key], probs, counts)
+            valid_n_idx = np.where(counts >= bin_min_n)
+            mi_sign = _sign(bin_centers[key][valid_n_idx], probs[valid_n_idx], counts[valid_n_idx])
             mi_matrix[i, j] = mi_sign * mi
             mi_ctrl_matrix[i, j] = mi_ctrl
     # set values that are smaller than control mean + significance threshold * control std to nan...
