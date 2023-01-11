@@ -455,6 +455,26 @@ def plot_assembly_prob_from(bin_centers, assembly_probs, assembly_probs_low, ass
     plt.close(fig)
 
 
+def plot_assembly_n_from(bin_centers, assembly_probs, assembly_probs_low, assembly_probs_high, xlabel, palette, fig_name):
+    """Similar to the above, but it's a single plot (as it's not assembly specific) and the ylabel is different"""
+    if palette == "projections":
+        palette = PROJ_COLORS
+    fig = plt.figure(figsize=(6, 4))
+    ax = fig.add_subplot(1, 1, 1)
+    for key, assembly_prob in assembly_probs.items():
+        color = palette[key]
+        ax.plot(bin_centers[key], assembly_prob, color=color, label=key)
+        ax.fill_between(bin_centers[key], assembly_probs_low[key], assembly_probs_high[key], color=color, alpha=0.1)
+    ax.legend(frameon=False)
+    ax.set_xlabel(xlabel)
+    ax.set_xlim(left=0)
+    ax.set_ylabel("Nr. of assemblies a neuron is part of")
+    ax.set_ylim(bottom=0)
+    sns.despine(trim=True, offset=2)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_frac_entropy_explained_by(mi_df, ylabel, fig_name):
     """Plots matrix of entropy explained by innervation (by patterns or internal connections)"""
     abs_max = np.max(mi_df.abs().to_numpy())

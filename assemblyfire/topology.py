@@ -192,7 +192,7 @@ def bin_gids_by_innervation(all_indegrees, gids, n_bins):
     return binned_gids, bin_centers_dict, bin_idx_dict
 
 
-def _prob_with_binom_ci(samples, min_n):
+def prob_with_binom_ci(samples, min_n):
     """Probability (just as the mean of samples) and binomial distribution based confidence interval"""
     samples = samples.astype(bool)
     n_samples = len(samples)
@@ -220,7 +220,7 @@ def assembly_membership_probability(gids, assembly_grp, binned_gids, bin_centers
             probs_low, probs_high = np.zeros_like(probs), np.zeros_like(probs)
             for i, bin_center in enumerate(bin_centers[key]):
                 idx = np.in1d(binned_gids_tmp[bin_center], assembly.gids, assume_unique=True)
-                probs[i], probs_low[i], probs_high[i] = _prob_with_binom_ci(idx, bin_min_n)
+                probs[i], probs_low[i], probs_high[i] = prob_with_binom_ci(idx, bin_min_n)
             assembly_probs[key][assembly_id] = probs
             assembly_probs_low[key][assembly_id] = probs_low
             assembly_probs_high[key][assembly_id] = probs_high

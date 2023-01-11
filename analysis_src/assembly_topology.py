@@ -242,6 +242,33 @@ def get_proj_innervation(config):
     return proj_indegrees, pattern_indegrees, mutual_innervation_matrices, post_gids
 
 
+def n_assembly_prob_from_projs(assembly_grp_dict, proj_indegrees, gids, fig_path, n_bins=21, bin_min_n=10):
+    """Plots number of assemblies a neuron participates in vs. indegree from projections"""
+    for seed, assembly_grp in assembly_grp_dict.items():
+        n_assemblies = np.sum(assembly_grp.as_bool(), axis=1)
+        # as assembly groups only store info about spiking gids,
+        # we'll need to get rid of the non-spiking ones from the degree vectors...
+        spiking_gid_idx = np.in1d(gids, assembly_grp.all, assume_unique=True)
+        proj_indegrees_seed = {proj_name: indegrees[spiking_gid_idx] for proj_name, indegrees in proj_indegrees.items()}
+        bin_centers_dict, assembly_probs, assembly_probs_low, assembly_probs_high = {}, {}, {}, {}
+        for proj_name, indegrees in proj_indegrees_seed.items():
+            # same edges as used in `topology.bin_gids_by_innervation()`
+            bin_edges = np.hstack(([0], np.linspace(np.percentile(indegrees[indegrees != 0], 1),
+                                                    np.percentile(indegrees[indegrees != 0], 99), n_bins)))
+            bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+            bin_centers_dict[proj_name] = bin_centers
+            bin_idx = np.digitize(indegrees, bin_edges, right=True)
+            probs = np.zeros_like(bin_centers, dtype=np.float32)
+            probs_low, probs_high = np.zeros_like(probs), np.zeros_like(probs)
+            for i in range(len(bin_centers)):
+                probs[i], probs_low[i], probs_high[i] = topology.prob_with_binom_ci(n_assemblies[bin_idx == i + 1], bin_min_n)
+            assembly_probs[proj_name] = probs
+            assembly_probs_low[proj_name], assembly_probs_high[proj_name] = probs_low, probs_high
+        fig_name = os.path.join(fig_path, "assembly_n_from_projections_seed%i.png" % seed)
+        plot_assembly_n_from(bin_centers_dict, assembly_probs, assembly_probs_low, assembly_probs_high,
+                             "In degree from projections", "projections", fig_name)
+
+
 def assembly_prob_mi_from_patterns(assembly_grp_dict, pattern_indegrees, gids, fig_path,
                                    n_bins=21, bin_min_n=10, sign_th=2):
     """Plots assembly probabilities and (relative) fraction of entropy explained from pattern indegrees"""
@@ -273,5 +300,6 @@ if __name__ == "__main__":
     #                                         {"below avg.": "assembly_color", "avg.": "gray", "above avg.": "black"})
 
     proj_indegrees, pattern_indegrees, mutual_innervation_matrices, gids = get_proj_innervation(config)
+    n_assembly_prob_from_projs(assembly_grp_dict, proj_indegrees, gids, config.fig_path)
     assembly_prob_mi_from_patterns(assembly_grp_dict, pattern_indegrees, gids, config.fig_path)
 
