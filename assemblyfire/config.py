@@ -35,6 +35,16 @@ class Config(object):
         return f_name if os.path.isabs(f_name) else os.path.join(self.root_path, f_name)
 
     @property
+    def pattern_locs_fname(self):
+        pattern_locs_fname = None
+        proj_dir = os.path.join(self.root_path, "projections")
+        if os.path.isdir(proj_dir):
+            for f_name in os.listdir(proj_dir):
+                if f_name.split(".txt")[0] in self.pattern_gids_fname:
+                    pattern_locs_fname = os.path.join(proj_dir, f_name)
+        return pattern_locs_fname
+
+    @property
     def patterns_projection_name(self):
         return os.path.split(self.pattern_gids_fname)[1].split('__')[0]
 
