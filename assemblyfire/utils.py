@@ -84,14 +84,6 @@ def get_pattern_gids(pklf_name):
     return pattern_gids
 
 
-def get_pattern_vectors(pklf_name):
-    """Loads pattern gids and returns boolean vectors with equal lengths"""
-    pattern_gids = get_pattern_gids(pklf_name)
-    all_gids = np.unique(np.concatenate([gids for pattern_name, gids in pattern_gids.items()]))
-    pattern_vectors = {pattern_name: np.in1d(all_gids, gids).astype(int) for pattern_name, gids in pattern_gids.items()}
-    return all_gids, pattern_vectors
-
-
 def get_gids(c, target):
     return c.cells.ids({"$target": target})
 
