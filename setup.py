@@ -36,6 +36,7 @@ setup(
                       "pyitlib>=0.2.2",
                       "libsonata>=0.1.10",
                       "pyflagser>=0.4.4",
+                      "pyflagsercount>=0.2.2",
                       "matplotlib>=3.4.3",
                       "seaborn>=0.11.2",
                       "neurom>=3.1.0"],
