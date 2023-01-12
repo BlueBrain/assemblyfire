@@ -36,7 +36,7 @@ def assembly_in_degrees(assembly_grp_dict, conn_mat, fig_path):
 
 
 def assembly_simplex_counts(assembly_grp_dict, conn_mat, fig_path):
-    """Loads in assemblies and plots simplex counts in assemblies and control models"""
+    """Plots simplex counts in assemblies and control models"""
     simplex_counts, simplex_counts_control = topology.simplex_counts_assemblies(assembly_grp_dict, conn_mat)
     for seed, simplices in simplex_counts.items():
         fig_name = os.path.join(fig_path, "simplex_counts_%s.png" % seed)
@@ -227,11 +227,11 @@ def get_proj_innervation(config):
     proj_gids, pattern_gids = _get_spiking_proj_gids(config, sim.config)
     c = sim.circuit
     post_gids = utils.get_gids(c, config.target)
-    proj_indegrees, pattern_indegrees, common_innervation_matrices = {}, {}, {}
+    conn_matrices, proj_indegrees, pattern_indegrees = {}, {}, {}
     for proj, pre_gids in proj_gids.items():
         # get (sparse) connectivity matrix between the input fibers and neurons in the circuit
         input_conn_mat = circuit_connection_matrix(c, proj, pre_gids, post_gids).tocsr()
-        common_innervation_matrices[proj] = input_conn_mat.transpose() * input_conn_mat
+        conn_matrices[proj] = input_conn_mat
         proj_indegrees[proj] = np.array(input_conn_mat.sum(axis=0)).flatten()
         if proj == config.patterns_projection_name:
             # for each pattern get how many pattern fibers innervate the neurons
@@ -239,7 +239,7 @@ def get_proj_innervation(config):
                 pattern_idx = np.in1d(pre_gids, gids, assume_unique=True)
                 pattern_indegrees[pattern_name] = np.array(input_conn_mat[pattern_idx].sum(axis=0)).flatten()
 
-    return proj_indegrees, pattern_indegrees, common_innervation_matrices, post_gids
+    return conn_matrices, proj_indegrees, pattern_indegrees, post_gids
 
 
 def n_assemblies_from_projs(assembly_grp_dict, proj_indegrees, gids, fig_path, n_bins=21, bin_min_n=10):
@@ -265,30 +265,31 @@ def n_assemblies_from_projs(assembly_grp_dict, proj_indegrees, gids, fig_path, n
             assembly_probs[proj_name] = probs
             assembly_probs_low[proj_name], assembly_probs_high[proj_name] = probs_low, probs_high
         fig_name = os.path.join(fig_path, "assembly_n_from_projections_seed%i.png" % seed)
-        plot_assembly_n_from(bin_centers_dict, assembly_probs, assembly_probs_low, assembly_probs_high,
-                             "In degree from projections", "projections", fig_name)
+        plots.plot_assembly_n_from(bin_centers_dict, assembly_probs, assembly_probs_low, assembly_probs_high,
+                                   "In degree from projections", "projections", fig_name)
 
 
-def assembly_prob_mi_from_proj_ci(assembly_grp_dict, common_innervation_matrices, gids, fig_path,
+def assembly_prob_mi_from_proj_ci(assembly_grp_dict, conn_matrices, gids, fig_path,
                                   n_bins=21, bin_min_n=10, sign_th=2):
     """Plots assembly probabilities and (relative) fraction of entropy explained
     from common innervation with projections"""
-    proj_names = list(common_innervation_matrices.keys())
+    proj_names = list(conn_matrices.keys())
     for seed, assembly_grp in assembly_grp_dict.items():
-        proj_cis = {proj_name: {} for proj_name in proj_names}
         plot_args = [{proj_name: {} for proj_name in proj_names}, {proj_name: {} for proj_name in proj_names},
                      {proj_name: {} for proj_name in proj_names}, {proj_name: {} for proj_name in proj_names}]
-        for proj_name, matrix in common_innervation_matrices.items():
-            matrix[range(len(gids)), range(len(gids))] = 0
+        for proj_name, matrix in conn_matrices.items():
+            ci_matrix = matrix.transpose() * matrix
+            ci_matrix[range(len(gids)), range(len(gids))] = 0
+            proj_cis = {}
             for assembly in assembly_grp.assemblies:
                 idx = np.in1d(gids, assembly.gids, assume_unique=True)
-                sub_matrix = matrix[:, idx]
+                sub_matrix = ci_matrix[:, idx]
                 ci = np.array(sub_matrix.sum(axis=1)).flatten().astype(np.float32)
                 ci[idx] /= (np.sum(idx) - 1)
                 ci[~idx] /= np.sum(idx)
-                proj_cis[proj_name][assembly.idx[0]] = ci
+                proj_cis[assembly.idx[0]] = ci
 
-            binned_gids, bin_centers, bin_idx = topology.bin_gids_by_innervation(proj_cis[proj_name], gids, n_bins)
+            binned_gids, bin_centers, bin_idx = topology.bin_gids_by_innervation(proj_cis, gids, n_bins)
             # getting MI matrices for all projections:
             mi = topology.assembly_rel_frac_entropy_explained(gids, assembly_grp, bin_centers, bin_idx,
                                                               seed, bin_min_n, sign_th)
@@ -336,8 +337,8 @@ if __name__ == "__main__":
     # assembly_prob_from_indegree_and_syn_nnd(config, assembly_indegrees, assembly_nnds,
     #                                         {"below avg.": "assembly_color", "avg.": "gray", "above avg.": "black"})
 
-    proj_indegrees, pattern_indegrees, common_innervation_matrices, gids = get_proj_innervation(config)
+    conn_matrices, proj_indegrees, pattern_indegrees, gids = get_proj_innervation(config)
     n_assemblies_from_projs(assembly_grp_dict, proj_indegrees, gids, config.fig_path)
-    assembly_prob_mi_from_proj_ci(assembly_grp_dict, common_innervation_matrices, gids, config.fig_path)
+    assembly_prob_mi_from_proj_ci(assembly_grp_dict, conn_matrices, gids, config.fig_path)
     assembly_prob_mi_from_patterns(assembly_grp_dict, pattern_indegrees, gids, config.fig_path)
 
