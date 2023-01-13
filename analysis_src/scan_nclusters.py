@@ -68,6 +68,7 @@ def cluster_sim_mat(spike_matrix, t_bins, stim_times, patterns, input_pattern_na
     n_clusters = {}
     for n in range(min_n_clusts, max_n_clusts+1):
         clusters = fcluster(linkage_matrix, n, criterion="maxclust")
+        clusters -= 1  # this is only needed for assembly detection...
         n_clusters[n] = clusters
         output_pattern_names, output_dist = get_assembly_count_distance(clusters, t_bins, stim_times, patterns)
 
