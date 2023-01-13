@@ -98,7 +98,7 @@ def corr_spike_matrix_clusters(spike_matrix, sparse_clusters):
 
 def corr_shuffled_spike_matrix_clusters(spike_matrix, sparse_clusters):
     """Random shuffles columns of the spike matrix (keeps number of spikes per neuron)
-    in order to create surrogate dataset for significance test of correlation"""
+    in order to create surrogate dataset for significance test for correlation"""
     spike_matrix_rnd = spike_matrix[:, np.random.permutation(spike_matrix.shape[1])]
     return corr_spike_matrix_clusters(spike_matrix_rnd, sparse_clusters)
 
@@ -145,7 +145,7 @@ def cluster_spikes(spike_matrix_dict, overwrite_seeds, project_metadata, fig_pat
     from assemblyfire.plots import plot_sim_matrix, plot_cluster_seqs, plot_pattern_clusters, plot_dendogram_silhouettes
 
     ts, stim_times = project_metadata["t"], project_metadata["stim_times"]
-    patterns = np.asarray(project_metadata["patterns"])
+    patterns = np.array(project_metadata["patterns"])
     clusters_dict = {}
     for seed, SpikeMatrixResult in tqdm(spike_matrix_dict.items(), desc="Clustering"):
         spike_matrix, t_bins = SpikeMatrixResult.spike_matrix, SpikeMatrixResult.t_bins
@@ -154,20 +154,20 @@ def cluster_spikes(spike_matrix_dict, overwrite_seeds, project_metadata, fig_pat
         else:
             idx = np.arange(len(stim_times))  # just to not break the code...
 
-        if "seed%i" % seed not in overwrite_seeds:
+        if "seed%s" % seed not in overwrite_seeds:
             sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix)
         else:
-            sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix, min_n_clusts=overwrite_seeds["seed%i" % seed],
-                                                             max_n_clusts=overwrite_seeds["seed%i" % seed])
+            sim_matrix, clusters, plotting = cluster_sim_mat(spike_matrix, min_n_clusts=overwrite_seeds["seed%s" % seed],
+                                                             max_n_clusts=overwrite_seeds["seed%s" % seed])
         clusters_dict[seed] = clusters
 
-        fig_name = os.path.join(fig_path, "similarity_matrix_seed%i.png" % seed)
+        fig_name = os.path.join(fig_path, "similarity_matrix_seed%s.png" % seed)
         plot_sim_matrix(sim_matrix.copy(), t_bins, stim_times[idx], patterns[idx], fig_name)
-        fig_name = os.path.join(fig_path, "ward_clustering_seed%i.png" % seed)
+        fig_name = os.path.join(fig_path, "ward_clustering_seed%s.png" % seed)
         plot_dendogram_silhouettes(clusters, *plotting, fig_name)
-        fig_name = os.path.join(fig_path, "cluster_seq_seed%i.png" % seed)
+        fig_name = os.path.join(fig_path, "cluster_seq_seed%s.png" % seed)
         plot_cluster_seqs(clusters, t_bins, stim_times[idx], patterns[idx], fig_name)
-        fig_name = os.path.join(fig_path, "clusters_patterns_seed%i.png" % seed)
+        fig_name = os.path.join(fig_path, "clusters_patterns_seed%s.png" % seed)
         plot_pattern_clusters(clusters, t_bins, stim_times[idx], patterns[idx], fig_name)
     return clusters_dict
 
@@ -207,11 +207,11 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, core_cell_th_pct, h5f_na
         # save to h5
         metadata = {"clusters": clusters}
         assembly_lst = [Assembly(gids[core_cell_idx[:, i] == 1], index=(i, seed)) for i in assembly_idx]
-        assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=gids, label="seed%i" % seed, metadata=metadata)
+        assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=gids, label="seed%s" % seed, metadata=metadata)
         assemblies.to_h5(h5f_name, prefix=h5_prefix)
 
         # plot (only spatial location at this point)
-        fig_name = os.path.join(fig_path, "assemblies_seed%i.png" % seed)
+        fig_name = os.path.join(fig_path, "assemblies_seed%s.png" % seed)
         plot_assemblies(core_cell_idx, assembly_idx, gids, nrn_loc_df, fig_name)
 
 
