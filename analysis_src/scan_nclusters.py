@@ -99,7 +99,7 @@ def main(config_path, seeds, save_assemblies=True):
             n_spike_matrix = {n: spike_matrix_dict["seed%i" % seed] for n, _ in n_clusters.items()}
             h5f_name = config.h5f_name.split(".h5")[0] + "_across_ns.h5"
             detect_assemblies(n_spike_matrix, n_clusters, config.core_cell_th_pct, h5f_name,
-                              spikes.h5_prefix_assemblies, nrn_loc_df, fig_dir)
+                              config.h5_prefix_assemblies, nrn_loc_df, fig_dir)
 
 
 if __name__ == "__main__":
