@@ -436,19 +436,6 @@ class AssemblyGroup(object):
         with h5py.File(fn, "r") as h5:
             return read_func(h5, group_name, prefix=prefix)
 
-    def intersection_sizes(self, other=None):
-        """
-        Pairwise intersections
-        :param other: Another AssemblyGroup object. If none provided, this object is used
-        :return: (numpy.array) For all combinations of an assembly from this and the other group the
-        size of the intersecting Assembly
-        """
-        if other is None:
-            return self.intersection_sizes(self)
-
-        return np.array([[len(a * b) for b in other]
-                          for a in self])
-
     def aligned_intersections(self, other=None):
         """
         Intersections along the diagonal
@@ -465,102 +452,6 @@ class AssemblyGroup(object):
         return AssemblyGroup([a * b for a, b in zip(self, other)],
                              new_all, label=str(self.label) + " * " + str(other.label),
                              metadata=new_meta)
-
-    def rel_intersection_sizes(self, other=None):
-        """
-        :param other: Another AssemblyGroup object. If none provided, this object is used
-        :return: (numpy.array) the sizes of pairwise intersections, relative to a random control
-        """
-        epsilon = 0.1
-        actual = self.intersection_sizes(other)
-        expected_mn = self.expected_intersection_sizes(other)
-        expected_sd = np.sqrt(self.expected_intersection_sizes(other, moment='v'))
-        return (actual - expected_mn) / (expected_sd + epsilon)
-
-    def expected_intersection_sizes(self, other=None, moment="m"):
-        """
-        :param other: Another AssemblyGroup object. If none provided, this object is used
-        :param moment: Which statistical moment (see scipy.stats; "m" = mean, "v" = variance)
-        :return: (numpy.array) The matrix of expected values for the size of overlaps between assemblies, based on
-        their respective sizes and the ... Here, for all pairs of assemblies in this and other
-        """
-        if other is None:
-            return self.expected_intersection_sizes(self)
-
-        return np.array([[hypergeom(len(self.all), len(a), len(b)).stats(moment) for b in other]
-                          for a in self])
-
-    @staticmethod
-    def norm_correlation(A, B):
-        """
-        Normalized correlations between values in A and B; rows: samples/observations; columns: variables
-        :param A: A numpy.array of shape N x A
-        :param B: A numpy.array of shape N x B, i.e. the same first dimension as A
-        :return: numpy.array of shape A x B
-        """
-        A = A - A.mean(axis=0, keepdims=True)
-        B = B - B.mean(axis=0, keepdims=True)
-        M = np.dot(A.transpose(), B) / A.shape[0]
-        M = M / np.sqrt(np.dot(A.var(axis=0, keepdims=True).transpose(),  # N x 1
-                                     B.var(axis=0, keepdims=True)))  # M x 1
-        return M
-
-    def intersection_pattern_correlation(self, other=None, normalized=True):
-        """
-        :param other: Another AssemblyGroup object. If none provided, this object is used
-        :param normalized: default: True. If true, use pattern of normalized overlaps, else pattern of raw overlap sizes
-        :return: (numpy.array) The matrix of how consistent each pair of one assembly from this group and another
-        assembly from the other are. Consistency is calculated in terms of how similar the two are in their overlap
-        with all assemblies in this group.
-        """
-        if other is None:
-            return self.intersection_pattern_correlation(self)
-        if normalized:
-            I = self.rel_intersection_sizes()
-            O = self.rel_intersection_sizes(other=other)
-        else:
-            I = self.intersection_sizes()
-            O = self.intersection_sizes(other=other)
-        return self.norm_correlation(I, O)
-
-
-class WeightedAssembly(Assembly):
-    """Represents an assembly with weights on neurons. Weights can be given in different ways, by activity,
-    by network properties, or by coreness in the ConsensusAssembly child class"""
-
-    # TODO: Maybe we want to add read/write functions if the weights come from network metrics that are hard to compute.
-    def __init__(self, lst_gids, weights):
-        """
-        :param weights: A list of the same size of the assembly. It represents the weights of neurons used to compute a
-        filtration.
-        """
-        assert len(lst_gids) == len(weights), "The list of gids and the list of weights must be of the same length"
-        self.gids = np.array(lst_gids)
-        self.weights = np.array(weights)
-
-    def at_weight(self, threshold, method="strength"):
-        """ Returns thresholded assembly
-        :param method: distance returns gids with weight smaller or equal than thresh
-                       strength returns gids with weight larger or equal than tresh"""
-        if method == "strength":
-           return Assembly(self.gids[self.weights >= threshold])
-        elif method == "distance":
-           return Assembly(self.gids[self.weights <= threshold])
-        else:
-            raise ValueError("Method has to be 'strength' or 'distance'")
-
-    def filtration(self, method='strength'):
-        """Returns an AssemblyGroup object represeting the filtration of that assembly.
-        :param method:distance smaller weights enter the filtration first
-                      strength larger weights enter the filtration first"""
-        if method == "strength":
-            filtration_weights = np.unique(self.weights)[::-1]
-        elif method == "distance":
-            filtration_weights = np.unique(self.weights)
-        else:
-           raise ValueError("Method has to be 'strength' or 'distance'")
-        filtration = [self.at_weight(filtration_weight, method=method) for filtration_weight in filtration_weights]
-        return AssemblyGroup(filtration, self.gids, label=None, metadata=None)
 
 
 class ConsensusAssembly(Assembly):
