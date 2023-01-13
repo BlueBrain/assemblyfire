@@ -16,7 +16,6 @@ import h5py
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 from scipy.spatial.distance import squareform
-import multiprocessing as mp
 from joblib import Parallel, delayed
 
 from assemblyfire.config import Config
@@ -36,39 +35,35 @@ def load_spikes(blueconfig_path, target, t_start, t_end):
 def spikes2mat(spike_times, spiking_gids, t_start, t_end, bin_size):
     """Bins time and builds spike matrix"""
     gids = np.unique(spiking_gids)
-    gid_bins = np.hstack([sorted(gids), np.max(gids) + 1])
+    gid_bins = np.hstack([np.sort(gids), np.max(gids) + 1])
     t_bins = np.arange(t_start, t_end + bin_size, bin_size)
     spike_matrix = np.histogram2d(spiking_gids, spike_times, bins=(gid_bins, t_bins))[0]
     return spike_matrix, gid_bins[:-1], t_bins
 
 
-def shuffle_tbins(spike_times, spiking_gids, t_start, t_end, bin_size):
-    """Creates surrogate dataset a la Sasaki et al. 2006 by randomly offsetting every spike
-    (thus after discretization see `spike2mat()` they will be in another time bin)"""
-    spike_times += bin_size * np.random.choice([-1, 1], len(spike_times))
-    spike_matrix, _, _ = spikes2mat(spike_times, spiking_gids, t_start, t_end, bin_size)
-    return spike_matrix
-
-
-def _shuffle_tbins_subprocess(inputs):
-    """Subprocess used by multiprocessing pool for setting significance threshold"""
-    surr_spike_matrix = shuffle_tbins(*inputs)
+def get_surrogate_rate_std(shape, row_idx, col_idx, vals):
+    """Shuffles spike matrix by offsetting every spike by 1 time bin, and then returns the std of the rate.
+    (Used for creating surrogate dataset a la Sasaki et al. 2006)"""
+    surr_col_idx = col_idx + np.random.choice([-1, 1], len(col_idx))
+    # shifting beginning and end to that got indexed out of the array to the other direction...
+    surr_col_idx[surr_col_idx == -1] = 1
+    surr_col_idx[surr_col_idx == shape[1]] = shape[1] - 2
+    surr_spike_matrix = np.zeros(shape, dtype=vals.dtype)
+    surr_spike_matrix[row_idx, col_idx] = vals
     return np.std(np.sum(surr_spike_matrix, axis=0))
 
 
-def sign_rate_std(spike_times, spiking_gids, t_start, t_end, bin_size, nreps=100):
-    """Generates surrogate datasets, checks the std of rates
-    and sets significance threshold to its 95% percentile"""
+def get_sign_rate_th(spike_matrix, nreps=100):
+    """Generates surrogate datasets, checks the stds of their rates
+    and sets significance threshold their 95% percentile"""
+    shape = spike_matrix.shape
+    spiking_neuron_idx, spiking_bin_idx = np.where(spike_matrix > 0)
+    spike_counts = spike_matrix[spiking_neuron_idx, spiking_bin_idx]
     nprocs = nreps if os.cpu_count() - 1 > nreps else os.cpu_count() - 1
-    # joblib implementation just runs out of memory...
-    pool = mp.Pool(processes=nprocs)
-    tbin_stds = pool.map(_shuffle_tbins_subprocess, zip([spike_times.copy() for _ in range(nreps)],
-                                                        [spiking_gids for _ in range(nreps)],
-                                                        [t_start for _ in range(nreps)],
-                                                        [t_end for _ in range(nreps)],
-                                                        [bin_size for _ in range(nreps)]))
-    pool.terminate()
-    return np.percentile(tbin_stds, 95)
+    with Parallel(n_jobs=nprocs, prefer="threads") as p:
+        stds = p(delayed(get_surrogate_rate_std)(shape, spiking_neuron_idx, spiking_bin_idx, spike_counts)
+                 for _ in range(nreps))
+    return np.percentile(stds, 95)
 
 
 def convolve_spike_matrix(blueconfig_path, target, t_start, t_end, bin_size=1, std=10):
@@ -93,7 +88,7 @@ def spikes_to_h5(h5f_name, spike_matrix_dict, metadata, prefix):
         for k, v in metadata.items():
             grp.attrs[k] = v
         for seed, SpikeMatrixResult in spike_matrix_dict.items():
-            grp_out = grp.create_group("seed%i" % seed)
+            grp_out = grp.create_group("seed%s" % seed)
             grp_out.create_dataset("spike_matrix", data=SpikeMatrixResult.spike_matrix, compression="gzip")
             grp_out.create_dataset("gids", data=SpikeMatrixResult.gids)
             grp_out.create_dataset("t_bins", data=SpikeMatrixResult.t_bins)
@@ -117,7 +112,7 @@ class SpikeMatrixGroup(Config):
         assert (spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1)))
         rate = np.sum(spike_matrix, axis=0)
         if self.threshold_rate:
-            rate_th = sign_rate_std(spike_times, spiking_gids, t_start, t_end, self.bin_size)
+            rate_th = get_sign_rate_th(spike_matrix)
             t_idx = np.where(rate > np.mean(rate) + rate_th)[0]  # get ids of significant time bins
             spike_matrix_results = SpikeMatrixResult(spike_matrix[:, t_idx], gids, t_bins[t_idx])
         else:
@@ -135,14 +130,14 @@ class SpikeMatrixGroup(Config):
         if self.t_chunks is None:
             ts = np.array([self.t_start, self.t_end])
             seeds = np.sort(sim_paths.index.to_numpy())
+            ignore_seeds = np.array(self.ignore_seeds)
+            seeds = np.setdiff1d(seeds, ignore_seeds, assume_unique=True)
             for seed in tqdm(seeds, desc="Loading in simulation results"):
-                if seed in self.ignore_seeds:
-                    pass
                 spike_matrix, rate, rate_th = self.get_sign_spike_matrix(sim_paths.loc[seed], self.t_start, self.t_end)
                 spike_matrix_dict[seed] = spike_matrix
                 del spike_matrix
                 gc.collect()
-                fig_name = os.path.join(self.fig_path, "rate_seed%i.png" % seed)
+                fig_name = os.path.join(self.fig_path, "rate_seed%s.png" % seed)
                 plot_rate(rate, rate_th, self.t_start, self.t_end, fig_name)
         else:
             assert (len(sim_paths) == 1), "Chunking sim only works for a single seed is atm."
@@ -153,13 +148,61 @@ class SpikeMatrixGroup(Config):
                 spike_matrix_dict[seed] = spike_matrix
                 del spike_matrix
                 gc.collect()
-                fig_name = os.path.join(self.fig_path, "rate_seed%i.png" % seed)
+                fig_name = os.path.join(self.fig_path, "rate_seed%s.png" % seed)
                 plot_rate(rate, rate_th, t_start, t_end, fig_name)
         stim_times, patterns = get_stimulus_stream(self.input_patterns_fname, self.t_start, self.t_end)
         project_metadata = {"root_path": self.root_path, "seeds": seeds, "t": ts,
                             "stim_times": stim_times, "patterns": patterns.tolist()}
         if save:
             spikes_to_h5(self.h5f_name, spike_matrix_dict, project_metadata, prefix=self.h5_prefix_spikes)
+        return spike_matrix_dict, project_metadata
+
+    def get_mean_sign_spike_matrix(self, save=True):
+        """Same as above, but instead of doing it seed-by-seed it averages spikes over seeds"""
+        from assemblyfire.utils import get_sim_path, get_bluepy_circuit, get_gids, get_stimulus_stream
+        from assemblyfire.plots import plot_rate
+
+        assert self.t_chunks is None, "Chunked results only work for a single seed is atm."
+        sim_paths = get_sim_path(self.root_path)
+        seeds = np.sort(sim_paths.index.to_numpy())
+        ignore_seeds = np.array(self.ignore_seeds)
+        seeds = np.setdiff1d(seeds, ignore_seeds, assume_unique=True)
+        all_gids = get_gids(get_bluepy_circuit(sim_paths.loc[seeds[0]]), self.target)
+        nt_bins = int(((self.t_end + self.bin_size - self.t_start) / self.bin_size) - 1)
+        spike_matrices = np.zeros((len(all_gids), nt_bins, len(seeds)), dtype=int)
+
+        for i, seed in enumerate(tqdm(seeds, desc="Loading in simulation results")):
+            spike_times, spiking_gids = load_spikes(sim_paths.loc[seed], self.target, self.t_start, self.t_end)
+            spike_matrix, gids, t_bins = spikes2mat(spike_times, spiking_gids, self.t_start, self.t_end, self.bin_size)
+            assert spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1))
+            assert spike_matrix.shape[1] == nt_bins
+            idx = np.in1d(all_gids, gids, assume_unique=True)
+            spike_matrices[idx, :, i] = spike_matrix
+            del spike_matrix
+            gc.collect()
+        idx = spike_matrices.any(axis=1).any(axis=1)
+        gids = all_gids[idx]
+        spike_matrix = np.mean(spike_matrices[idx, :, :], axis=2)
+        del spike_matrices
+        gc.collect()
+        rate = np.sum(spike_matrix, axis=0)
+        if self.threshold_rate:
+            rate_th = get_sign_rate_th(spike_matrix)
+            t_idx = np.where(rate > np.mean(rate) + rate_th)[0]  # get ids of significant time bins
+            spike_matrix_results = SpikeMatrixResult(spike_matrix[:, t_idx], gids, t_bins[t_idx])
+        else:
+            rate_th, spike_matrix_results = np.nan, SpikeMatrixResult(spike_matrix, gids, t_bins)
+        spike_matrix_dict = {"_average": spike_matrix_results}
+
+        rate_norm = len(gids) * 1e-3 * self.bin_size
+        fig_name = os.path.join(self.fig_path, "rate_seed_average.png")
+        plot_rate(rate / rate_norm, rate_th / rate_norm, self.t_start, self.t_end, fig_name)
+
+        stim_times, patterns = get_stimulus_stream(self.input_patterns_fname, self.t_start, self.t_end)
+        project_metadata = {"root_path": self.root_path, "seeds": seeds, "t": np.array([self.t_start, self.t_end]),
+                            "stim_times": stim_times, "patterns": patterns.tolist()}
+        if save:
+            spikes_to_h5(self.h5f_name, spike_matrix_dict, project_metadata, prefix=self.h5_prefix_avg_spikes)
         return spike_matrix_dict, project_metadata
 
     def get_spike_time_reliability(self):
