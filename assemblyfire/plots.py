@@ -725,18 +725,14 @@ def plot_n_assemblies(stim_times, patterns, n_assemblies, t_chunks, fig_name):
     plt.close(fig)
 
 
-def plot_assembly_intersection_corr(intersection_corrs, xlabel, ylabel, fig_name):
+def plot_assembly_similarities(similarities, xlabel, ylabel, fig_name):
     """Plots similarity matrix of assemblies"""
-    abs_max = np.max(np.abs(intersection_corrs))
     fig = plt.figure(figsize=(10, 9))
     ax = fig.add_subplot(1, 1, 1)
-    i = ax.imshow(intersection_corrs, cmap="coolwarm", aspect="auto", interpolation="none",
-                  vmin=-abs_max, vmax=abs_max)
-    fig.colorbar(i, label="intersection correlation")
+    i = ax.imshow(similarities, cmap="inferno", aspect="auto", interpolation="none",)
+    fig.colorbar(i, label="Jaccard similarity")
     ax.set_xlabel(xlabel)
-    # ax.set_xticks([i for i in range(intersection_corrs.shape[0])])
     ax.set_ylabel(ylabel)
-    # ax.set_xticks([i for i in range(intersection_corrs.shape[1])])
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 
