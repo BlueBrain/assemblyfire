@@ -275,6 +275,18 @@ def plot_pattern_clusters(clusters, t_bins, stim_times, patterns, fig_name):
     plt.close(fig)
 
 
+def plot_distance_corr(input_dist, output_dist, fig_name):
+    """Plots input vs. output distances"""
+    fig = plt.figure(figsize=(6, 5))
+    ax = fig.add_subplot(1, 1, 1)
+    sns.regplot(x=input_dist, y=output_dist, color="black", marker='.', ax=ax)
+    ax.set_xlabel("Input distance")
+    ax.set_ylabel("Output distance")
+    sns.despine(trim=True, offset=2)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def _get_depth_yticks(loc_df):
     """Gets mean depth for each layer (used for setting ticks for depth based plots)"""
     gb_locs = loc_df.groupby("layer")
