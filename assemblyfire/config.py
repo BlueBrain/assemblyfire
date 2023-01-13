@@ -62,12 +62,20 @@ class Config(object):
         return self.config["h5_out"]["prefixes"]["spikes"]
 
     @property
+    def h5_prefix_avg_spikes(self):
+        return self.config["h5_out"]["prefixes"]["average_spikes"]
+
+    @property
     def h5_prefix_assemblies(self):
         return self.config["h5_out"]["prefixes"]["assemblies"]
 
     @property
     def h5_prefix_consensus_assemblies(self):
         return self.config["h5_out"]["prefixes"]["consensus_assemblies"]
+
+    @property
+    def h5_prefix_avg_assemblies(self):
+        return self.config["h5_out"]["prefixes"]["average_assemblies"]
 
     @property
     def h5_prefix_connectivity(self):

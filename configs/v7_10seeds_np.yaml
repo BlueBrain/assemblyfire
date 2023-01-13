@@ -7,8 +7,10 @@ h5_out:
     file_name: "assemblies.h5"
     prefixes:
         spikes: "spikes"
+        average_spikes: "average_spikes"
         assemblies: "assemblies"
         consensus_assemblies: "consensus"
+        average_assemblies: "average_assemblies"
         connectivity: "connectivity"
         single_cell_features: "single_cell"
 
@@ -22,7 +24,7 @@ preprocessing_protocol:
     threshold_rate: True
 
 clustering:
-    overwrite_n_clusters: {"seed1": 10, "seed47": 9, "seed54": 12, "seed63": 11, "seed80": 9, "seed99": 13}
+    overwrite_n_clusters: {"seed1": 10, "seed47": 9, "seed54": 12, "seed63": 11, "seed80": 9, "seed99": 13, "seed_average": 14}
     synapses:
         target: "hex_O1Excitatory_Sample10pct"
         lookup_df_pklfname: "/gpfs/bbp.cscs.ch/project/proj96/circuits/plastic_v1/sample10pct_clustering_syn_df.pkl"
