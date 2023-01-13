@@ -287,6 +287,20 @@ def plot_distance_corr(input_dist, output_dist, fig_name):
     plt.close(fig)
 
 
+def plot_db_scores(n, db_scores, fig_name):
+    """Plots DB scores against n-clusters"""
+    fig = plt.figure(figsize=(6, 5))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.plot(n, db_scores, color="black")
+    ax.axvline(n[np.argmin(db_scores)], color="red", ls="--")
+    ax.set_xlim([n[0], n[-1]])
+    ax.set_xlabel("Number of clusters")
+    ax.set_ylabel("D-B score")
+    sns.despine(trim=True, offset=2)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def _get_depth_yticks(loc_df):
     """Gets mean depth for each layer (used for setting ticks for depth based plots)"""
     gb_locs = loc_df.groupby("layer")

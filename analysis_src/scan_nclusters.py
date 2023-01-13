@@ -9,6 +9,7 @@ import numpy as np
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.optimize import linear_sum_assignment
 from scipy.cluster.hierarchy import linkage, fcluster
+from sklearn.metrics import davies_bouldin_score
 
 from assemblyfire.config import Config
 import assemblyfire.utils as utils
@@ -65,9 +66,10 @@ def cluster_sim_mat(spike_matrix, t_bins, stim_times, patterns, input_pattern_na
     linkage_matrix = linkage(cond_dists, method="ward")
 
     # iterate over number of clusters and plot results for all
-    n_clusters = {}
-    for n in range(min_n_clusts, max_n_clusts+1):
+    ns, db_scores, n_clusters = np.arange(min_n_clusts, max_n_clusts+1), [], {}
+    for n in ns:
         clusters = fcluster(linkage_matrix, n, criterion="maxclust")
+        db_scores.append(davies_bouldin_score(dists, clusters))
         clusters -= 1  # this is only needed for assembly detection...
         n_clusters[n] = clusters
         output_pattern_names, output_dist = get_assembly_count_distance(clusters, t_bins, stim_times, patterns)
@@ -78,6 +80,7 @@ def cluster_sim_mat(spike_matrix, t_bins, stim_times, patterns, input_pattern_na
             warnings.warn("Input and output pattern names don't match!")
         else:
             plot_distance_corr(input_dist, output_dist, os.path.join(fig_dir, "input_vs_output_dists_n%i.png" % n))
+    plot_db_scores(ns, db_scores, os.path.join(fig_dir, "db_scores.png"))
 
     return n_clusters
 
@@ -90,14 +93,14 @@ def main(config_path, seeds, save_assemblies=True):
     nrn_loc_df = utils.get_neuron_locs(utils.get_sim_path(config.root_path).iloc[0], config.target)
 
     for seed in seeds:
-        spike_matrix, t_bins = spike_matrix_dict["seed%i" % seed].spike_matrix, spike_matrix_dict["seed%i" % seed].t_bins
-        fig_dir = os.path.join(config.fig_path, "seed%i_debug" % seed)
+        spike_matrix, t_bins = spike_matrix_dict["seed%s" % seed].spike_matrix, spike_matrix_dict["seed%s" % seed].t_bins
+        fig_dir = os.path.join(config.fig_path, "seed%s_debug" % seed)
         utils.ensure_dir(fig_dir)
         n_clusters = cluster_sim_mat(spike_matrix, t_bins, stim_times, patterns, input_pattern_names, input_dist, fig_dir)
         if save_assemblies:
             # create "fake" dictionary of spike matrices for different ns,
             # so the looping (and proper saving) will be done by `detect_assemblies`
-            n_spike_matrix = {n: spike_matrix_dict["seed%i" % seed] for n, _ in n_clusters.items()}
+            n_spike_matrix = {n: spike_matrix_dict["seed%s" % seed] for n, _ in n_clusters.items()}
             h5f_name = config.h5f_name.split(".h5")[0] + "_across_ns.h5"
             detect_assemblies(n_spike_matrix, n_clusters, config.core_cell_th_pct, h5f_name,
                               config.h5_prefix_assemblies, nrn_loc_df, fig_dir)
