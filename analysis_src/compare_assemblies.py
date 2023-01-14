@@ -1,6 +1,6 @@
 """
 Load assemblies from (either from 2 HDF5 files, or from different prefixes) and compare them
-last modified: András Ecker 09.2022
+last modified: András Ecker 01.2023
 """
 
 import os
@@ -41,7 +41,35 @@ def assembly_similarities_from2configs(config1_path, config2_path):
         plot_assembly_similarities(similarities, xlabel, ylabel, fig_name)
 
 
+def _create_assembly_grp_from_consensus_core(consensus_assemblies):
+    """Create AssemblyGroup object (the format used in `get_assembly_similarities()`)
+    from the core's of consensus assemblies"""
+    from assemblyfire.assemblies import Assembly, AssemblyGroup
+    consensus_assembly_idx = np.sort([int(key.split("cluster")[1]) for key in list(consensus_assemblies.keys())])
+    all_gids, assembly_lst = [], []
+    for consensus_assembly_id in consensus_assembly_idx:
+        gids = consensus_assemblies["cluster%i" % consensus_assembly_id].gids
+        all_gids.extend(gids)
+        assembly_lst.append(Assembly(gids, index=consensus_assembly_id))
+    return AssemblyGroup(assemblies=assembly_lst, all_gids=np.unique(all_gids))
+
+
+def consensus_vs_average_assembly_similarity(config_path):
+    """Loads in consensus and average assemblies and gets their Jaccard similarity"""
+    config = Config(config_path)
+    assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_avg_assemblies)
+    avg_assembly_grp = assembly_grp_dict["seed_average"]
+    consensus_assemblies = utils.load_consensus_assemblies_from_h5(config.h5f_name, config.h5_prefix_consensus_assemblies)
+    consensus_assembly_grp = _create_assembly_grp_from_consensus_core(consensus_assemblies)
+    similarities = get_assembly_similarities(avg_assembly_grp, consensus_assembly_grp)
+    fig_name = os.path.join(config.fig_path, "consensus_vs_average_assembly_similarities.png")
+    plot_assembly_similarities(similarities, "Consensus assembly", "Average assembly", fig_name)
+
+
 if __name__ == "__main__":
-    config1_path = "../configs/v7_bbp-workflow.yaml"
-    config2_path = "../configs/v7_bbp-workflow_L23.yaml"
-    assembly_similarities_from2configs(config1_path, config2_path)
+    # config1_path = "../configs/v7_bbp-workflow.yaml"
+    # config2_path = "../configs/v7_bbp-workflow_L23.yaml"
+    # assembly_similarities_from2configs(config1_path, config2_path)
+    config_path = "../configs/v7_10seeds_np.yaml"
+    consensus_vs_average_assembly_similarity(config_path)
+
