@@ -9,6 +9,7 @@ authors: Thomas Delemontex and András Ecker; last update 01.2023
 
 import os
 import gc
+import warnings
 from tqdm import tqdm
 from tqdm.contrib import tzip
 from collections import namedtuple, OrderedDict
@@ -41,7 +42,7 @@ def spikes2mat(spike_times, spiking_gids, t_start, t_end, bin_size):
     return spike_matrix, gid_bins[:-1], t_bins
 
 
-def get_surrogate_rate_std(shape, row_idx, col_idx, vals):
+def _sasaki_surr_rate_std(shape, row_idx, col_idx, vals):
     """Shuffles spike matrix by offsetting every spike by 1 time bin, and then returns the std of the rate.
     (Used for creating surrogate dataset a la Sasaki et al. 2006)"""
     surr_col_idx = col_idx + np.random.choice([-1, 1], len(col_idx))
@@ -49,20 +50,38 @@ def get_surrogate_rate_std(shape, row_idx, col_idx, vals):
     surr_col_idx[surr_col_idx == -1] = 1
     surr_col_idx[surr_col_idx == shape[1]] = shape[1] - 2
     surr_spike_matrix = np.zeros(shape, dtype=vals.dtype)
-    surr_spike_matrix[row_idx, col_idx] = vals
+    surr_spike_matrix[row_idx, surr_col_idx] = vals
     return np.std(np.sum(surr_spike_matrix, axis=0))
 
 
-def get_sign_rate_th(spike_matrix, nreps=100):
+def _keep_sc_rate_surr_rate_std(shape, row_idx, col_idx, vals):
+    """Shuffles spike matrix in a more drastic manner than the above one (Still keeps spike count
+    and single cell rate. This one is also widely used in the literature.)
+    Passing `col_idx` is not really necessary, but it's there to keep the same inputs of the 2 functions"""
+    surr_col_idx = np.random.choice(np.arange(shape[1]), len(col_idx))
+    surr_spike_matrix = np.zeros(shape, dtype=vals.dtype)
+    surr_spike_matrix[row_idx, surr_col_idx] = vals
+    return np.std(np.sum(surr_spike_matrix, axis=0))
+
+
+def get_sign_rate_th(spike_matrix, surr_rate_method, nreps=100):
     """Generates surrogate datasets, checks the stds of their rates
     and sets significance threshold their 95% percentile"""
     shape = spike_matrix.shape
     spiking_neuron_idx, spiking_bin_idx = np.where(spike_matrix > 0)
     spike_counts = spike_matrix[spiking_neuron_idx, spiking_bin_idx]
     nprocs = nreps if os.cpu_count() - 1 > nreps else os.cpu_count() - 1
-    with Parallel(n_jobs=nprocs, prefer="threads") as p:
-        stds = p(delayed(get_surrogate_rate_std)(shape, spiking_neuron_idx, spiking_bin_idx, spike_counts)
-                 for _ in range(nreps))
+    if surr_rate_method == "Sasaki":
+        with Parallel(n_jobs=nprocs, prefer="threads") as p:
+            stds = p(delayed(_sasaki_surr_rate_std)(shape, spiking_neuron_idx, spiking_bin_idx, spike_counts)
+                     for _ in range(nreps))
+    elif surr_rate_method == "keep_sc_rate":
+        with Parallel(n_jobs=nprocs, prefer="threads") as p:
+            stds = p(delayed(_keep_sc_rate_surr_rate_std)(shape, spiking_neuron_idx, spiking_bin_idx, spike_counts)
+                     for _ in range(nreps))
+    else:
+        warnings.warn("Only `Sasaki` and `keep_sc_rate` shuffling methods are implemented...")
+        return 0
     return np.percentile(stds, 95)
 
 
@@ -112,7 +131,7 @@ class SpikeMatrixGroup(Config):
         assert (spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1)))
         rate = np.sum(spike_matrix, axis=0)
         if self.threshold_rate:
-            rate_th = get_sign_rate_th(spike_matrix)
+            rate_th = get_sign_rate_th(spike_matrix, self.surr_rate_method)
             t_idx = np.where(rate > np.mean(rate) + rate_th)[0]  # get ids of significant time bins
             spike_matrix_results = SpikeMatrixResult(spike_matrix[:, t_idx], gids, t_bins[t_idx])
         else:
@@ -187,7 +206,7 @@ class SpikeMatrixGroup(Config):
         gc.collect()
         rate = np.sum(spike_matrix, axis=0)
         if self.threshold_rate:
-            rate_th = get_sign_rate_th(spike_matrix)
+            rate_th = get_sign_rate_th(spike_matrix, self.surr_rate_method)
             t_idx = np.where(rate > np.mean(rate) + rate_th)[0]  # get ids of significant time bins
             spike_matrix_results = SpikeMatrixResult(spike_matrix[:, t_idx], gids, t_bins[t_idx])
         else:

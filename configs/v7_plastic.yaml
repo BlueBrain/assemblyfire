@@ -1,0 +1,29 @@
+root_path: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/2235ec7c-e6a6-4d79-903e-36083f415aa6"
+
+input_patterns_fname: "input_spikes/stimulus_stream__start2000__end126501__rate2__seed9.txt"
+pattern_gids_fname: "input_spikes/Thalamocortical_input_VPM__hex_O1__supersample__nc100__pct12__seed9__pattern_gids.pkl"
+
+h5_out:
+    file_name: "assemblies.h5"
+    prefixes:
+        spikes: "spikes"
+        assemblies: "assemblies"
+        connectivity: "connectivity"
+
+root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures/v7_assemblies"
+
+preprocessing_protocol:
+    target: "hex_O1Excitatory"
+    t_start: 1500
+    t_end: 126000
+    bin_size: 20
+    threshold_rate: True
+    surr_rate_method: "keep_sc_rate"
+
+clustering:
+    synapses:
+        target: "hex_O1Excitatory_Sample10pct"
+        lookup_df_pklfname: "/gpfs/bbp.cscs.ch/project/proj96/circuits/plastic_v1/sample10pct_clustering_syn_df.pkl"
+        target_range: 10
+        min_nsyns: 10
+        n_neurons_sample: 10

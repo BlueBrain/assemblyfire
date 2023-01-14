@@ -125,6 +125,13 @@ class Config(object):
         return self.config["preprocessing_protocol"]["threshold_rate"]
 
     @property
+    def surr_rate_method(self):
+        if "surr_rate_method" in self.config["preprocessing_protocol"]:
+            return self.config["preprocessing_protocol"]["surr_rate_method"]
+        else:
+            return "Sasaki"
+
+    @property
     def ignore_seeds(self):
         if "ignore_seeds" in self.config["preprocessing_protocol"]:
             return self.config["preprocessing_protocol"]["ignore_seeds"]
