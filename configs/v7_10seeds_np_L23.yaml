@@ -1,4 +1,4 @@
-root_path: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/d21efd45-7740-4268-b06f-e1de35f2b6cf"
+root_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/d21efd45-7740-4268-b06f-e1de35f2b6cf"
 
 input_patterns_fname: "input_spikes/stimulus_stream__start2000__end126501__rate2__seed9.txt"
 pattern_gids_fname: "input_spikes/Thalamocortical_input_VPM__hex_O1__supersample__nc100__pct12__seed9__pattern_gids.pkl"
