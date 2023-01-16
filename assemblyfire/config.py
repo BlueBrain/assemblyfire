@@ -35,6 +35,16 @@ class Config(object):
         return f_name if os.path.isabs(f_name) else os.path.join(self.root_path, f_name)
 
     @property
+    def pattern_locs_fname(self):
+        pattern_locs_fname = None
+        proj_dir = os.path.join(self.root_path, "projections")
+        if os.path.isdir(proj_dir):
+            for f_name in os.listdir(proj_dir):
+                if f_name.split(".txt")[0] in self.pattern_gids_fname:
+                    pattern_locs_fname = os.path.join(proj_dir, f_name)
+        return pattern_locs_fname
+
+    @property
     def patterns_projection_name(self):
         return os.path.split(self.pattern_gids_fname)[1].split('__')[0]
 
@@ -52,12 +62,20 @@ class Config(object):
         return self.config["h5_out"]["prefixes"]["spikes"]
 
     @property
+    def h5_prefix_avg_spikes(self):
+        return self.config["h5_out"]["prefixes"]["average_spikes"]
+
+    @property
     def h5_prefix_assemblies(self):
         return self.config["h5_out"]["prefixes"]["assemblies"]
 
     @property
     def h5_prefix_consensus_assemblies(self):
         return self.config["h5_out"]["prefixes"]["consensus_assemblies"]
+
+    @property
+    def h5_prefix_avg_assemblies(self):
+        return self.config["h5_out"]["prefixes"]["average_assemblies"]
 
     @property
     def h5_prefix_connectivity(self):
@@ -105,6 +123,13 @@ class Config(object):
     @property
     def threshold_rate(self):
         return self.config["preprocessing_protocol"]["threshold_rate"]
+
+    @property
+    def surr_rate_method(self):
+        if "surr_rate_method" in self.config["preprocessing_protocol"]:
+            return self.config["preprocessing_protocol"]["surr_rate_method"]
+        else:
+            return "Sasaki"
 
     @property
     def ignore_seeds(self):

@@ -6,13 +6,13 @@ author: András Ecker, last update: 01.2023
 import os
 import pickle
 import h5py
+import warnings
 from collections import namedtuple
 import numpy as np
 import pandas as pd
 from libsonata import EdgeStorage
 
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
-SingleCellFeatures = namedtuple("SingleCellFeatures", ["gids", "r_spikes", "mean_ts", "std_ts"])
 
 
 def get_bluepy_circuit(circuitconfig_path):
@@ -84,14 +84,6 @@ def get_pattern_gids(pklf_name):
     return pattern_gids
 
 
-def get_pattern_vectors(pklf_name):
-    """Loads pattern gids and returns boolean vectors with equal lengths"""
-    pattern_gids = get_pattern_gids(pklf_name)
-    all_gids = np.unique(np.concatenate([gids for pattern_name, gids in pattern_gids.items()]))
-    pattern_vectors = {pattern_name: np.in1d(all_gids, gids).astype(int) for pattern_name, gids in pattern_gids.items()}
-    return all_gids, pattern_vectors
-
-
 def get_gids(c, target):
     return c.cells.ids({"$target": target})
 
@@ -120,6 +112,16 @@ def get_spikes(sim, gids, t_start, t_end):
     else:
         spikes = sim.spikes.get(gids, t_start=t_start, t_end=t_end)
     return spikes.index.to_numpy(), spikes.to_numpy()
+
+
+def get_projf_names(sim_config):
+    """Gets the name and edge file path of projections from bluepy.Simulation.config object"""
+    projf_names = {}
+    projs = sim_config.typed_sections("Projection")
+    for proj in projs:
+        if hasattr(proj, "Path"):
+            projf_names[proj.name] = proj.Path
+    return projf_names
 
 
 def _get_spikef_name(sim_config):
@@ -229,11 +231,10 @@ def _il_isin(whom, where, parallel):
         return np.isin(whom, where)
 
 
-def get_syn_idx(c, pre_gids, post_gids, parallel=True):
+def get_syn_idx(edgef_name, pre_gids, post_gids, parallel=True):
     """Returns syn IDs between `pre_gids` and `post_gids`
     (~1000x faster than c.connectome.pathway_synapses(pre_gids, post_gids))"""
-    edge_fname = c.config["connectome"]
-    edges = EdgeStorage(edge_fname)
+    edges = EdgeStorage(edgef_name)
     edge_pop = edges.open_population(list(edges.population_names)[0])
     # sonata nodes are 0 based (and the functions expect lists of ints)
     afferents_edges = edge_pop.afferent_edges((post_gids.astype(int) - 1).tolist())
@@ -244,6 +245,10 @@ def get_syn_idx(c, pre_gids, post_gids, parallel=True):
 
 def get_syn_properties(c, syn_idx, properties):
     return c.connectome.synapse_properties(syn_idx, properties)
+
+
+def get_proj_properties(c, proj_name, syn_idx, properties):
+    return c.projection(proj_name).synapse_properties(syn_idx, properties)
 
 
 def get_loc_df(loc_pklf_name, c, target, subtarget):
@@ -260,7 +265,7 @@ def get_loc_df(loc_pklf_name, c, target, subtarget):
     extra_gids = np.setdiff1d(target_gids, df_gids)
     if len(extra_gids):
         from bluepy.enums import Synapse
-        syn_idx = get_syn_idx(c, get_gids(c, target), extra_gids)
+        syn_idx = get_syn_idx(c.config["connectome"], get_gids(c, target), extra_gids)
         extra_loc_df = get_syn_properties(c, syn_idx, [Synapse.PRE_GID, Synapse.POST_GID, Synapse.POST_SECTION_ID,
                                                        Synapse.POST_X_CENTER, Synapse.POST_Y_CENTER, Synapse.POST_Z_CENTER])
         extra_loc_df.rename(columns={Synapse.PRE_GID: "pre_gid", Synapse.POST_GID: "post_gid",
@@ -274,30 +279,10 @@ def get_rho0s(c, target):
     """Get initial efficacies (rho0_GB in the sonata file) for all EXC synapses in the `target`"""
     from bluepy.enums import Synapse
     gids = get_gids(c, target)
-    syn_idx = get_syn_idx(c, gids, gids)
+    syn_idx = get_syn_idx(c.config["connectome"], gids, gids)
     syn_df = get_syn_properties(c, syn_idx, [Synapse.PRE_GID, Synapse.POST_GID, "rho0_GB"])
     syn_df.rename(columns={Synapse.PRE_GID: "pre_gid", Synapse.POST_GID: "post_gid", "rho0_GB": "rho"}, inplace=True)
     return syn_df
-
-
-def determine_bins(unique_ns, counts, min_samples):
-    """Based on the long-tailed distribution of data, determines optimal binning,
-    to have minimum `min_samples` datapoints in each bin (used for calculating probabilities from those numbers)"""
-    cumsum, bin_edges = 0, [unique_ns[-1]]
-    for i, count in enumerate(counts[::-1]):  # assumes long tail (towards higher values)
-        cumsum += count
-        if cumsum > min_samples:
-            bin_edges.append(unique_ns[-(i+1)])
-            cumsum = 0
-    bin_edges = np.array(bin_edges[::-1])
-    diffs = np.diff(bin_edges)
-    bin_centers = []
-    for i, diff in enumerate(diffs):
-        if diff == 1:
-            bin_centers.append(bin_edges[i + 1])
-        else:
-            bin_centers.append(np.mean([bin_edges[i], bin_edges[i + 1]]))
-    return bin_edges, np.array(bin_centers)
 
 
 def save_syn_clusters(save_dir_root, assembly_idx, cluster_df, cross_assembly=True):
@@ -370,8 +355,7 @@ def load_single_cell_features_from_h5(h5f_name, prefix="single_cell"):
     h5f = h5py.File(h5f_name, "r")
     project_metadata = _read_h5_metadata(h5f, prefix=prefix)
     prefix_grp = h5f[prefix]
-    single_cell_features = SingleCellFeatures(prefix_grp["gids"][:], prefix_grp["r_spikes"][:],
-                                              prefix_grp["mean_ts_in_bin"][:], prefix_grp["std_ts_in_bin"][:])
+    single_cell_features = {"gids": prefix_grp["gids"][:], "r_spikes": prefix_grp["r_spikes"][:]}
     h5f.close()
     return single_cell_features, project_metadata
 

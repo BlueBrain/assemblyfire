@@ -1,6 +1,6 @@
 """
 Assembly detection related plots
-author: András Ecker, last update: 12.2022
+author: András Ecker, last update: 01.2023
 """
 
 import numpy as np
@@ -17,6 +17,7 @@ import seaborn as sns
 sns.set(style="ticks", context="notebook")
 PATTERN_COLORS = {"A": "#234091", "B": "#57B4D0", "C": "#C4A943", "D": "#7E1F19", "E": "#3F7AB3",
                   "F": "#8CAD8A", "G": "#A1632E", "H": "#66939D", "I": "#66939D", "J": "#665869"}
+PROJ_COLORS = {"Thalamocortical_input_VPM": "tab:purple", "Thalamocortical_input_POM": "black"}
 RED, BLUE = "#e32b14", "#3271b8"
 
 
@@ -274,6 +275,32 @@ def plot_pattern_clusters(clusters, t_bins, stim_times, patterns, fig_name):
     plt.close(fig)
 
 
+def plot_distance_corr(input_dist, output_dist, fig_name):
+    """Plots input vs. output distances"""
+    fig = plt.figure(figsize=(6, 5))
+    ax = fig.add_subplot(1, 1, 1)
+    sns.regplot(x=input_dist, y=output_dist, color="black", marker='.', ax=ax)
+    ax.set_xlabel("Input distance")
+    ax.set_ylabel("Output distance")
+    sns.despine(trim=True, offset=2)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_db_scores(n, db_scores, fig_name):
+    """Plots DB scores against n-clusters"""
+    fig = plt.figure(figsize=(6, 5))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.plot(n, db_scores, color="black")
+    ax.axvline(n[np.argmin(db_scores)], color="red", ls="--")
+    ax.set_xlim([n[0], n[-1]])
+    ax.set_xlabel("Number of clusters")
+    ax.set_ylabel("D-B score")
+    sns.despine(trim=True, offset=2)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def _get_depth_yticks(loc_df):
     """Gets mean depth for each layer (used for setting ticks for depth based plots)"""
     gb_locs = loc_df.groupby("layer")
@@ -319,43 +346,6 @@ def plot_assemblies(core_cell_idx, assembly_idx, gids, loc_df, fig_name):
     plt.close(fig)
 
 
-#TODO: fix consensus assembly related plots that still have `ystuff` and `depths` as inputs
-def plot_single_cell_features(gids, r_spikes, mean_ts, std_ts, ystuff, depths, bin_size, fig_name):
-    """Plots spike time reliability and mean+/-std(spike time) in bin"""
-    gid_depths = depths.loc[gids].to_numpy()
-    r_spikes[r_spikes == 0] = np.nan
-    yrange = [ystuff["hlines"][-1], ystuff["hlines"][0]]
-    c_version = _guess_circuit_version(ystuff["hlines"])
-
-    fig = plt.figure(figsize=(9, 8))
-    ax = fig.add_subplot(1, 2, 1)
-    sns.despine(ax=ax, offset=5)
-    ax.scatter(r_spikes, gid_depths,
-               color="black", alpha=0.5, marker='.', s=5, edgecolor="none")
-    ax.set_xlabel("r_spike")
-    ax.set_xlim([0, np.nanmax(r_spikes)])
-    ax.set_yticks(ystuff["yticks"])
-    ax.set_ylim(yrange)
-    ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"]])
-    ax2 = fig.add_subplot(1, 2, 2)
-    sns.despine(ax=ax2, left=True, offset=5)
-    ax2.errorbar(mean_ts, gid_depths, xerr=std_ts, color="black",
-                 fmt="none", alpha=0.5, lw=0.1, errorevery=10)
-    ax2.scatter(mean_ts, gid_depths,
-               color="black", alpha=0.5, marker='.', s=5, edgecolor="none")
-    ax2.set_xlabel("Spike time in bin (ms)")
-    ax2.set_xlim([0, bin_size])
-    ax2.set_ylim(yrange)
-    ax2.set_yticks([])
-    if c_version == "v5":
-        for i in range(1, 5):
-            ax.axhline(ystuff["hlines"][i], color="gray", ls="--")
-            ax2.axhline(ystuff["hlines"][i], color="gray", ls="--")
-    fig.tight_layout()
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
-    plt.close(fig)
-
-
 def plot_efficacy(efficacies, fig_name):
     """Plots efficacies (depressed and potentiated) for synapses within assemblies (within one seed)"""
     plt.rcParams["patch.edgecolor"] = "black"
@@ -375,6 +365,36 @@ def plot_efficacy(efficacies, fig_name):
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
     plt.rcParams["patch.edgecolor"] = "white"
+
+
+def plot_tc_syn_properties(df, fig_name):
+    """Plots synapse (to a given assembly) properties of projections"""
+    df.loc[df["layer"].isin([2, 3]), "layer"] = 23
+    order = [23, 4, 5, 6]
+    hue_order = np.sort(df["name"].unique())
+    palette = []
+    for name in hue_order:
+        color = PATTERN_COLORS[name] if name in PATTERN_COLORS else "black"
+        palette.append(colors.to_rgb(color))
+
+    fig = plt.figure(figsize=(20, 8))
+    ax = fig.add_subplot(2, 1, 1)
+    sns.violinplot(x="layer", y="g_syn", hue="name", order=order, hue_order=hue_order,
+                   scale="count", bw="silverman", cut=1, inner=None, palette=palette, data=df, ax=ax)
+    h, l = ax.get_legend_handles_labels()
+    ax.legend(h, l, loc=2, ncol=3, fancybox=True)
+    ax.set_xlabel('')
+    ax.set_ylabel("G_syn (nS)")
+    ax2 = fig.add_subplot(2, 1, 2)
+    sns.violinplot(x="layer", y="path distance", hue="name", order=order, hue_order=hue_order,
+                   scale="count", bw="silverman", cut=1, inner=None, palette=palette, data=df, ax=ax2)
+    ax2.legend([], [], frameon=False)
+    ax2.set_xlabel("Layer")
+    ax2.set_ylabel("Path distance (um)")
+    sns.despine(bottom=True, trim=True)
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
 
 
 def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"):
@@ -411,18 +431,24 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"
     plt.close(fig)
 
 
-def plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, xlabel, palette, fig_name, logx=False):
+def plot_assembly_prob_from(bin_centers, assembly_probs, assembly_probs_low, assembly_probs_high, chance_levels,
+                            xlabel, palette, fig_name, logx=False):
     """Plots assembly membership probability vs. whatever data `xlabel` is"""
     keys = list(assembly_probs.keys())
     assembly_labels = list(assembly_probs[keys[0]].keys())
     n = len(assembly_labels)
+    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n / 5)
     if palette == "patterns":
         palette = PATTERN_COLORS
+        ncol = 2
+    elif palette == "projections":
+        palette = PROJ_COLORS
+        ncol = 1
     else:
         cmap = plt.cm.get_cmap("tab20", np.max([assembly_label for assembly_label in assembly_labels]) + 1)
+        ncol = n_rows
 
     fig = plt.figure(figsize=(20, 8))
-    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
     gs = gridspec.GridSpec(n_rows, 5)
     for i, assembly_label in enumerate(assembly_labels):
         ax = fig.add_subplot(gs[i])
@@ -434,10 +460,11 @@ def plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, xlabel, 
                 color = cmap(j)
             else:
                 color = palette[key]
-            ax.plot(bin_centers[key][assembly_label], assembly_probs[key][assembly_label], color=color,
-                    label=key)
+            ax.plot(bin_centers[key][assembly_label], assembly_probs[key][assembly_label], color=color, label=key)
+            ax.fill_between(bin_centers[key][assembly_label], assembly_probs_low[key][assembly_label],
+                            assembly_probs_high[key][assembly_label], color=color, alpha=0.1)
             if i == 0:
-                ax.legend(frameon=False, ncol=n_rows)
+                ax.legend(frameon=False, ncol=ncol)
         ax.set_title("Assembly %s" % assembly_label)
         if logx:
             ax.set_xscale("log")
@@ -450,6 +477,26 @@ def plot_assembly_prob_from(bin_centers, assembly_probs, chance_levels, xlabel, 
     plt.xlabel(xlabel)
     plt.ylabel("Prob. of assembly membership")
     fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_assembly_n_from(bin_centers, assembly_probs, assembly_probs_low, assembly_probs_high, xlabel, palette, fig_name):
+    """Similar to the above, but it's a single plot (as it's not assembly specific) and the ylabel is different"""
+    if palette == "projections":
+        palette = PROJ_COLORS
+    fig = plt.figure(figsize=(6, 4))
+    ax = fig.add_subplot(1, 1, 1)
+    for key, assembly_prob in assembly_probs.items():
+        color = palette[key]
+        ax.plot(bin_centers[key], assembly_prob, color=color, label=key)
+        ax.fill_between(bin_centers[key], assembly_probs_low[key], assembly_probs_high[key], color=color, alpha=0.1)
+    ax.legend(frameon=False)
+    ax.set_xlabel(xlabel)
+    ax.set_xlim(left=0)
+    ax.set_ylabel("Nr. of assemblies a neuron is part of")
+    ax.set_ylim(bottom=0)
+    sns.despine(trim=True, offset=2)
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 
@@ -557,95 +604,47 @@ def plot_consensus_mtypes(mtypes, core_mtypes, union_mtypes, fig_name):
     plt.close(fig)
 
 
-def plot_consensus_r_spike(consenus_r_spikes, union_r_spikes, r_spikes, fig_name):
-    """Plots spike time reliability for consensus assemblies"""
-    n = len(consenus_r_spikes)
-    n_all = r_spikes.shape[0]
-    r_spikes = r_spikes[~np.isnan(r_spikes)]
-    yrange = [np.min(r_spikes), np.percentile(r_spikes, 99.9)]
-    cmap = plt.cm.get_cmap("tab20", n)
-
-    fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(1, n+1)
-    for i in range(n):
-        ax = fig.add_subplot(gs[i])
-        color = colors.to_hex(cmap(i))
-        ax.hist(consenus_r_spikes[i], bins=50, range=yrange, orientation="horizontal",
-                color=color, edgecolor=color, label="core")
-        ax.hist(union_r_spikes[i], bins=50, range=yrange, orientation="horizontal",
-                color="black", histtype="step", label="union")
-        ax.set_title("cons%s\n(n=%i)" % (i, consenus_r_spikes[i].shape[0]))
-        ax.set_ylim(yrange)
-        ax.set_xscale("log")
-        if i == 0:
-            ax.set_ylabel("r_spike")
-            sns.despine(ax=ax, offset=5, trim=True)
-            ax.legend(frameon=False)
-        else:
-            ax.set_yticks([])
-            sns.despine(ax=ax, left=True, offset=5, trim=True)
-    ax2 = fig.add_subplot(gs[-1])
-    ax2.hist(r_spikes, bins=50, range=yrange, orientation="horizontal", color="gray", edgecolor="gray")
-    ax2.set_title("all_gids\n(n=%i)" % n_all)
-    ax2.set_ylim(yrange)
-    ax2.set_yticks([])
-    ax2.set_xscale("log")
-    sns.despine(ax=ax2, left=True, offset=5, trim=True)
-    fig.tight_layout()
+def plot_r_spikes(gids, r_spikes, loc_df, fig_name):
+    """Plots spike time reliability (for all gids)"""
+    yticks, yticklabels = _get_depth_yticks(loc_df)
+    fig = plt.figure(figsize=(4, 6))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.scatter(r_spikes, loc_df.loc[gids, "depth"].to_numpy(),
+               color="black", alpha=0.5, marker='.', s=5, edgecolor="none")
+    ax.set_xlim([np.min(r_spikes), np.max(r_spikes)])
+    ax.set_xlabel("r_spike")
+    ax.set_ylim([loc_df["depth"].max(), loc_df["depth"].min()])
+    ax.set_yticks(yticks)
+    ax.set_yticklabels([label[0:2] for label in yticklabels])
+    sns.despine(offset=2)
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 
 
-def plot_consensus_t_in_bin(consensus_gids, all_gids, consenus_mean_ts, consenus_std_ts, mean_ts, std_ts,
-                            ystuff, depths, bin_size, fig_name):
-    """Plots time in bin for consensus assemblies"""
-    n = len(consenus_mean_ts)
-    cmap = plt.cm.get_cmap("tab20", n)
-    yrange = [ystuff["hlines"][-1], ystuff["hlines"][0]]
-    c_version = _guess_circuit_version(ystuff["hlines"])
+def plot_consensus_r_spikes(df, fig_name):
+    """Plots spike time reliability for consensus assemblies"""
+    yrange = [df["r_spike"].min(), df["r_spike"].max()]
+    df_cons_assembly = df.loc[df["consensus assembly id"] != "non assembly"]
+    order = np.sort(df_cons_assembly["consensus assembly id"].unique().astype(int))
+    cmap = plt.cm.get_cmap("tab20", len(order))
+    palette = [colors.to_rgb(cmap(i)) for i in order]
+    order = order.astype(str)
 
     fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(1, n+1)
-    for i in range(n):
-        ax = fig.add_subplot(gs[i])
-        gid_depths = depths.loc[consensus_gids[i]].to_numpy()
-        color = colors.to_hex(cmap(i))
-        errorevery = 10 if consensus_gids[i].shape[0] > 2000 else 1
-        ax.errorbar(consenus_mean_ts[i], gid_depths, xerr=consenus_std_ts[i], color=color,
-                    fmt="none", alpha=0.5, lw=0.1, errorevery=errorevery)
-        ax.scatter(consenus_mean_ts[i], gid_depths,
-                   color=color, alpha=0.5, marker='.', s=5, edgecolor="none")
-        if c_version == "v5":
-            for j in range(1, 5):
-                ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
-        ax.set_xlim([0, bin_size])
-        ax.set_title("cons%s\n(n=%i)" % (i + 1, consensus_gids[i].shape[0]))
-        ax.set_ylim(yrange)
-        if i == 0:
-            ax.set_yticks(ystuff["yticks"])
-            ax.set_yticklabels([label[0:2] for label in ystuff["yticklabels"]])
-            sns.despine(ax=ax, offset=5)
-        else:
-            ax.set_yticks([])
-            sns.despine(ax=ax, left=True, offset=5)
-
-    ax = fig.add_subplot(gs[-1])
-    gid_depths = depths.loc[all_gids].to_numpy()
-    ax.errorbar(mean_ts, gid_depths, xerr=std_ts, color="black",
-                fmt="none", alpha=0.5, lw=0.1, errorevery=10)
-    ax.scatter(mean_ts, gid_depths,
-               color="black", alpha=0.5, marker='.', s=5, edgecolor="none")
-    if c_version == "v5":
-        for j in range(1, 5):
-            ax.axhline(ystuff["hlines"][j], color="gray", ls="--")
-    ax.set_xlim([0, bin_size])
-    ax.set_title("all_gids\n(n=%i)" % all_gids.shape[0])
+    gs = gridspec.GridSpec(1, 2, width_ratios=[len(order), 1])
+    ax = fig.add_subplot(gs[0])
+    sns.violinplot(x="consensus assembly id", y="r_spike", order=order,
+                   scale="count", bw="silverman", cut=1, inner=None, palette=palette, data=df_cons_assembly, ax=ax)
+    ax.legend([], [], frameon=False)
+    ax.set_xlabel('')
     ax.set_ylim(yrange)
-    ax.set_yticks([])
-    sns.despine(ax=ax, left=True, offset=5)
-    fig.add_subplot(1, 1, 1, frameon=False)
-    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
-    plt.xlabel("Spike time in bin (ms)")
+    ax2 = fig.add_subplot(gs[1])
+    sns.violinplot(x="consensus assembly id", y="r_spike", scale="count", bw="silverman", cut=1, inner=None,
+                   color="black", data=df.loc[df["consensus assembly id"] == "non assembly"], ax=ax2)
+    ax2.legend([], [], frameon=False)
+    ax2.set_xlabel('')
+    ax2.set_ylim(yrange)
+    sns.despine(bottom=True, trim=True)
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
@@ -655,7 +654,7 @@ def plot_coreness_r_spike(r_spikes, coreness, fig_name):
     """Plots corenss vs. spike time reliability"""
     n = len(coreness)
     cmap = plt.cm.get_cmap("tab20", n)
-    max_r = np.max([np.nanmax(r_spikes_) for r_spikes_ in r_spikes])
+    max_r = np.max([np.max(r_spikes_) for r_spikes_ in r_spikes])
 
     fig = plt.figure(figsize=(20, 8))
     gs = gridspec.GridSpec(np.floor_divide(n, 5)+1, 5)
@@ -670,33 +669,10 @@ def plot_coreness_r_spike(r_spikes, coreness, fig_name):
         ax.set_ylim([0, max_r])
         sns.despine(ax=ax, offset=True, trim=True)
     fig.tight_layout()
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
-    plt.close(fig)
-
-
-def plot_coreness_t_in_bin(mean_ts, std_ts, coreness, bin_size, fig_name):
-    """Plots corenss vs. spike time in bin"""
-    n = len(coreness)
-    cmap = plt.cm.get_cmap("tab20", n)
-
-    fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(np.floor_divide(n, 5) + 1, 5)
-    for i in range(n):
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
-        color = colors.to_hex(cmap(i))
-        errorevery = 10 if coreness[i].shape[0] > 2000 else 1
-        ax.errorbar(coreness[i], mean_ts[i], yerr=std_ts[i], color=color,
-                    fmt="none", alpha=0.5, lw=0.1, errorevery=errorevery)
-        ax.scatter(coreness[i], mean_ts[i],
-                   color=color, alpha=0.5, marker='.', s=5, edgecolor="none")
-        ax.set_title("union%i\n(n=%i)" % (i + 1, coreness[i].shape[0]))
-        ax.axvline(4., color="gray", ls="--")
-        ax.set_xticks([0, 4, 5])
-        ax.set_xlim([0, 5.1])
-        ax.set_yticks([0, bin_size/2, bin_size])
-        ax.set_ylim([0, bin_size])
-        sns.despine(ax=ax, offset=True, trim=True)
-    fig.tight_layout()
+    # fig.add_subplot(1, 1, 1, frameon=False)
+    # plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    # plt.xlabel("Coreness")
+    # plt.ylabel("r_spike")
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 
@@ -749,18 +725,14 @@ def plot_n_assemblies(stim_times, patterns, n_assemblies, t_chunks, fig_name):
     plt.close(fig)
 
 
-def plot_assembly_intersection_corr(intersection_corrs, xlabel, ylabel, fig_name):
+def plot_assembly_similarities(similarities, xlabel, ylabel, fig_name):
     """Plots similarity matrix of assemblies"""
-    abs_max = np.max(np.abs(intersection_corrs))
     fig = plt.figure(figsize=(10, 9))
     ax = fig.add_subplot(1, 1, 1)
-    i = ax.imshow(intersection_corrs, cmap="coolwarm", aspect="auto", interpolation="none",
-                  vmin=-abs_max, vmax=abs_max)
-    fig.colorbar(i, label="intersection correlation")
+    i = ax.imshow(similarities, cmap="inferno", aspect="auto", interpolation="none",)
+    fig.colorbar(i, label="Jaccard similarity")
     ax.set_xlabel(xlabel)
-    # ax.set_xticks([i for i in range(intersection_corrs.shape[0])])
     ax.set_ylabel(ylabel)
-    # ax.set_xticks([i for i in range(intersection_corrs.shape[1])])
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 

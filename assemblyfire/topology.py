@@ -1,11 +1,15 @@
 """
 Advanced network metrics on ConnectivityMatrix (now in `conntility`)
 authors: Daniela Egas Santander, Nicolas Ninin, András Ecker
-last modified: 10.2022
+last modified: 01.2023
 """
 
-import numpy as np
 from tqdm import tqdm
+import numpy as np
+import pandas as pd
+from scipy.stats import binom
+from pyitlib import discrete_random_variable as drv
+
 from conntility.connectivity import ConnectivityMatrix
 
 
@@ -166,4 +170,97 @@ def simplex_counts_consensus_core_union_intersection(consensus_assemblies_dict, 
         s_c_union[k] = conn_mat.simplex_counts(consensus_assembly.union)
         s_c_intersection[k] = conn_mat.simplex_counts(intersection_gids_dict[k])
     return s_c_core, s_c_intersection
+
+
+def bin_gids_by_innervation(all_indegrees, gids, n_bins):
+    """Creates lookups of gids in optimal bins for each pre-synaptic group (in terms of in-degree)
+    works with both dictionary and DataFrame (column-wise)"""
+    binned_gids, bin_centers_dict, bin_idx_dict = {key: {} for key in list(all_indegrees.keys())}, {}, {}
+    for key, indegrees in all_indegrees.items():
+        if isinstance(indegrees, pd.Series):
+            indegrees = indegrees.to_numpy()
+        idx = np.where(indegrees >= 0.)[0]  # sometimes -1s are used as placeholders...
+        gids_tmp, indegrees = gids[idx], indegrees[idx]
+        bin_edges = np.hstack(([0], np.linspace(np.percentile(indegrees[indegrees != 0], 1),
+                                                np.percentile(indegrees[indegrees != 0], 99), n_bins)))
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+        bin_centers_dict[key] = bin_centers
+        bin_idx = np.digitize(indegrees, bin_edges, right=True)
+        bin_idx_dict[key] = bin_idx
+        for i, center in enumerate(bin_centers):
+            binned_gids[key][center] = gids_tmp[bin_idx == i+1]
+    return binned_gids, bin_centers_dict, bin_idx_dict
+
+
+def prob_with_binom_ci(samples, min_n):
+    """Probability (just as the mean of samples) and binomial distribution based confidence interval"""
+    samples = samples.astype(bool)
+    n_samples = len(samples)
+    if n_samples < min_n:
+        return np.nan, np.nan, np.nan
+    p = np.linspace(0, 1, 100)
+    p_n_cond_p = binom(n_samples, p).pmf(np.sum(samples))
+    p_p_post = p_n_cond_p / np.sum(p_n_cond_p)
+    return np.mean(samples), np.interp(0.05, np.cumsum(p_p_post), p), np.interp(0.95, np.cumsum(p_p_post), p)
+
+
+def assembly_membership_probability(gids, assembly_grp, binned_gids, bin_centers, bin_min_n):
+    """Gets membership probability (and CI) for all gids in all assemblies (using pre-binned indegrees)"""
+    chance_levels = {}
+    keys = list(binned_gids.keys())
+    bin_centers_plot, assembly_probs = {key: {} for key in keys}, {key: {} for key in keys}
+    assembly_probs_low, assembly_probs_high = {key: {} for key in keys}, {key: {} for key in keys}
+    for assembly in assembly_grp.assemblies:
+        assembly_id = assembly.idx[0]
+        idx = np.in1d(gids, assembly.gids, assume_unique=True)
+        chance_levels[assembly_id] = np.sum(idx) / len(idx)
+        for key, binned_gids_tmp in binned_gids.items():
+            bin_centers_plot[key][assembly_id] = bin_centers[key]
+            probs = np.zeros_like(bin_centers[key], dtype=np.float32)
+            probs_low, probs_high = np.zeros_like(probs), np.zeros_like(probs)
+            for i, bin_center in enumerate(bin_centers[key]):
+                idx = np.in1d(binned_gids_tmp[bin_center], assembly.gids, assume_unique=True)
+                probs[i], probs_low[i], probs_high[i] = prob_with_binom_ci(idx, bin_min_n)
+            assembly_probs[key][assembly_id] = probs
+            assembly_probs_low[key][assembly_id] = probs_low
+            assembly_probs_high[key][assembly_id] = probs_high
+    return bin_centers_plot, assembly_probs, assembly_probs_low, assembly_probs_high, chance_levels
+
+
+def _sign(bin_centers, probs, counts=None):
+    """Gets sign of line fitted to assembly probs. vs. indegree"""
+    return np.sign(np.polyfit(bin_centers, probs, 1, w=counts)[0])
+
+
+def assembly_rel_frac_entropy_explained(gids, assembly_grp, bin_centers, bin_idx, seed, bin_min_n, sign_th):
+    """Gets mutual information between assembly membership and structural innervation (using pre-binned indegrees)"""
+    if isinstance(seed, str):
+        seed = int(seed.split("seed")[1])
+    keys = np.sort(list(bin_idx.keys()))
+    assembly_idx = np.sort([assembly.idx[0] for assembly in assembly_grp.assemblies])
+    mi_matrix = np.zeros((len(keys), len(assembly_idx)), dtype=np.float32)
+    mi_ctrl_matrix = np.zeros_like(mi_matrix)
+    for j, assembly_id in enumerate(assembly_idx):
+        for i, key in enumerate(keys):
+            idx = np.in1d(gids, assembly_grp.loc((assembly_id, seed)).gids, assume_unique=True)
+            bin_idx_ = bin_idx[key].copy()
+            mi = drv.information_mutual(idx, bin_idx_) / drv.entropy(idx)
+            mi_ctrl = drv.information_mutual(idx, np.random.permutation(bin_idx_)) / drv.entropy(idx)
+            # recalculate assembly probability for line fitting
+            # (could be passed from `get_assembly_membership_probability()` but whatever...)
+            probs = np.zeros_like(bin_centers[key], dtype=np.float32)
+            counts = np.zeros_like(probs, dtype=int)
+            for k, center in enumerate(bin_centers[key]):
+                tmp = idx[bin_idx_ == k + 1]
+                counts[k], probs[k] = len(tmp), np.mean(tmp)
+            valid_n_idx = np.where(counts >= bin_min_n)
+            mi_sign = _sign(bin_centers[key][valid_n_idx], probs[valid_n_idx], counts[valid_n_idx])
+            mi_matrix[i, j] = mi_sign * mi
+            mi_ctrl_matrix[i, j] = mi_ctrl
+    # set values that are smaller than control mean + significance threshold * control std to nan...
+    if sign_th > 0:
+        mi_matrix[np.abs(mi_matrix) < (np.mean(mi_ctrl_matrix) + sign_th * np.std(mi_ctrl_matrix))] = np.nan
+    ratio = (np.nanmean(np.abs(mi_matrix)) - np.mean(mi_ctrl_matrix)) / np.std(mi_ctrl_matrix)
+    print("MI ratio (between data and shuffled/control data): %.2f" % ratio)
+    return pd.DataFrame(data=mi_matrix, columns=assembly_idx, index=keys)
 
