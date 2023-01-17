@@ -1,12 +1,12 @@
-# -*- coding: utf-8 -*-
 """
 CLI to detect and analyse cell assemblies
  * `assemblyfire assemblies config_path`: detect assemblies in spiking data
  * `assemblyfire consensus config_path`: create consensus assemblies from assemblies across seeds
  * `assemblyfire conn-mat config_path`: gets connectivity matrix
  * `assemblyfire syn-clust config_path`: finds clusters of synapses in assembly neurons
+ * `assemblyfire syn-nnd config_path assembly_group_name`: gets synapses nearest neighbour distances
  * `assemblyfire single-cell config_path`: gets single cell features from simulations
-last modified: Thomas Delemontex, András Ecker 11.2020
+last modified: Thomas Delemontex, András Ecker 01.2023
 """
 
 import click
@@ -59,6 +59,17 @@ def syn_clust(config_path, debug):
     """CLI for `find_synapse_clusters.py/run()`"""
     from assemblyfire.find_synapse_clusters import run
     run(config_path, debug)
+
+
+@cli.command()
+@click.argument("config_path", required=True)
+@click.argument("assembly_grp_name", required=True)
+@click.argument("buf_size", required=False, default=100)
+@click.argument("seed", required=False, default=100)
+def syn_nnd(config_path, assembly_grp_name, buf_size, seed):
+    """CLI for `get_synapse_nnds.py/run()`"""
+    from assemblyfire.get_synapse_nnds import run
+    run(config_path, assembly_grp_name, buf_size, seed)
 
 
 @cli.command()
