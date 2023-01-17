@@ -315,6 +315,21 @@ def _read_h5_metadata(h5f, group_name=None, prefix=None):
     return metadata
 
 
+def load_spikes_from_h5(h5f_name, prefix="spikes"):
+    """Load spike matrices over seeds from saved h5 file"""
+    h5f = h5py.File(h5f_name, "r")
+    seeds = list(h5f[prefix].keys())
+    project_metadata = _read_h5_metadata(h5f, prefix=prefix)
+    prefix_grp = h5f[prefix]
+    spike_matrix_dict = {}
+    for seed in seeds:
+        spike_matrix_dict[seed] = SpikeMatrixResult(prefix_grp[seed]["spike_matrix"][:],
+                                                    prefix_grp[seed]["gids"][:],
+                                                    prefix_grp[seed]["t_bins"][:])
+    h5f.close()
+    return spike_matrix_dict, project_metadata
+
+
 def load_assemblies_from_h5(h5f_name, prefix="assemblies"):
     """Load assemblies over seeds from saved h5 file into dict of AssemblyGroups"""
     from assemblyfire.assemblies import AssemblyGroup
@@ -335,19 +350,18 @@ def load_consensus_assemblies_from_h5(h5f_name, prefix="consensus"):
     return {k: ConsensusAssembly.from_h5(h5f_name, k, prefix=prefix) for k in keys}
 
 
-def load_spikes_from_h5(h5f_name, prefix="spikes"):
-    """Load spike matrices over seeds from saved h5 file"""
-    h5f = h5py.File(h5f_name, "r")
-    seeds = list(h5f[prefix].keys())
-    project_metadata = _read_h5_metadata(h5f, prefix=prefix)
-    prefix_grp = h5f[prefix]
-    spike_matrix_dict = {}
-    for seed in seeds:
-        spike_matrix_dict[seed] = SpikeMatrixResult(prefix_grp[seed]["spike_matrix"][:],
-                                                    prefix_grp[seed]["gids"][:],
-                                                    prefix_grp[seed]["t_bins"][:])
-    h5f.close()
-    return spike_matrix_dict, project_metadata
+def consensus_dict2assembly_grp(consensus_assemblies):
+    """Create AssemblyGroup (object) from dictionary of consensus assemblies
+    (AssemblyGroups are used by several functions investigating connectivity to iterate over assemblies...)"""
+    from assemblyfire.assemblies import AssemblyGroup
+    cons_assembly_idx = np.sort([int(key.split("cluster")[1]) for key in list(consensus_assemblies.keys())])
+    all_gids, assembly_lst = [], []
+    for cons_assembly_id in cons_assembly_idx:
+        cons_assembly = consensus_assemblies["cluster%i" % cons_assembly_id]
+        all_gids.extend(cons_assembly.union.gids)
+        cons_assembly.idx = (cons_assembly_id, "consensus")
+        assembly_lst.append(cons_assembly)
+    return AssemblyGroup(assemblies=assembly_lst, all_gids=np.unique(all_gids), label="ConsensusGroup")
 
 
 def load_single_cell_features_from_h5(h5f_name, prefix="single_cell"):
