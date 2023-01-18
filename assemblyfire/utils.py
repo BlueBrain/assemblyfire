@@ -368,22 +368,26 @@ def load_syn_nnd_from_h5(h5f_name, n_assemblies, prefix):
     """Loads synapse nearest neighbour results from h5 file
     pd.read_hdf() doesn't understand the structure, so we need to create an object, and access the DataFrame..."""
     from assemblyfire.syn_nnd import SynNNDResults
-    results = SynNNDResults(h5f_name, n_assemblies, prefix)
-    df = results._df.copy()  # TODO: fix the access in the class
-    df.set_index(("gid", "gid"), inplace=True)
-    df.index = df.index.astype(int)  # studpid pandas
-    df.index.name = "gid"  # studpid pandas
-    return df.sort_index()
+    h5f = h5py.File(h5f_name, "r")
+    if prefix in list(h5f.keys()):
+        results = SynNNDResults(h5f_name, n_assemblies, prefix)
+        df = results._df.copy()  # TODO: fix the access in the class
+        df.set_index(("gid", "gid"), inplace=True)
+        df.index = df.index.astype(int)  # studpid pandas
+        df.index.name = "gid"  # studpid pandas
+        return df.sort_index()
+    else:
+        warnings.warn("Prefix: %s not found in HDF5: %s keys. Returning `None`" % (prefix, h5f_name))
+        return None
 
 
 def load_single_cell_features_from_h5(h5f_name, prefix="single_cell"):
     """Load spike matrices over seeds from saved h5 file"""
     h5f = h5py.File(h5f_name, "r")
-    project_metadata = _read_h5_metadata(h5f, prefix=prefix)
     prefix_grp = h5f[prefix]
     single_cell_features = {"gids": prefix_grp["gids"][:], "r_spikes": prefix_grp["r_spikes"][:]}
     h5f.close()
-    return single_cell_features, project_metadata
+    return single_cell_features
 
 
 def read_cluster_seq_data(h5f_name):
