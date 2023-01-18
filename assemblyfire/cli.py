@@ -89,4 +89,5 @@ def clean_h5(config_path, prefix):
     from assemblyfire.config import Config
     config = Config(config_path)
     h5f = h5py.File(config.h5f_name, "a")
+    assert prefix in list(h5f.keys())
     del h5f[prefix]
