@@ -468,8 +468,8 @@ def plot_assembly_prob_from(bin_centers, assembly_probs, assembly_probs_low, ass
         ax.set_title("Assembly %s" % assembly_label)
         if logx:
             ax.set_xscale("log")
-        else:
-            ax.set_xlim(left=0)
+        # else:
+            # ax.set_xlim(left=0)
         ax.set_ylim([0, 1])
     sns.despine(trim=True, offset=2)
     fig.add_subplot(1, 1, 1, frameon=False)

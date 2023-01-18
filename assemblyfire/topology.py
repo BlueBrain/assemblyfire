@@ -179,16 +179,19 @@ def bin_gids_by_innervation(all_indegrees, gids, n_bins):
     for key, indegrees in all_indegrees.items():
         if isinstance(indegrees, pd.Series):
             indegrees = indegrees.to_numpy()
-        idx = np.where(indegrees >= 0.)[0]  # sometimes -1s are used as placeholders...
-        gids_tmp, indegrees = gids[idx], indegrees[idx]
-        bin_edges = np.hstack(([0], np.linspace(np.percentile(indegrees[indegrees != 0], 1),
-                                                np.percentile(indegrees[indegrees != 0], 99), n_bins)))
+        if np.any(indegrees < 0):  # to deal with zsored values...
+            idx = ~np.isnan(indegrees)
+            bin_edges = np.linspace(np.percentile(indegrees[idx], 1), np.percentile(indegrees[idx], 99), n_bins + 1)
+            indegrees[~idx] = np.min(indegrees)  # replace NaNs with minimum value (to not break stuff afterwards)
+        else:
+            bin_edges = np.hstack(([0], np.linspace(np.percentile(indegrees[indegrees != 0], 1),
+                                                    np.percentile(indegrees[indegrees != 0], 99), n_bins)))
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         bin_centers_dict[key] = bin_centers
         bin_idx = np.digitize(indegrees, bin_edges, right=True)
         bin_idx_dict[key] = bin_idx
         for i, center in enumerate(bin_centers):
-            binned_gids[key][center] = gids_tmp[bin_idx == i+1]
+            binned_gids[key][center] = gids[bin_idx == i+1]
     return binned_gids, bin_centers_dict, bin_idx_dict
 
 
