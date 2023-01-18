@@ -13,6 +13,8 @@ import assemblyfire.utils as utils
 import assemblyfire.topology as topology
 import assemblyfire.plots as plots
 
+DSET_CLST = "strength"
+
 
 def assembly_efficacy(config, assembly_grp_dict):
     """Plots synapses initialized at depressed (rho=0) and potentiated (rho=1) states"""
@@ -46,7 +48,6 @@ def assembly_simplex_counts(assembly_grp_dict, conn_mat, fig_path):
 def assembly_prob_mi_from_indegree(assembly_grp_dict, conn_mat, fig_path, n_bins=21, bin_min_n=10, sign_th=2):
     """Plots assembly probabilities and (relative) fraction of entropy explained from indegrees"""
     gids = conn_mat.gids
-    # assembly_indegrees_dict = {}
     for seed, assembly_grp in assembly_grp_dict.items():
         assembly_indegrees = {assembly.idx[0]: conn_mat.degree(assembly.gids, gids)
                               for assembly in assembly_grp.assemblies}
@@ -62,8 +63,6 @@ def assembly_prob_mi_from_indegree(assembly_grp_dict, conn_mat, fig_path, n_bins
                                                           seed, bin_min_n, sign_th)
         fig_name = os.path.join(fig_path, "frac_entropy_explained_by_recurrent_innervation_%s.png" % seed)
         plots.plot_frac_entropy_explained_by(mi, "Innervation by assembly", fig_name)
-
-    # return assembly_indegrees_dict
 
 
 def assembly_prob_mi_from_sinks(assembly_grp_dict, conn_mat, palette, fig_path, n_bins=21, bin_min_n=10, sign_th=2):
@@ -101,65 +100,35 @@ def assembly_prob_mi_from_sinks(assembly_grp_dict, conn_mat, palette, fig_path, 
         plots.plot_assembly_prob_from(*plot_args, "Generalized in degree (#simplex sinks)", palette, fig_name, True)
 
 
-'''TODO: replace this with Michael's implementation
-def _nnd_df_to_dict(nnd_df):
-    """Converts DataFrame from `clustering.syn_nearest_neighbour_distances()` to the dict format
-    which is compatible with the `_bin_gids_by_innervation()` helper functions above"""
-    gids = nnd_df.index.to_numpy()
-    assembly_idx = nnd_df.columns.to_numpy()
-    return {assembly_id: nnd_df[assembly_id].to_numpy() for assembly_id in assembly_idx}, gids
+def assembly_prob_mi_from_syn_nnd(assembly_grp_dict, h5f_name, fig_path, n_bins=21, bin_min_n=10, sign_th=2):
+    """Plots assembly probabilities and (relative) fraction of entropy explained from
+    synapse nearest neighbour distance 'strength' (converts low distances to high 'strength' values)
+    (Because these calculations are not parallelized yet it's loading data from HDF5)"""
 
-
-def frac_entropy_explained_by_syn_nnd(config, min_samples=100):
-    """Loads in assemblies and for each (sub)target neurons calculates the (normalized) nearest neighbour distance
-    for assembly synapses (which is meant to be a parameter free measure of synapse clustering) and plots the prob.
-    of assembly membership vs. this measure"""
-    from assemblyfire.clustering import syn_nearest_neighbour_distances
-
-    assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
-    c = utils.get_bluepy_circuit(utils.get_sim_path(config.root_path).iloc[0])
-    loc_df = utils.get_loc_df(config.syn_clustering_lookup_df_pklfname, c, config.target, config.syn_clustering_target)
-    mtypes = utils.get_mtypes(c, utils.get_gids(c, config.target)).reset_index()
-    mtypes.rename(columns={"index": "gid"}, inplace=True)
-
-    assembly_nnds_dict = {}
     for seed, assembly_grp in assembly_grp_dict.items():
-        ctrl_assembly_grp = assembly_grp.random_categorical_controls(mtypes, "mtype")
-        assembly_nnds, ctrl_nnds = syn_nearest_neighbour_distances(loc_df, assembly_grp, ctrl_assembly_grp)
-        assembly_nnds_dict[seed] = assembly_nnds
-        binned_gids, bin_centers = _bin_gids_by_innervation(*_nnd_df_to_dict(assembly_nnds), min_samples)
+        syn_nnds = utils.load_syn_nnd_from_h5(h5f_name, len(assembly_grp), prefix="%s_syn_nnd" % seed)
+        if len(syn_nnds):  # since this runs forever one might not have the results for all seeds
+            # index out synapse nearest neighbour "strength" from MI DF
+            assembly_idx = syn_nnds.columns.get_level_values(0).unique().to_numpy()
+            df = syn_nnds.loc[:, (assembly_idx, DSET_CLST)]
+            df.columns = [int(assembly_id.split("assembly")[1]) for assembly_id in assembly_idx]
+            df = -1 * df  # TODO: get rid of this when the new results are ready (the new code takes this *-1 into acc.)
+            gids = df.index.to_numpy()
+            # from here it's the same as the other functions with dicts built on the fly
+            binned_gids, bin_centers, bin_idx = topology.bin_gids_by_innervation(df, gids, n_bins)
 
-        chance_levels = {}
-        bin_centers_plot = {pre_assembly: {} for pre_assembly in list(binned_gids.keys())}
-        assembly_probs = {pre_assembly: {} for pre_assembly in list(binned_gids.keys())}
-        assembly_mi = {pre_assembly: {} for pre_assembly in list(binned_gids.keys())}
-        for assembly in assembly_grp.assemblies:
-            assembly_id = assembly.idx[0]
-            idx = np.in1d(assembly_nnds[assembly_id].to_numpy(), assembly.gids, assume_unique=True)
-            chance_levels[assembly_id] = idx.sum() / len(idx)
-            for pre_assembly, binned_gids_tmp in binned_gids.items():
-                probs, counts, vals = [], [], []
-                for bin_center in bin_centers[pre_assembly]:
-                    idx = np.in1d(binned_gids_tmp[bin_center], assembly.gids, assume_unique=True)
-                    probs.append(idx.sum() / len(idx))
-                    counts.append(len(binned_gids_tmp[bin_center]))
-                    vals.append(bin_center)
-                bin_centers_plot[pre_assembly][assembly_id] = bin_centers[pre_assembly]
-                assembly_probs[pre_assembly][assembly_id] = np.array(probs)
-                me, pe = _mi_implementation(counts, probs)
-                assembly_mi[pre_assembly][assembly_id] = _sign_of_correlation(vals, probs) * (1.0 - pe / me)
+            plot_args = topology.assembly_membership_probability(gids, assembly_grp, binned_gids, bin_centers, bin_min_n)
+            fig_name = os.path.join(fig_path, "assembly_prob_from_syn_nnd_%s.png" % seed)
+            palette = {assembly.idx[0]: "pre_assembly_color" for assembly in assembly_grp.assemblies}
+            plots.plot_assembly_prob_from(*plot_args, "Zscored synapse nnd. strength", palette, fig_name)
 
-        fig_name = os.path.join(config.fig_path, "assembly_prob_from_syn_nearest_neighbour_%s.png" % seed)
-        palette = {assembly.idx[0]: "pre_assembly_color" for assembly in assembly_grp.assemblies}
-        plots.plot_assembly_prob_from(bin_centers_plot, assembly_probs, chance_levels,
-                                      "Synapse nearest neighbour distance", palette, fig_name)
-        fig_name = os.path.join(config.fig_path, "frac_entropy_explained_by_syn_nearest_neighbour_%s.png" % seed)
-        plots.plot_frac_entropy_explained_by(pd.DataFrame(assembly_mi).transpose(),
-                                             "Synapse nearest neighbour from assembly", fig_name)
-
-    return assembly_nnds_dict
+            mi = topology.assembly_rel_frac_entropy_explained(gids, assembly_grp, bin_centers, bin_idx,
+                                                              seed, bin_min_n, sign_th)
+            fig_name = os.path.join(fig_path, "frac_entropy_explained_by_syn_nnd_%s.png" % seed)
+            plots.plot_frac_entropy_explained_by(mi, "Synapse nnd. strength from assembly", fig_name)
 
 
+'''TODO: replace this with Michael's implementation
 def assembly_prob_from_indegree_and_syn_nnd(config, assembly_indegrees_dict, assembly_nnds_dict,
                                             palette, min_samples=100):
     """Combines previous results and weights indegrees with synapse neighbour distances
@@ -323,22 +292,22 @@ def assembly_prob_mi_from_patterns(assembly_grp_dict, pattern_indegrees, gids, f
 
 
 if __name__ == "__main__":
-    config = Config("../configs/v7_10seeds_np.yaml")
+    config = Config("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_10seeds_np.yaml")
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
     conn_mat = topology.AssemblyTopology.from_h5(config.h5f_name, prefix=config.h5_prefix_connectivity)
+    fig_path = config.fig_path
 
     # assembly_efficacy(config, assembly_grp_dict)
-    assembly_in_degrees(assembly_grp_dict, conn_mat, config.fig_path)
-    assembly_simplex_counts(assembly_grp_dict, conn_mat, config.fig_path)
-    assembly_prob_mi_from_indegree(assembly_grp_dict, conn_mat, config.fig_path)
-    assembly_prob_mi_from_sinks(assembly_grp_dict, conn_mat, {2: "gray", 3: "black", 4: "assembly_color"},
-                                config.fig_path)
-    # assembly_nnds = frac_entropy_explained_by_syn_nnd(config)
+    assembly_in_degrees(assembly_grp_dict, conn_mat, fig_path)
+    assembly_simplex_counts(assembly_grp_dict, conn_mat, fig_path)
+    assembly_prob_mi_from_indegree(assembly_grp_dict, conn_mat, fig_path)
+    assembly_prob_mi_from_sinks(assembly_grp_dict, conn_mat, {2: "gray", 3: "black", 4: "assembly_color"}, fig_path)
+    assembly_prob_mi_from_syn_nnd(assembly_grp_dict, config.h5f_name, fig_path)
     # assembly_prob_from_indegree_and_syn_nnd(config, assembly_indegrees, assembly_nnds,
     #                                         {"below avg.": "assembly_color", "avg.": "gray", "above avg.": "black"})
 
     conn_matrices, proj_indegrees, pattern_indegrees, gids = get_proj_innervation(config)
-    n_assemblies_from_projs(assembly_grp_dict, proj_indegrees, gids, config.fig_path)
-    assembly_prob_mi_from_proj_ci(assembly_grp_dict, conn_matrices, gids, config.fig_path)
-    assembly_prob_mi_from_patterns(assembly_grp_dict, pattern_indegrees, gids, config.fig_path)
+    n_assemblies_from_projs(assembly_grp_dict, proj_indegrees, gids, fig_path)
+    assembly_prob_mi_from_proj_ci(assembly_grp_dict, conn_matrices, gids, fig_path)
+    assembly_prob_mi_from_patterns(assembly_grp_dict, pattern_indegrees, gids, fig_path)
 
