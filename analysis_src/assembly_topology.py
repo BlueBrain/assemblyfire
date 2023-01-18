@@ -14,6 +14,7 @@ import assemblyfire.topology as topology
 import assemblyfire.plots as plots
 
 DSET_CLST = "strength"
+DSET_DEG = "degree"
 
 
 def assembly_efficacy(config, assembly_grp_dict):
@@ -126,6 +127,31 @@ def assembly_prob_mi_from_syn_nnd(assembly_grp_dict, h5f_name, fig_path, n_bins=
                                                               seed, bin_min_n, sign_th)
             fig_name = os.path.join(fig_path, "frac_entropy_explained_by_syn_nnd_%s.png" % seed)
             plots.plot_frac_entropy_explained_by(mi, "Synapse nnd. strength from assembly", fig_name)
+
+
+def assembly_prob_mi_from_syn_nnd_weighted_indegree(assembly_grp_dict, h5f_name, fig_path, n_bins=21, sign_th=2):
+    """TODO"""
+    for seed, assembly_grp in assembly_grp_dict.items():
+        syn_nnds = utils.load_syn_nnd_from_h5(h5f_name, len(assembly_grp), prefix="%s_syn_nnd" % seed)
+        if len(syn_nnds):  # since this runs forever one might not have the results for all seeds
+            assembly_idx = syn_nnds.columns.get_level_values(0).unique().to_numpy()
+            # quickly check if the syn nnd. strength and indegree are correlated
+            fig_name = os.path.join(fig_path, "syn_nnd_indegree_corr_%s.png" % seed)
+            plot_joint_dists(-1 * syn_nnds.loc[:, (assembly_idx, DSET_CLST)].to_numpy().flatten(),
+                             syn_nnds.loc[:, (assembly_idx, DSET_DEG)].to_numpy().flatten(),
+                             DSET_CLST, DSET_DEG, fig_name)
+
+            df = syn_nnds.loc[:, (assembly_idx, DSET_CLST)]
+            df.columns = [int(assembly_id.split("assembly")[1]) for assembly_id in assembly_idx]
+            df = -1 * df  # TODO: get rid of this when the new results are ready (the new code takes this *-1 into acc.)
+            gids = df.index.to_numpy()
+            _, _, bin_idx = topology.bin_gids_by_innervation(df, gids, n_bins)
+            df = syn_nnds.loc[:, (assembly_idx, DSET_DEG)]
+            df.columns = [int(assembly_id.split("assembly")[1]) for assembly_id in assembly_idx]
+            _, _, bin_idx_cond = topology.bin_gids_by_innervation(df, gids, n_bins)
+            mi = topology.assembly_cond_frac_entropy_explained(gids, assembly_grp, bin_idx, bin_idx_cond, seed, sign_th)
+            fig_name = os.path.join(fig_path, "cond_frac_entropy_explained_nnd|indegree_%s.png" % seed)
+            plots.plot_frac_entropy_explained_by(mi, "Synapse nnd. strength | indegree from assembly", fig_name)
 
 
 '''TODO: replace this with Michael's implementation

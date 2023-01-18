@@ -431,6 +431,36 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"
     plt.close(fig)
 
 
+def plot_simplex_counts(simplex_counts, simplex_counts_control, fig_name):
+    """Plots simplex counts for assemblies (within one seed) and random controls"""
+    assembly_labels = list(simplex_counts.keys())
+    n = len(assembly_labels)
+    cmap = plt.cm.get_cmap("tab20", np.max([assembly_label[0] for assembly_label in assembly_labels]) + 1)
+
+    fig = plt.figure(figsize=(20, 8))
+    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
+    gs = gridspec.GridSpec(n_rows, 5)
+    for i, assembly_label in enumerate(assembly_labels):
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
+        ax.plot(simplex_counts[assembly_label], color=cmap(assembly_label[0]), lw=3, label="assembly")
+        ax.plot(simplex_counts_control["n"][assembly_label], color="black", lw=1, ls="--", label="ctrl. n neurons")
+        ax.plot(simplex_counts_control["depths"][assembly_label], color="black", lw=1, ls="-.",
+                label="ctrl. depth profile")
+        ax.plot(simplex_counts_control["mtypes"][assembly_label], color="black", lw=1, label="ctrl. mtype comp.")
+        ax.set_title("Assembly %i" % assembly_label[0])
+        ax.set_yticks([])
+        ax.set_xlim([0, 6])  # TODO not hard code this
+        sns.despine(ax=ax, left=True, offset=5)
+        if i == 0:
+            ax.legend(frameon=False)
+    fig.add_subplot(1, 1, 1, frameon=False)
+    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
+    plt.xlabel("Simplex dimension")
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_assembly_prob_from(bin_centers, assembly_probs, assembly_probs_low, assembly_probs_high, chance_levels,
                             xlabel, palette, fig_name, logx=False):
     """Plots assembly membership probability vs. whatever data `xlabel` is"""
@@ -503,11 +533,15 @@ def plot_assembly_n_from(bin_centers, assembly_probs, assembly_probs_low, assemb
 
 def plot_frac_entropy_explained_by(mi_df, ylabel, fig_name):
     """Plots matrix of entropy explained by innervation (by patterns or internal connections)"""
-    abs_max = np.max(mi_df.abs().to_numpy())
     fig = plt.figure(figsize=(10, 9))
     ax = fig.add_subplot(1, 1, 1)
-    i = ax.imshow(mi_df, cmap="coolwarm", aspect="auto", interpolation="none", vmin=-1*abs_max, vmax=abs_max)
-    fig.colorbar(i, label="Relative loss in entropy")
+    if np.any(mi_df.to_numpy() < 0):  # relative case
+        abs_max = np.nanmax(mi_df.abs().to_numpy())
+        i = ax.imshow(mi_df, cmap="coolwarm", aspect="auto", interpolation="none", vmin=-1*abs_max, vmax=abs_max)
+        fig.colorbar(i, label="Relative loss in entropy")
+    else:  # 'classical' case
+        i = ax.imshow(mi_df, cmap="inferno", aspect="auto", interpolation="none")
+        fig.colorbar(i, label="Loss in entropy")
     ax.set_xticks(np.arange(len(mi_df.columns)))
     ax.set_xticklabels(mi_df.columns.to_numpy())
     ax.set_xlabel("Assembly")
@@ -517,34 +551,21 @@ def plot_frac_entropy_explained_by(mi_df, ylabel, fig_name):
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
 
 
-def plot_simplex_counts(simplex_counts, simplex_counts_control, fig_name):
-    """Plots simplex counts for assemblies (within one seed) and random controls"""
-    assembly_labels = list(simplex_counts.keys())
-    n = len(assembly_labels)
-    cmap = plt.cm.get_cmap("tab20", np.max([assembly_label[0] for assembly_label in assembly_labels]) + 1)
-
-    fig = plt.figure(figsize=(20, 8))
-    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
-    gs = gridspec.GridSpec(n_rows, 5)
-    for i, assembly_label in enumerate(assembly_labels):
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
-        ax.plot(simplex_counts[assembly_label], color=cmap(assembly_label[0]), lw=3, label="assembly")
-        ax.plot(simplex_counts_control["n"][assembly_label], color="black", lw=1, ls="--", label="ctrl. n neurons")
-        ax.plot(simplex_counts_control["depths"][assembly_label], color="black", lw=1, ls="-.",
-                label="ctrl. depth profile")
-        ax.plot(simplex_counts_control["mtypes"][assembly_label], color="black", lw=1, label="ctrl. mtype comp.")
-        ax.set_title("Assembly %i" % assembly_label[0])
-        ax.set_yticks([])
-        ax.set_xlim([0, 6])  # TODO not hard code this
-        sns.despine(ax=ax, left=True, offset=5)
-        if i == 0:
-            ax.legend(frameon=False)
-    fig.add_subplot(1, 1, 1, frameon=False)
-    plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
-    plt.xlabel("Simplex dimension")
-    fig.tight_layout()
+def plot_joint_dists(vars_x, vars_y, xlabel, ylabel, fig_name):
+    """Plots joint distibution of 2 variables (with hexbins and log count)"""
+    idx = np.logical_and(~np.isnan(vars_x), ~np.isnan(vars_y))
+    vars_x, vars_y = vars_x[idx], vars_y[idx]
+    extent = (np.percentile(vars_x, 0.1), np.percentile(vars_x, 99.9),
+              np.percentile(vars_y, 0.1), np.percentile(vars_y, 99.9))
+    fig = plt.figure(figsize=(10, 9))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.hexbin(vars_x, vars_y, gridsize=25, bins="log", extent=extent, cmap="inferno")
+    ax.set_xlim([extent[0], extent[1]])
+    ax.set_xlabel(xlabel)
+    ax.set_ylim([extent[2], extent[3]])
+    ax.set_ylabel(ylabel)
+    sns.despine(trim=True, offset=2)
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
-    plt.close(fig)
 
 
 def plot_assembly_sim_matrix(sim_matrix, n_assemblies, fig_name):

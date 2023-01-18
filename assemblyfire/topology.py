@@ -236,7 +236,8 @@ def _sign(bin_centers, probs, counts=None):
 
 
 def assembly_rel_frac_entropy_explained(gids, assembly_grp, bin_centers, bin_idx, seed, bin_min_n, sign_th):
-    """Gets mutual information between assembly membership and structural innervation (using pre-binned indegrees)"""
+    """Gets mutual information between assembly membership and structural innervation (using pre-binned indegrees)
+    and gives it a sign (hence 'relative') based on fitting the probabilities with a line"""
     if isinstance(seed, str):
         seed = int(seed.split("seed")[1])
     keys = np.sort(list(bin_idx.keys()))
@@ -265,5 +266,31 @@ def assembly_rel_frac_entropy_explained(gids, assembly_grp, bin_centers, bin_idx
         mi_matrix[np.abs(mi_matrix) < (np.mean(mi_ctrl_matrix) + sign_th * np.std(mi_ctrl_matrix))] = np.nan
     ratio = (np.nanmean(np.abs(mi_matrix)) - np.mean(mi_ctrl_matrix)) / np.std(mi_ctrl_matrix)
     print("MI ratio (between data and shuffled/control data): %.2f" % ratio)
+    return pd.DataFrame(data=mi_matrix, columns=assembly_idx, index=keys)
+
+
+def assembly_cond_frac_entropy_explained(gids, assembly_grp, bin_idx, bin_idx_cond, seed, sign_th):
+    """Gets conditional mutual information between assembly membership and structural innervation
+    (using pre-binned indegrees). (Unlike above here it would be hard to define the sign, so we just skip it...)"""
+    if isinstance(seed, str):
+        seed = int(seed.split("seed")[1])
+    keys = np.sort(list(bin_idx.keys()))
+    assembly_idx = np.sort([assembly.idx[0] for assembly in assembly_grp.assemblies])
+    mi_matrix = np.zeros((len(keys), len(assembly_idx)), dtype=np.float32)
+    mi_ctrl_matrix = np.zeros_like(mi_matrix)
+    for j, assembly_id in enumerate(assembly_idx):
+        for i, key in enumerate(keys):
+            idx = np.in1d(gids, assembly_grp.loc((assembly_id, seed)).gids, assume_unique=True)
+            bin_idx_ = bin_idx[key].copy()
+            bin_idx_cond_ = bin_idx_cond[key]
+            mi_matrix[i, j] = drv.information_mutual_conditional(idx, bin_idx_, bin_idx_cond_)\
+                              / drv.entropy_conditional(idx, bin_idx_cond_)
+            mi_ctrl_matrix[i, j] = drv.information_mutual_conditional(idx, np.random.permutation(bin_idx_), bin_idx_cond_)\
+                                   / drv.entropy_conditional(idx, bin_idx_cond_)
+    # set values that are smaller than control mean + significance threshold * control std to nan...
+    if sign_th > 0:
+        mi_matrix[mi_matrix < (np.mean(mi_ctrl_matrix) + sign_th * np.std(mi_ctrl_matrix))] = np.nan
+    ratio = (np.nanmean(mi_matrix) - np.mean(mi_ctrl_matrix)) / np.std(mi_ctrl_matrix)
+    print("Conditional MI ratio (between data and shuffled/control data): %.2f" % ratio)
     return pd.DataFrame(data=mi_matrix, columns=assembly_idx, index=keys)
 
