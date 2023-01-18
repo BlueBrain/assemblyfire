@@ -27,7 +27,10 @@ def _assembly_group_from_name(config, assembly_grp_name):
         return utils.consensus_dict2assembly_grp(cons_assemblies)
     elif assembly_grp_name == "seed_average":
         assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_avg_assemblies)
-        return assembly_grp_dict["seed_average"]
+        assembly_grp = assembly_grp_dict["seed_average"]
+        for assembly in assembly_grp.assemblies:
+            assembly.idx = (assembly.idx, "_average")  # for some reason the str. is not saved/loaded to/from HDF5
+        return assembly_grp
     else:
         assert "seed" in assembly_grp_name, "Need to specify a seed, `seed_average`, or `consensus`"
         assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
@@ -65,7 +68,7 @@ def run(config_path, assembly_grp_name, buf_size, seed):
 
     indegree_mat = _get_assembly_indegrees(assembly_grp, conn_mat, gids_rnd)
 
-    pbar, buf = tqdm(total=total, initial=results._written), []
+    pbar, buf = tqdm(total=total, initial=results._written, miniters=buf_size), []
     for gid, gid_indegrees in zip(gids_rnd, indegree_mat):
         pbar.update()
         # prepare args, and calculate synapse nearest neighbour distance
