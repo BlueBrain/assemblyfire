@@ -476,7 +476,7 @@ def plot_assembly_prob_from(bin_centers, assembly_probs, assembly_probs_low, ass
         ncol = 1
     else:
         cmap = plt.cm.get_cmap("tab20", np.max([assembly_label for assembly_label in assembly_labels]) + 1)
-        ncol = n_rows
+        ncol = n_rows if "gray" not in list(palette.values()) else 2
 
     fig = plt.figure(figsize=(20, 8))
     gs = gridspec.GridSpec(n_rows, 5)
