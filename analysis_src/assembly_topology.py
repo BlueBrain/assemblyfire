@@ -240,6 +240,7 @@ def assembly_prob_mi_from_syn_nnd(assembly_grp_dict, h5f_name, fig_path, n_bins=
             assembly_idx = syn_nnds.columns.get_level_values(0).unique().to_numpy()
             df = syn_nnds.loc[:, (assembly_idx, DSET_CLST)]
             df.columns = [int(assembly_id.split("assembly")[1]) for assembly_id in assembly_idx]
+            df = df.loc[:, np.sort(df.columns.to_numpy())]  # order matters for colors...
             df = -1 * df  # TODO: get rid of this when the new results are ready (the new code takes this *-1 into acc.)
             gids = df.index.to_numpy()
             # from here it's the same as the other functions with dicts built on the fly
@@ -286,6 +287,7 @@ def assembly_prob_mi_from_indegree_groupedby_syn_nnd(assembly_grp_dict, h5f_name
             _, _, bin_idx = topology.bin_gids_by_innervation(df, gids, n_bins)
             df = syn_nnds.loc[:, (assembly_idx, DSET_DEG)]
             df.columns = [int(assembly_id.split("assembly")[1]) for assembly_id in assembly_idx]
+            df = df.loc[:, np.sort(df.columns.to_numpy())]  # order matters for colors...
             _, bin_centers, bin_idx_cond = topology.bin_gids_by_innervation(df, gids, n_bins)
 
             sign_keys = {"sing. avoidance": -1, "non-sign.": 0, "sign. 'clustering'": 1}
