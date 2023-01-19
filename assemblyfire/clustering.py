@@ -12,6 +12,7 @@ authors: András Ecker, Michael W. Reimann; last modified: 01.2023
 import os
 import logging
 from tqdm import tqdm
+from hashlib import md5
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
@@ -293,6 +294,57 @@ def cluster_assemblies(assemblies, n_assemblies, distance_metric, linkage_method
     return sim_matrix, clusters - 1, plotting
 
 
+def syn_nearest_neighbour_distances(gid, mpdc, syn_loc_df, assembly_grp, same_section_only=False, n_ctrls=20):
+    """
+    Calculate nearest neighbour distance for all synaptic locations along the dendrite.
+    (+ Compares it to a random controls, with the same number of presynaptic gids)
+    param gid (int): gid of the neuron whose dendritic locations are considered
+    param mpdc (conntility.subcellular.MorphologyPathDistanceCalculator): Path distance calculator for the same neuron
+    param syn_loc_df (pd.DataFrame): frame specifying dendritic locations on the dendrite. (one row per loc)
+                                     Columns are: ["afferent_section_id", "afferent_segment_id", "afferent_segment_offset"].
+                                     (Indexed by the (presynaptic) gids associated with the locations.)
+    param assembly_grp (AssemblyGroup): group of assemblies that are to be tested for clustering.
+                                        The test is whether the dendritic locations associated with the assembly.gids
+                                        are closer together than the location associated with an equally sized group.
+    param same_section_only (bool, default=False): If True, only locations on the same dendritic section are considered.
+    param n_ctrls (int): number of controls to use for t-test
+    """
+    results = {}
+    for assembly in assembly_grp:
+        results[("gid", "gid")] = gid
+        results[("assembly%i" % assembly.idx[0], DSET_MEMBER)] = gid in assembly.gids
+
+        from_assembly = np.in1d(syn_loc_df.index.to_numpy(), assembly.gids)
+        from_assembly_count = len(np.intersect1d(syn_loc_df.index.to_numpy(), assembly.gids))
+        if from_assembly.sum() == 0:
+            results[("assembly%i" % assembly.idx[0], DSET_CLST)]: np.NaN
+            results[("assembly%i" % assembly.idx[0], DSET_PVALUE)]: np.NaN
+            continue
+        pd_data = mpdc.path_distances(syn_loc_df[from_assembly], same_section_only=same_section_only)
+        pd_data[pd_data == 0.] = np.NaN  # don't use distance to itself...
+        nnd_data = np.nanmin(pd_data, axis=0)
+
+        nnd_ctrl = []
+        gids = np.unique(syn_loc_df.index.to_numpy())
+        hash_ = md5(assembly.gids)
+        assembly_seed = np.mod(int(hash_.hexdigest(), 16), 1000)
+        for seed in range(n_ctrls):
+            np.random.seed(seed * (assembly_seed + gid))
+            from_ctrl = np.in1d(syn_loc_df.index.to_numpy(), np.random.choice(gids, from_assembly_count, replace=False))
+            pd_ctrl = mpdc.path_distances(syn_loc_df[from_ctrl], same_section_only=same_section_only)
+            pd_ctrl[pd_ctrl == 0] = np.NaN
+            nnd_ctrl.append(np.nanmin(pd_ctrl, axis=0))
+
+        a = np.mean(nnd_data)
+        b = [np.mean(_ctrl) for _ctrl in nnd_ctrl]
+        str_res = (a - np.nanmean(b)) / np.nanstd(b)
+        stat_res = ttest_ind(nnd_data, np.hstack(nnd_ctrl), nan_policy="omit")
+        results[("assembly%i" % assembly.idx[0], DSET_CLST)] = -str_res  # -1 to convert low nnd. to "high strength"
+        results[("assembly%i" % assembly.idx[0], DSET_PVALUE)] = stat_res.pvalue
+
+    return results
+
+
 def _create_lookups(loc_df, assembly_grp):
     """Create dicts with synapse idx, and fraction of those (compared to total) for all assemblies
     in the `assembly_grp`. (As neurons can be part of more than 1 assembly, `fracs` won't add up to 1)"""
@@ -322,96 +374,6 @@ def syn_distances(loc_df, mask_col, xzy_cols):
     dists[mask > 0] = np.nan
     np.fill_diagonal(dists, np.nan)
     return dists
-
-
-'''
-def syn_nearest_neighbour_distances(loc_df, assembly_grp, ctrl_assembly_grp, agg_fn=np.median, min_nsyns=10):
-    """For each postsynaptic neuron passed in `loc_df` iterate over all assemblies (and their controls)
-    and for each synapse finds the distance to the nearest neighbouring synapse coming from the same assembly (or control).
-    It returns the aggregated (min, mean, median whatever) value of these nn. distances per neuron per assembly."""
-
-    # initialize big arrays for storing data (will be converted to pandas DFs at the end)
-    post_gids = loc_df["post_gid"].unique()
-    assembly_labels = [assembly.idx[0] for assembly in assembly_grp]
-    data = -1 * np.ones((len(post_gids), len(assembly_labels)), dtype=np.float32)
-    ctrl_data = -1 * np.ones_like(data)
-
-    for i, gid in enumerate(tqdm(post_gids, desc="Min pairwise syn. dists.", miniters=len(post_gids)/100)):
-        # prepare lookup tables and calculate pairwise distances
-        loc_df_gid = loc_df.loc[loc_df["post_gid"] == gid]
-        syn_idx, _ = _create_lookups(loc_df_gid, assembly_grp)
-        ctrl_syn_idx, _ = _create_lookups(loc_df_gid, ctrl_assembly_grp)
-        dists = syn_distances(loc_df_gid, "section_id", XYZ)
-        # iterate over assemblies and (their controls) and index stuff out
-        for j, assembly_label in enumerate(assembly_labels):
-            sub_dists = dists[np.ix_(syn_idx["assembly%i" % assembly_label], syn_idx["assembly%i" % assembly_label])]
-            sub_dists = sub_dists[:, ~np.all(np.isnan(sub_dists), axis=1)]
-            if sub_dists.shape[1] > min_nsyns:
-                data[i, j] = agg_fn(np.nanmin(sub_dists, axis=0))
-            ctrl_sub_dists = dists[np.ix_(ctrl_syn_idx["assembly%i" % assembly_label], ctrl_syn_idx["assembly%i" % assembly_label])]
-            ctrl_sub_dists = ctrl_sub_dists[:, ~np.all(np.isnan(ctrl_sub_dists), axis=1)]
-            if ctrl_sub_dists.shape[1] > min_nsyns:
-                ctrl_data[i, j] = agg_fn(np.nanmin(ctrl_sub_dists, axis=0))
-        del loc_df_gid, dists
-
-    assembly_df = pd.DataFrame(data=data, index=post_gids, columns=assembly_labels)
-    ctrl_df = pd.DataFrame(data=ctrl_data, index=post_gids, columns=assembly_labels)
-    return assembly_df, ctrl_df
-'''
-
-
-def syn_nearest_neighbour_distances(gid, mpdc, syn_loc_df, assembly_grp, same_section_only=False, n_ctrls=20):
-    """
-    Calculate nearest neighbour distance for all synaptic locations along the dendrite.
-    (+ Compares it to a random controls, with the same number of presynaptic gids)
-    param gid (int): gid of the neuron whose dendritic locations are considered
-    param mpdc (conntility.subcellular.MorphologyPathDistanceCalculator): Path distance calculator for the same neuron
-    param syn_loc_df (pd.DataFrame): frame specifying dendritic locations on the dendrite. (one row per loc)
-                                     Columns are: ["afferent_section_id", "afferent_segment_id", "afferent_segment_offset"].
-                                     (Indexed by the (presynaptic) gids associated with the locations.)
-    param assembly_grp (AssemblyGroup): group of assemblies that are to be tested for clustering.
-                                        The test is whether the dendritic locations associated with the assembly.gids
-                                        are closer together than the location associated with an equally sized group.
-    param same_section_only (bool, default=False): If True, only locations on the same dendritic section are considered.
-    param n_ctrls (int): number of controls to use for t-test
-    """
-    results = {}
-    for assembly in assembly_grp:
-        gids = np.unique(syn_loc_df.index.to_numpy())
-        from_assembly = np.in1d(syn_loc_df.index.to_numpy(), assembly.gids)
-        from_assembly_count = len(np.intersect1d(syn_loc_df.index.to_numpy(), assembly.gids))
-        if from_assembly.sum() == 0:
-            results.update({("gid", "gid"): gid,
-                            ("assembly%i" % assembly.idx[0], DSET_CLST): np.NaN,
-                            ("assembly%i" % assembly.idx[0], DSET_PVALUE): np.NaN,
-                            ("assembly%i" % assembly.idx[0], DSET_MEMBER):
-                            gid in assembly.gids})
-            continue
-        pd_data = mpdc.path_distances(syn_loc_df[from_assembly], same_section_only=same_section_only)
-        pd_data[pd_data == 0] = np.NaN
-        nn_data = np.nanmin(pd_data, axis=0)
-
-        nn_ctrl = []
-        for seed in range(n_ctrls):
-            np.random.seed(seed)
-            from_assembly_ = np.in1d(syn_loc_df.index.to_numpy(),
-                                     np.random.choice(gids, from_assembly_count, replace=False))
-            pd_ctrl = mpdc.path_distances(syn_loc_df[from_assembly_], same_section_only=same_section_only)
-            pd_ctrl[pd_ctrl == 0] = np.NaN
-            nn_ctrl.append(np.nanmin(pd_ctrl, axis=0))
-
-        a = np.mean(nn_data)
-        b = [np.mean(_ctrl) for _ctrl in nn_ctrl]
-        str_res = (a - np.nanmean(b)) / np.nanstd(b)
-        stat_res = ttest_ind(nn_data, np.hstack(nn_ctrl), nan_policy="omit")
-        mmbr_res = gid in assembly.gids
-
-        results[("gid", "gid")] = gid
-        results[("assembly%i" % assembly.idx[0], DSET_CLST)] = str_res
-        results[("assembly%i" % assembly.idx[0], DSET_PVALUE)] = stat_res.pvalue
-        results[("assembly%i" % assembly.idx[0], DSET_MEMBER)] = mmbr_res
-
-    return results
 
 
 def distance_model(dists, fracs, target_range, fig_name=None):
