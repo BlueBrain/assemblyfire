@@ -215,14 +215,41 @@ def assembly_membership_probability(gids, assembly_grp, binned_gids, bin_centers
     assembly_probs_low, assembly_probs_high = {key: {} for key in keys}, {key: {} for key in keys}
     for assembly in assembly_grp.assemblies:
         assembly_id = assembly.idx[0]
-        idx = np.in1d(gids, assembly.gids, assume_unique=True)
-        chance_levels[assembly_id] = np.sum(idx) / len(idx)
+        chance_levels[assembly_id] = np.mean(np.in1d(gids, assembly.gids, assume_unique=True))
         for key, binned_gids_tmp in binned_gids.items():
             bin_centers_plot[key][assembly_id] = bin_centers[key]
             probs = np.zeros_like(bin_centers[key], dtype=np.float32)
             probs_low, probs_high = np.zeros_like(probs), np.zeros_like(probs)
             for i, bin_center in enumerate(bin_centers[key]):
                 idx = np.in1d(binned_gids_tmp[bin_center], assembly.gids, assume_unique=True)
+                probs[i], probs_low[i], probs_high[i] = prob_with_binom_ci(idx, bin_min_n)
+            assembly_probs[key][assembly_id] = probs
+            assembly_probs_low[key][assembly_id] = probs_low
+            assembly_probs_high[key][assembly_id] = probs_high
+    return bin_centers_plot, assembly_probs, assembly_probs_low, assembly_probs_high, chance_levels
+
+
+def cond_assembly_membership_probability(gids, assembly_grp, bin_centers, bin_idx, cond_df, cond_keys, seed, bin_min_n):
+    """Reimplementation of `assembly_membership_probability()` above with some changes:
+    1: it's not using pre-binned gids, but `bin_idx` (from `np.digitize`) and an extra condition passed in `cond_df`
+    2: it doesn't do full cross assembly analysis (because that's a lot with extra condition), only within assembly."""
+    if isinstance(seed, str):
+        seed = int(seed.split("seed")[1])
+    chance_levels = {}
+    keys = list(cond_keys.keys())
+    bin_centers_plot, assembly_probs = {key: {} for key in keys}, {key: {} for key in keys}
+    assembly_probs_low, assembly_probs_high = {key: {} for key in keys}, {key: {} for key in keys}
+    for assembly_id, bin_centers_ in bin_centers.items():
+        assembly_gids = assembly_grp.loc((assembly_id, seed)).gids
+        chance_levels[assembly_id] = np.mean(np.in1d(gids, assembly_gids, assume_unique=True))
+        for key, key_id in cond_keys.items():
+            bin_centers_plot[key][assembly_id] = bin_centers_
+            probs = np.zeros_like(bin_centers_, dtype=np.float32)
+            probs_low, probs_high = np.zeros_like(probs), np.zeros_like(probs)
+            for i in range(len(bin_centers_)):
+                gids_tmp = gids[np.logical_and((bin_idx[assembly_id] == i + 1),
+                                               (cond_df[assembly_id] == key_id).to_numpy())]
+                idx = np.in1d(gids_tmp, assembly_gids, assume_unique=True)
                 probs[i], probs_low[i], probs_high[i] = prob_with_binom_ci(idx, bin_min_n)
             assembly_probs[key][assembly_id] = probs
             assembly_probs_low[key][assembly_id] = probs_low
@@ -254,7 +281,7 @@ def assembly_rel_frac_entropy_explained(gids, assembly_grp, bin_centers, bin_idx
             # (could be passed from `get_assembly_membership_probability()` but whatever...)
             probs = np.zeros_like(bin_centers[key], dtype=np.float32)
             counts = np.zeros_like(probs, dtype=int)
-            for k, center in enumerate(bin_centers[key]):
+            for k in range(len(bin_centers[key])):
                 tmp = idx[bin_idx_ == k + 1]
                 counts[k], probs[k] = len(tmp), np.mean(tmp)
             valid_n_idx = np.where(counts >= bin_min_n)
