@@ -368,17 +368,15 @@ def load_syn_nnd_from_h5(h5f_name, n_assemblies, prefix):
     """Loads synapse nearest neighbour results from h5 file
     pd.read_hdf() doesn't understand the structure, so we need to create an object, and access the DataFrame..."""
     from assemblyfire.syn_nnd import SynNNDResults
-    h5f = h5py.File(h5f_name, "r")
-    if prefix in list(h5f.keys()):
-        results = SynNNDResults(h5f_name, n_assemblies, prefix)
-        df = results._df.copy()  # TODO: fix the access in the class
-        df.set_index(("gid", "gid"), inplace=True)
-        df.index = df.index.astype(int)  # studpid pandas
-        df.index.name = "gid"  # studpid pandas
-        return df.sort_index()
-    else:
-        warnings.warn("Prefix: %s not found in HDF5: %s keys. Returning `None`" % (prefix, h5f_name))
-        return None
+    with h5py.File(h5f_name, "r") as h5f:
+        h5_keys = list(h5f.keys())
+    assert prefix in h5_keys, "Prefix not found in HDF5 file"
+    results = SynNNDResults(h5f_name, n_assemblies, prefix)
+    df = results._df.copy()  # TODO: fix the access in the class
+    df.set_index(("gid", "gid"), inplace=True)
+    df.index = df.index.astype(int)  # studpid pandas
+    df.index.name = "gid"  # studpid pandas
+    return df.sort_index()
 
 
 def load_single_cell_features_from_h5(h5f_name, prefix="single_cell"):
