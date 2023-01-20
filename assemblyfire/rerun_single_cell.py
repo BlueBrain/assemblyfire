@@ -66,6 +66,7 @@ def run(config_path, seed, gid):
     and saves spikes and voltages of all sections from them"""
 
     config = Config(config_path)
+    seed, gid = int(seed), int(gid)
     save_dir = os.path.join(config.root_path, "analyses", "rerun_results")
     utils.ensure_dir(save_dir)
     sim_path = utils.get_sim_path(config.root_path).loc[seed]
