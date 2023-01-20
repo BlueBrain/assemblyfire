@@ -29,7 +29,7 @@ def get_gid_instantiation_vars(ssim):
     return pre_gids, proj_spike_trains, ca.config.bc.Run_Default.SpikeLocation
 
 
-def run_sim(ssim, gid, pre_gids, pre_spike_trains, spike_loc, passive_dend=False, block_NMDA=False, tstop=None):
+def run_sim(ssim, gid, pre_gids, pre_spike_trains, spike_loc, passive_dends=False, block_nmda=False, tstop=None):
     """Reruns simulation of a single `gid` w/ all the inputs from the network simulation"""
     # instantiate gid with replay on all synapses and the same input as it gets in the network simulation
     ssim.instantiate_gids([gid], add_synapses=True, add_projections=True, add_minis=True, intersect_pre_gids=pre_gids,
@@ -45,8 +45,8 @@ def run_sim(ssim, gid, pre_gids, pre_spike_trains, spike_loc, passive_dend=False
         cell.add_recording("neuron.h." + section.name() + "(0.5)._ref_v", dt=ssim.record_dt)
 
     # make dendrites passive
-    if passive_dend:
-        L.info('Making dendrites passive in GID %s' % gid)
+    if passive_dends:
+        L.debug(" Making dendrites passive in gid %i " % gid)
         for section in cell.basal + cell.apical:
             mech_names = set()
             for seg in section:
@@ -54,16 +54,16 @@ def run_sim(ssim, gid, pre_gids, pre_spike_trains, spike_loc, passive_dend=False
                     mech_names.add(mech.name())
             for mech_name in mech_names:
                 if mech_name not in ["k_ion", "na_ion", "ca_ion", "pas", "ttx_ion"]:
-                    bglibpy.neuron.h('uninsert %s' % mech_name, sec=section)
+                    bglibpy.neuron.h("uninsert %s" % mech_name, sec=section)
 
     # block NMDA synaptic conductances
-    if block_NMDA:
-        L.info('Blocking NMDA conductances into GID %s' % gid)
+    if block_nmda:
+        L.debug(" Blocking NMDA conductances into gid %i " % gid)
         exc_syns = [s.hsynapse for s in cell.synapses.values() if s.is_excitatory()]
         for syn in exc_syns:
-            if hasattr(syn, 'NMDA_ratio'):
+            if hasattr(syn, "NMDA_ratio"):
                 syn.NMDA_ratio = 0.0
-            elif hasattr(syn, 'gmax_NMDA'):
+            elif hasattr(syn, "gmax_NMDA"):  # plastic mod file...
                 syn.gmax_NMDA = 0.0
 
     # run simulation
@@ -105,11 +105,11 @@ def run(config_path, seed, gid):
     ssim.delete()
     gc.collect()
     t2 = time.time()
-    L.info(" Baseline sim. finished in: %s " % time.strftime("%H:%M:%S", time.gmtime(t2 - t1)))
+    L.info(" Sim. w/ baseline conditions finished in: %s " % time.strftime("%H:%M:%S", time.gmtime(t2 - t1)))
 
     L.info(" Running sim w/ passive dendrites ")
     ssim = utils.get_bglibpy_ssim(sim_path)
-    spikes_, vs = run_sim(ssim, gid, pre_gids, pre_spike_trains, spike_loc, passive_dend=True)
+    spikes_, vs = run_sim(ssim, gid, pre_gids, pre_spike_trains, spike_loc, passive_dends=True)
     spikes_["condition"] = "passive_dendrites"
     spikes = pd.concat([spikes, spikes_], ignore_index=True)
     spikes = spikes.sort_values("spike_times")
@@ -122,7 +122,7 @@ def run(config_path, seed, gid):
 
     L.info(" Running sim w/ NMDA channels blocked ")
     ssim = utils.get_bglibpy_ssim(sim_path)
-    spikes_, vs = run_sim(ssim, gid, pre_gids, pre_spike_trains, spike_loc, block_NMDA=True)
+    spikes_, vs = run_sim(ssim, gid, pre_gids, pre_spike_trains, spike_loc, block_nmda=True)
     spikes_["condition"] = "no_NMDA"
     spikes = pd.concat([spikes, spikes_], ignore_index=True)
     spikes = spikes.sort_values("spike_times")
