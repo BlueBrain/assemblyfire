@@ -19,11 +19,9 @@ def get_bluepy_circuit(circuitconfig_path):
     try:
         from bluepy import Circuit
     except ImportError as e:
-        msg = (
-            "Assemblyfire requirements are not installed.\n"
-            "Please pip install bluepy as follows:\n"
-            " pip install -i https://bbpteam.epfl.ch/repository/devpi/simple bluepy[all]"
-        )
+        msg = ("Assemblyfire requirements are not installed.\n"
+               "Please pip install bluepy as follows:\n"
+               " pip install -i https://bbpteam.epfl.ch/repository/devpi/simple bluepy[all]")
         raise ImportError(str(e) + "\n\n" + msg)
     return Circuit(circuitconfig_path)
 
@@ -32,13 +30,22 @@ def get_bluepy_simulation(blueconfig_path):
     try:
         from bluepy import Simulation
     except ImportError as e:
-        msg = (
-            "Assemblyfire requirements are not installed.\n"
-            "Please pip install bluepy as follows:\n"
-            " pip install -i https://bbpteam.epfl.ch/repository/devpi/simple bluepy[all]"
-        )
+        msg = ("Assemblyfire requirements are not installed.\n"
+               "Please pip install bluepy as follows:\n"
+               " pip install -i https://bbpteam.epfl.ch/repository/devpi/simple bluepy[all]")
         raise ImportError(str(e) + "\n\n" + msg)
     return Simulation(blueconfig_path)
+
+
+def get_bglibpy_ssim(blueconfig_path):
+    try:
+        import bglibpy
+    except ImportError as e:
+        msg = ("Assemblyfire requirements are not installed.\n"
+               "Please pip install bglibpy as follows:\n"
+               " pip install -i https://bbpteam.epfl.ch/repository/devpi/bbprelman/dev/+simple/ bglibpy")
+        raise ImportError(str(e) + "\n\n" + msg)
+    return bglibpy.SSim(blueconfig_path, record_dt=0.1)
 
 
 def ensure_dir(dirpath):
@@ -167,6 +174,31 @@ def get_grouped_tc_spikes(pklf_name, sim_config, t_start, t_end):
     if pom_mask.sum() > 0:
         tc_spikes["POm"] = {"spike_times": spike_times[pom_mask], "spiking_gids": spiking_gids[pom_mask]}
     return tc_spikes
+
+
+# copy-pasted from bglibpy/ssim.py (until BGLibPy will support adding spikes from SpikeFile!)
+def _parse_outdat(f_name):
+    """Parse the replay spiketrains in a out.dat formatted file"""
+    from bluepy.impl.spike_report import SpikeReport
+    spikes = SpikeReport.load(f_name).get()
+    # convert Series to DataFrame with 2 columns for `groupby` operation
+    spike_df = spikes.to_frame().reset_index()
+    if (spike_df["t"] < 0).any():
+        warnings.warn("Found negative spike times... Clipping them to 0")
+        spike_df["t"].clip(lower=0., inplace=True)
+    outdat = spike_df.groupby("gid")["t"].apply(np.array)
+    return outdat.to_dict()
+
+
+def get_tc_spikes_bglibpy(sim_config):
+    """Loads in input spikes (on projections) using the bluepy.Simulation.config object.
+    Returns the format used in BGLibPy spike replay"""
+    f_name = _get_spikef_name(sim_config)
+    if f_name is not None:
+        return _parse_outdat(f_name)
+    else:
+        warnings.warn("No SpikeFile found in the BlueConfig, returning empty dict.")
+        return {}
 
 
 def group_clusters_by_patterns(clusters, t_bins, stim_times, patterns):
