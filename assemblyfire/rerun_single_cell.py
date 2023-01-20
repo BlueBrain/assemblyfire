@@ -57,10 +57,7 @@ def run_sim(ssim, gid, pre_gids, pre_spike_trains, spike_loc):
 
 
 def main(config_path, seed, gid=8473):
-    """
-    Loads in project related info from yaml config file
-    :param config_path: str - path to project config file
-    """
+    """TODO"""
 
     config = Config(config_path)
     save_dir = os.path.join(config.root_path, "analyses", "allsec_voltages")
