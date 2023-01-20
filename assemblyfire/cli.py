@@ -74,6 +74,16 @@ def syn_nnd(config_path, assembly_grp_name, buf_size, seed):
 
 @cli.command()
 @click.argument("config_path", required=True)
+@click.argument("seed", required=True)
+@click.argument("gid", required=True)
+def rerun(config_path, seed, gid):
+    """CLI for `rerun_single_cell.py/run()`"""
+    from assemblyfire.rerun_single_cell import run
+    run(config_path, seed, gid)
+
+
+@cli.command()
+@click.argument("config_path", required=True)
 def single_cell(config_path):
     """CLI for `get_single_cell_features.py/run()`"""
     from assemblyfire.get_single_cell_features import run
