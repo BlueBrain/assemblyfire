@@ -1,6 +1,6 @@
 """
 Main run function for finding consensus assemblies
-last modified: András Ecker 10.2022
+last modified: András Ecker 01.2023
 """
 
 import logging

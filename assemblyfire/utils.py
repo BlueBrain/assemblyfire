@@ -334,7 +334,7 @@ def save_syn_clusters(save_dir_root, assembly_idx, cluster_df, cross_assembly=Tr
 
 
 def read_base_h5_metadata(h5f_name):
-    """Reads ''base'' metadata from h5 attributes (root_path, seeds etc.)"""
+    """Reads 'base' metadata from h5 attributes (root_path, seeds etc.)"""
     h5f = h5py.File(h5f_name, "r")
     return dict(h5f["spikes"].attrs)
 
