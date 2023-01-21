@@ -119,6 +119,18 @@ def sign_corr_ths(spike_matrix, sparse_clusters, th_pct, nreps=1000):
     return corr_ths
 
 
+def get_core_cell_idx(spike_matrix, clusters, th_pct):
+    """Finds cells whose spiking activity correlate with the activation of (clustered) time bins
+    (Just a combinations of functions above, made into yet an other function to be callable for other scripts...)"""
+    assert spike_matrix.shape[1] == len(clusters)
+    sparse_clusters = _convert_clusters(clusters)
+    corrs = corr_spike_matrix_clusters(spike_matrix, sparse_clusters)
+    corr_ths = sign_corr_ths(spike_matrix, sparse_clusters, th_pct)
+    core_cell_idx = np.zeros_like(corrs, dtype=int)
+    core_cell_idx[corrs > corr_ths] = 1
+    return core_cell_idx, corrs
+
+
 def within_cluster_correlations(spike_matrix, core_cell_idx):
     """Compares within cluster correlations (correlation of core cells)
     against the avg. correlation in the whole dataset
@@ -197,15 +209,9 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, core_cell_th_pct, h5f_na
         gids = SpikeMatrixResult.gids
         clusters = clusters_dict[seed]
 
-        # core cells
-        sparse_clusters = _convert_clusters(clusters)
-        corrs = corr_spike_matrix_clusters(spike_matrix, sparse_clusters)
-        corr_ths = sign_corr_ths(spike_matrix, sparse_clusters, core_cell_th_pct)
-        core_cell_idx = np.zeros_like(corrs, dtype=int)
-        core_cell_idx[corrs > corr_ths] = 1
-        # cell assemblies
+        core_cell_idx, _ = get_core_cell_idx(spike_matrix, clusters, core_cell_th_pct)
         spike_matrix_csr = csr_matrix(spike_matrix, dtype=np.float32)
-        del corrs, corr_ths, spike_matrix
+        del spike_matrix
         assembly_idx = within_cluster_correlations(spike_matrix_csr, core_cell_idx)
 
         # save to h5
