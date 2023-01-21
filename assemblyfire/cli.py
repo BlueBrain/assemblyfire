@@ -5,6 +5,7 @@ CLI to detect and analyse cell assemblies
  * `assemblyfire conn-mat config_path`: gets connectivity matrix
  * `assemblyfire syn-clust config_path`: finds clusters of synapses in assembly neurons
  * `assemblyfire syn-nnd config_path assembly_group_name`: gets synapses nearest neighbour distances
+ * `assemblyfire rerun config_path seed gid`: reruns single gid in BGLibPy (with extra reporting and modifications)
  * `assemblyfire single-cell config_path`: gets single cell features from simulations
 last modified: Thomas Delemontex, András Ecker 01.2023
 """
@@ -98,6 +99,6 @@ def clean_h5(config_path, prefix):
     import h5py
     from assemblyfire.config import Config
     config = Config(config_path)
-    h5f = h5py.File(config.h5f_name, "a")
-    assert prefix in list(h5f.keys())
-    del h5f[prefix]
+    with h5py.File(config.h5f_name, "a") as h5f:
+        assert prefix in list(h5f.keys())
+        del h5f[prefix]
