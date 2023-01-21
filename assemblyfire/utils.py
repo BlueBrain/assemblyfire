@@ -104,6 +104,10 @@ def get_mtypes(c, gids):
     return c.cells.get(gids)["mtype"]
 
 
+def get_layer(c, gids):
+    return c.cells.get(gids)["layer"]
+
+
 def get_neuron_locs(circuit_config, target):
     """Gets neuron locations in (supersampled) flat space"""
     from conntility.circuit_models.neuron_groups import load_neurons
