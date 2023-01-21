@@ -112,7 +112,7 @@ class SynNNDResults(object):
                 dset = grp[dset_str]
                 assert dset.shape[1] == (n_assemblies + 1)
                 if ("gid", "gid") in existing_dict:
-                    assert np.all(existing_dict[("gid", "gid")] == dset[:, 0])
+                    assert np.all(existing_dict[("gid", "gid")] == dset[:, 0].astype(int))
                 else:
                     existing_dict[("gid", "gid")] = dset[:, 0].astype(int)
                 assembly_names = sorted(["assembly%i" % i for i in range(n_assemblies)])
