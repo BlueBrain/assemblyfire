@@ -2,14 +2,20 @@
 Functionalities to investigate the relationship between synaptc clustering and dendritic nonlinearities
 1st step: writes launch scripts that rerun selected cells in BGLibPy (see `assemblyfire/rerun_single_cell.py`)
           (with extra reporting and some modifications)
+2nd step: load spiking data from sims. with modified conditions (and baseline), check rates, and
+          if based on the new spike times the neuron would be still part of the assembly
 last modified: András Ecker 01.2023
 """
 
 import os
 import h5py
+import pickle
+import numpy as np
+import pandas as pd
 
 import assemblyfire.utils as utils
 from assemblyfire.config import Config
+from assemblyfire.clustering import get_core_cell_idx
 
 
 DSET_MEMBER = "member"
@@ -25,7 +31,7 @@ slurm_template = """\
 #SBATCH --constraint=cpu
 #SBATCH --cpus-per-task=2
 #SBATCH --ntasks=2
-#SBATCH --time=6:00:00
+#SBATCH --time=24:00:00
 #SBATCH --mem=15g
 #SBATCH --no-requeue
 #SBATCH --output={log_name}
@@ -35,11 +41,10 @@ assemblyfire -v rerun {config_path} {seed} {gid}\n
 """
 
 
-def write_launchscripts(config_path, n_gids=10, p_th=0.05):
+def write_launchscripts(config, n_gids=10, p_th=0.05):
     """Loads synapse nearest neighbour distance results for each seed (that has any saved),
     in each assembly finds the top `n_gids` with the highest indegree and significant nnd. 'strength',
     and writes launchscripts for them"""
-    config = Config(config_path)
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
 
     sbatch_dir = os.path.join(config.root_path, "sbatch")
@@ -65,6 +70,8 @@ def write_launchscripts(config_path, n_gids=10, p_th=0.05):
                 df = df.sort_values(DSET_DEG, ascending=False)
                 gids = df.iloc[:n_gids].index.to_numpy()
                 simulated_gids[seed][assembly_id] = gids
+
+                # write SLURM script for all selected gids
                 for gid in gids:
                     f_name = os.path.join(sbatch_dir, "%s_%s_a%i.batch" % (seed, assembly_id, gid))
                     f_names.append(f_name)
@@ -72,13 +79,69 @@ def write_launchscripts(config_path, n_gids=10, p_th=0.05):
                         f.write(slurm_template.format(job_name="rerun_a%i" % gid,
                                                       log_name=os.path.splitext(f_name)[0] + ".log",
                                                       config_path=config_path, seed=int(seed.split("seed")[1]), gid=gid))
-            # write one big launchscript that launches them all
+            # write one big script that launches them all (for one seed)
             with open(os.path.join(sbatch_dir, "launch_%s.sh" % seed), "w") as f:
                 for f_name in f_names:
                     f.write("sbatch %s\n" % f_name)
 
+    # save all simulated gids
+    with open(os.path.join(sbatch_dir, "simulated_gids.pkl"), "wb") as f:
+        pickle.dump(simulated_gids, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def _get_binned_spikes(results_dir, seed, assembly_gids, t_bins):
+    """Loads spikes and bins them (the same way they are binned in the network simulation)
+    for (correlation based) assembly membership test later"""
+    assembly_idx, all_gids = [], []
+    spike_vectors = {"baseline": [], "passivedend": [], "noNMDA": []}
+    for assembly_str, gids in assembly_gids.items():
+        assembly_id = int(assembly_str.split("assembly")[1])
+        for gid in gids:
+            spikesf_name = os.path.join(results_dir, "%s_a%i_spikes.pkl" % (seed, gid))
+            if os.path.isfile(spikesf_name):
+                assembly_idx.append(assembly_id)
+                all_gids.append(gid)
+                spikes = pd.read_pickle(spikesf_name)
+                for condition in ["baseline", "passivedend", "noNMDA"]:
+                    spike_times = spikes.loc[spikes["condition"] == condition, "spike_times"].to_numpy()
+                    binned_spikes, _ = np.histogram(spike_times, t_bins)
+                    spike_vectors[condition].append(binned_spikes.reshape(1, -1))
+    spike_matrices = {condition: np.vstack(spike_vectors_) for condition, spike_vectors_ in spike_vectors.items()}
+    return spike_matrices, all_gids, assembly_idx
+
+
+def analyse_results(config):
+    sbatch_dir = os.path.join(config.root_path, "sbatch")
+    with open(os.path.join(sbatch_dir, "simulated_gids.pkl"), "rb") as f:
+        simulated_gids = pickle.load(f)
+    results_dir = os.path.join(config.root_path, "analyses", "rerun_results")
+    df_columns = ["gid", "assembly", "condition", "rate", "correlation", "member"]
+
+    t_bins = np.arange(config.t_start, config.t_end + config.bin_size, config.bin_size)
+    rate_norm = (config.t_end - config.t_start) / 1e3  # ms -> s conversion
+    clust_meta = utils.read_cluster_seq_data(config.h5f_name)
+
+    for seed, assembly_gids in simulated_gids.items():
+        # build spike matrices for checking assembly membership
+        spike_matrices, gids, assembly_idx = _get_binned_spikes(results_dir, seed, assembly_gids, t_bins)
+        dfs = []
+        for condition, spike_matrix in spike_matrices.items():
+            rates = np.sum(spike_matrix, axis=1) / rate_norm
+            # index out only significant time bins (detected before, only loaded now)
+            t_idx = np.in1d(t_bins[:-1], clust_meta["t_bins"][seed], assume_unique=True)
+            core_cell_idx, corrs = get_core_cell_idx(spike_matrix[:, t_idx], clust_meta["clusters"][seed],
+                                                     config.core_cell_th_pct)
+            memberships = core_cell_idx[:, assembly_idx]
+            correlations = corrs[:, assembly_idx]
+            # TODO: test this part once there is more then 1 datapoint...
+            dfs.append(pd.DataFrame(data=np.hstack(gids, assembly_idx, np.full(rates.shape, condition),
+                                                   rates, correlations, memberships), columns=df_columns))
+        df = pd.concat(dfs, ignore_index=True)
+        # TODO: add some viz. of these results across conditions
+
 
 if __name__ == "__main__":
-    config_path = "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_10seeds_np.yaml"
-    write_launchscripts(config_path)
+    config = Config("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_10seeds_np.yaml")
+    # write_launchscripts(config)
+    analyse_results(config)
 
