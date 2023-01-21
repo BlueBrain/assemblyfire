@@ -94,7 +94,7 @@ def run(config_path, seed, gid):
     sim_path = utils.get_sim_path(config.root_path).loc[seed]
     L.info(" Instantiating %i from %s in BGLibPy " % (gid, sim_path))
 
-    L.info(" Running sim w/ baseline conditions ")
+    L.info(" Running sim. w/ baseline conditions ")
     t1 = time.time()
     ssim = utils.get_bglibpy_ssim(sim_path)
     pre_gids, pre_spike_trains, spike_loc = get_gid_instantiation_vars(ssim)
@@ -107,10 +107,10 @@ def run(config_path, seed, gid):
     t2 = time.time()
     L.info(" Sim. w/ baseline conditions finished in: %s " % time.strftime("%H:%M:%S", time.gmtime(t2 - t1)))
 
-    L.info(" Running sim w/ passive dendrites ")
+    L.info(" Running sim. w/ passive dendrites ")
     ssim = utils.get_bglibpy_ssim(sim_path)
     spikes_, vs = run_sim(ssim, gid, pre_gids, pre_spike_trains, spike_loc, passive_dends=True)
-    spikes_["condition"] = "passive_dendrites"
+    spikes_["condition"] = "passivedend"
     spikes = pd.concat([spikes, spikes_], ignore_index=True)
     spikes = spikes.sort_values("spike_times")
     spikes.to_pickle(os.path.join(save_dir, "seed%s_a%i_spikes.pkl" % (seed, gid)))
@@ -120,10 +120,10 @@ def run(config_path, seed, gid):
     t3 = time.time()
     L.info(" Sim. w/ passive dendrites finished in: %s " % time.strftime("%H:%M:%S", time.gmtime(t3 - t2)))
 
-    L.info(" Running sim w/ NMDA channels blocked ")
+    L.info(" Running sim. w/ NMDA channels blocked ")
     ssim = utils.get_bglibpy_ssim(sim_path)
     spikes_, vs = run_sim(ssim, gid, pre_gids, pre_spike_trains, spike_loc, block_nmda=True)
-    spikes_["condition"] = "no_NMDA"
+    spikes_["condition"] = "noNMDA"
     spikes = pd.concat([spikes, spikes_], ignore_index=True)
     spikes = spikes.sort_values("spike_times")
     spikes.to_pickle(os.path.join(save_dir, "seed%s_a%i_spikes.pkl" % (seed, gid)))
