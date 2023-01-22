@@ -32,7 +32,7 @@ slurm_template = """\
 #SBATCH --cpus-per-task=2
 #SBATCH --ntasks=2
 #SBATCH --time=24:00:00
-#SBATCH --mem=15g
+#SBATCH --mem=30g
 #SBATCH --no-requeue
 #SBATCH --output={log_name}
 
@@ -41,10 +41,11 @@ assemblyfire -v rerun {config_path} {seed} {gid}\n
 """
 
 
-def write_launchscripts(config, n_gids=10, p_th=0.05):
+def write_launchscripts(config_path, n_gids=10, p_th=0.05):
     """Loads synapse nearest neighbour distance results for each seed (that has any saved),
     in each assembly finds the top `n_gids` with the highest indegree and significant nnd. 'strength',
     and writes launchscripts for them"""
+    config = Config(config_path)
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
 
     sbatch_dir = os.path.join(config.root_path, "sbatch")
@@ -63,7 +64,6 @@ def write_launchscripts(config, n_gids=10, p_th=0.05):
                 df = syn_nnds.loc[:, [(assembly_id, DSET_MEMBER), (assembly_id, DSET_DEG),
                                       (assembly_id, DSET_CLST), (assembly_id, DSET_PVALUE)]]
                 df.columns = df.columns.get_level_values(1)
-                df[DSET_CLST] *= -1  # TODO: get rid of this when the new results are ready (the new code takes this *-1 into acc.)
                 # index out assembly members with significant syn nnd. 'strength'
                 df = df.loc[(df[DSET_MEMBER] == 1) & (df[DSET_CLST] > 0) & (df[DSET_PVALUE] < p_th)]
                 # get the gids of the first n highest indegrees
@@ -106,16 +106,19 @@ def _get_binned_spikes(results_dir, seed, assembly_gids, t_bins):
                     spike_times = spikes.loc[spikes["condition"] == condition, "spike_times"].to_numpy()
                     binned_spikes, _ = np.histogram(spike_times, t_bins)
                     spike_vectors[condition].append(binned_spikes.reshape(1, -1))
+            else:
+                print("No spikes from: %s_assembly%i_a%i" % (seed, assembly_id, gid))
     spike_matrices = {condition: np.vstack(spike_vectors_) for condition, spike_vectors_ in spike_vectors.items()}
-    return spike_matrices, all_gids, assembly_idx
+    return spike_matrices, np.array(all_gids), np.array(assembly_idx)
 
 
-def analyse_results(config):
+def analyse_results(config_path):
+    config = Config(config_path)
     sbatch_dir = os.path.join(config.root_path, "sbatch")
     with open(os.path.join(sbatch_dir, "simulated_gids.pkl"), "rb") as f:
         simulated_gids = pickle.load(f)
     results_dir = os.path.join(config.root_path, "analyses", "rerun_results")
-    df_columns = ["gid", "assembly", "condition", "rate", "correlation", "member"]
+    df_columns = ["gid", "assembly", "rate", "correlation", "member", "condition"]
 
     t_bins = np.arange(config.t_start, config.t_end + config.bin_size, config.bin_size)
     rate_norm = (config.t_end - config.t_start) / 1e3  # ms -> s conversion
@@ -127,21 +130,33 @@ def analyse_results(config):
         dfs = []
         for condition, spike_matrix in spike_matrices.items():
             rates = np.sum(spike_matrix, axis=1) / rate_norm
+            idx = rates == 0
+            if idx.any():
+                for gid, assembly_id in zip(gids[idx], assembly_idx[idx]):
+                    print("No %s spikes from: %s_assembly%i_a%i" % (condition, seed, assembly_id, gid))
             # index out only significant time bins (detected before, only loaded now)
             t_idx = np.in1d(t_bins[:-1], clust_meta["t_bins"][seed], assume_unique=True)
+            # check if gid would be still member of assembly
             core_cell_idx, corrs = get_core_cell_idx(spike_matrix[:, t_idx], clust_meta["clusters"][seed],
                                                      config.core_cell_th_pct)
-            memberships = core_cell_idx[:, assembly_idx]
-            correlations = corrs[:, assembly_idx]
-            # TODO: test this part once there is more then 1 datapoint...
-            dfs.append(pd.DataFrame(data=np.hstack(gids, assembly_idx, np.full(rates.shape, condition),
-                                                   rates, correlations, memberships), columns=df_columns))
+            memberships = core_cell_idx[np.arange(len(assembly_idx)), assembly_idx].reshape(-1, 1)
+            correlations = corrs[np.arange(len(assembly_idx)), assembly_idx].reshape(-1, 1)
+            # put results into some meaningful format...
+            df = pd.DataFrame(data=np.hstack([gids.reshape(-1, 1), assembly_idx.reshape(-1, 1), rates.reshape(-1, 1),
+                                              correlations, memberships]), columns=df_columns[:-1])
+            df = df.astype({"gid": int, "assembly": int, "member": int})
+            df["condition"] = condition
+            dfs.append(df)
         df = pd.concat(dfs, ignore_index=True)
+        # due to the random schuffled controls it can happen that neurons that were members of the assembly before,
+        # won't be any longer, and we'll exclude those from the analysis...
+        drop_gids = df.loc[(df["condition"] == "baseline") & (df["member"] == 0), "gid"].to_numpy()
+        df.drop(df.loc[df["gid"].isin(drop_gids)].index, inplace=True)
         # TODO: add some viz. of these results across conditions
 
 
 if __name__ == "__main__":
-    config = Config("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_10seeds_np.yaml")
-    # write_launchscripts(config)
-    analyse_results(config)
+    config_path = "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_10seeds_np.yaml"
+    write_launchscripts(config_path)
+    # analyse_results(config)
 
