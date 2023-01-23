@@ -575,23 +575,6 @@ class ConsensusAssembly(Assembly):
         return np.vstack(res).sum(axis=0)
 
 
-def build_assembly_group(gids, n_assemblies, assembly_lst, seeds, assembly_grp_dict):
-    """
-    Builds 1 big assembly group from assemblies in `assembly_grp_dict` for consensus clustering
-    (`gids`, `n_assemblies`, `assembly_lst`, and `seeds` are passed to be able to create consensus
-    from a subset of seeds only and then increase the size of the subset)
-    """
-    for seed in seeds:
-        assembly_grp = assembly_grp_dict[seed]
-        gids.extend(assembly_grp.all.tolist())
-        n = len(assembly_grp.assemblies)
-        n_assemblies.append(n)
-        assembly_lst.extend([assembly_grp.assemblies[i] for i in range(n)])
-    all_gids = np.unique(gids)
-    assembly_grp = AssemblyGroup(assemblies=assembly_lst, all_gids=all_gids, label="all")
-    return gids, n_assemblies, assembly_lst, assembly_grp
-
-
 def consensus_over_seeds(assembly_grp_dict, h5f_name, h5_prefix, fig_path,
                          distance_metric="jaccard", linkage_method="ward"):
     """
@@ -600,13 +583,11 @@ def consensus_over_seeds(assembly_grp_dict, h5f_name, h5_prefix, fig_path,
     :param distance_metric, linkage_method: see `clustering.py/cluster_assemblies()`
     :return: assembly_grp_clust: dict with cluster idx as keys and AssemblyGroup object as values
     """
+    from assemblyfire.utils import assembly_groupdic2assembly_grp
     from assemblyfire.clustering import cluster_assemblies
     from assemblyfire.plots import plot_assembly_sim_matrix, plot_dendogram_silhouettes
 
-    gids, n_assemblies, assembly_lst = [], [], []
-    seeds = list(assembly_grp_dict.keys())
-    _, n_assemblies, _, assembly_grp = build_assembly_group(gids, n_assemblies, assembly_lst, seeds, assembly_grp_dict)
-
+    assembly_grp, n_assemblies = assembly_groupdic2assembly_grp(assembly_grp_dict)
     sim_matrix, clusters, plotting = cluster_assemblies(assembly_grp.as_bool().T, n_assemblies,
                                                         distance_metric, linkage_method)
     # plotting clustering results

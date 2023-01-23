@@ -377,6 +377,18 @@ def load_assemblies_from_h5(h5f_name, prefix="assemblies"):
     return assembly_grp_dict, project_metadata
 
 
+def assembly_groupdic2assembly_grp(assembly_grp_dict):
+    from assemblyfire.assemblies import AssemblyGroup
+    """Builds 1 big assembly group from assemblies in `assembly_grp_dict` for consensus clustering"""
+    gids, n_assemblies, assembly_lst = [], [], []
+    for seed, assembly_grp in assembly_grp_dict.items():
+        gids.extend(assembly_grp.all.tolist())
+        n = len(assembly_grp.assemblies)
+        n_assemblies.append(n)
+        assembly_lst.extend([assembly_grp.assemblies[i] for i in range(n)])
+    return AssemblyGroup(assembly_lst, np.unique(gids), label="all"), n_assemblies
+
+
 def load_consensus_assemblies_from_h5(h5f_name, prefix="consensus"):
     """Load consensus (clustered and thresholded )assemblies
     from saved h5 file into dict of ConsensusAssembly objects"""
