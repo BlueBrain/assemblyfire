@@ -698,6 +698,23 @@ def plot_coreness_r_spike(r_spikes, coreness, fig_name):
     plt.close(fig)
 
 
+def plot_consensus_vs_average_assembly_composition(intersection_at_n, diff_at_n, fig_name):
+    """TODO"""
+    x = np.arange(len(intersection_at_n)) + 1
+    fig = plt.figure(figsize=(6, 4))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.bar(x, intersection_at_n, color="red", edgecolor="black", lw=0.5, label="consensus & average")
+    ax.bar(x, diff_at_n, bottom=intersection_at_n, color="gray", edgecolor="black", lw=0.5, label="consensus \\ average")
+    ax.legend(frameon=False)
+    ax.set_xlabel("Times contained in consensus instantiations")
+    ax.set_yscale("log")
+    ax.set_ylim(bottom=100)
+    ax.set_ylabel("Count")
+    sns.despine(trim=True, offset=2, bottom=True)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_simplex_counts_consensus(simplex_counts, simplex_counts_control, fig_name):
     """Plots simplex counts for all instantiations of a consensus assembly
     and random control with the same size as the mean number of neurons in the instantiations"""
