@@ -70,7 +70,7 @@ def run_sim(ssim, gid, pre_gids, pre_spike_trains, spike_loc, passive_dends=Fals
     ssim.run(t_stop=tstop)
 
     # return spike times as DF (more columns to be added later...)
-    spike_times = np.array(spike_vec)
+    spike_times = spike_vec.as_numpy()
     spikes = pd.DataFrame(data=spike_times[spike_times > 0], columns=["spike_times"])
     # get voltage recordings from all sections and create DF
     data, columns = [], []
