@@ -14,7 +14,7 @@ from sklearn.metrics import davies_bouldin_score
 from assemblyfire.config import Config
 import assemblyfire.utils as utils
 from assemblyfire.clustering import cosine_similarity, detect_assemblies
-from assemblyfire.plots import plot_dendogram_silhouettes, plot_cluster_seqs, plot_distance_corr
+from assemblyfire.plots import plot_dendogram_silhouettes, plot_cluster_seqs, plot_distance_corr, plot_db_scores
 
 
 def get_pattern_distance(locf_name, pklf_name):
@@ -87,7 +87,10 @@ def cluster_sim_mat(spike_matrix, t_bins, stim_times, patterns, input_pattern_na
 
 def main(config_path, seeds, save_assemblies=True):
     config = Config(config_path)
-    spike_matrix_dict, project_metadata = utils.load_spikes_from_h5(config.h5f_name)
+    if seeds == ["_average"]:
+        spike_matrix_dict, project_metadata = utils.load_spikes_from_h5(config.h5f_name, config.h5_prefix_avg_spikes)
+    else:
+        spike_matrix_dict, project_metadata = utils.load_spikes_from_h5(config.h5f_name, config.h5_prefix_spikes)
     stim_times, patterns = project_metadata["stim_times"], project_metadata["patterns"]
     input_pattern_names, input_dist = get_pattern_distance(config.pattern_locs_fname, config.pattern_gids_fname)
     nrn_loc_df = utils.get_neuron_locs(utils.get_sim_path(config.root_path).iloc[0], config.target)
