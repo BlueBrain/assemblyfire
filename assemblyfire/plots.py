@@ -775,6 +775,23 @@ def plot_assembly_similarities(similarities, xlabel, ylabel, fig_name):
     plt.close(fig)
 
 
+def plot_across_conditions(df, y, fig_name):
+    """Plots `y` features of spikes, across different condition (rerun in BGLibPy)"""
+    order = np.sort(df["assembly"].unique())
+    palette = {"passivedend": "tab:blue", "baseline": "gray", "noNMDA": "tab:purple"}
+    fig = plt.figure(figsize=(20, 8))
+    ax = fig.add_subplot(1, 1, 1)
+    sns.boxplot(x="assembly", y=y, hue="condition", order=order, hue_order=["passivedend", "baseline", "noNMDA"],
+                palette=palette, fliersize=0, data=df, ax=ax)
+    sns.stripplot(x="assembly", y=y, hue="condition", order=order, hue_order=["passivedend", "baseline", "noNMDA"],
+                  dodge=True, palette="dark:black", data=df.loc[df["member"] == 1], ax=ax, legend=False)
+    sns.stripplot(x="assembly", y=y, hue="condition", order=order, hue_order=["passivedend", "baseline", "noNMDA"],
+                  dodge=True, palette="dark:red", data=df.loc[df["member"] == 0], ax=ax, legend=False)
+    sns.despine(trim=True, offset=2, bottom=True)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_synapse_distance_dist(bin_edges, hist, cum, fit, fig_name):
     """Plots distribution of distances between synapses (on the same section)"""
     bin_centers = (bin_edges[1:] + bin_edges[:-1]) / 2

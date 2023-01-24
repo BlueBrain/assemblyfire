@@ -16,6 +16,7 @@ import pandas as pd
 import assemblyfire.utils as utils
 from assemblyfire.config import Config
 from assemblyfire.clustering import get_core_cell_idx
+from assemblyfire.plots import plot_across_conditions
 
 
 DSET_MEMBER = "member"
@@ -151,12 +152,15 @@ def analyse_results(config_path):
         # due to the random schuffled controls it can happen that neurons that were members of the assembly before,
         # won't be any longer, and we'll exclude those from the analysis...
         drop_gids = df.loc[(df["condition"] == "baseline") & (df["member"] == 0), "gid"].to_numpy()
-        df.drop(df.loc[df["gid"].isin(drop_gids)].index, inplace=True)
-        # TODO: add some viz. of these results across conditions
+        if len(drop_gids):
+            df.drop(df.loc[df["gid"].isin(drop_gids)].index, inplace=True)
+
+        plot_across_conditions(df, "rate", os.path.join(config.fig_path, "spike_rate_across_conditions_%s.png" % seed))
+        plot_across_conditions(df, "correlation", os.path.join(config.fig_path, "spike_corr_across_conditions_%s.png" % seed))
 
 
 if __name__ == "__main__":
     config_path = "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_10seeds_np.yaml"
-    write_launchscripts(config_path)
-    # analyse_results(config)
+    # write_launchscripts(config_path)
+    analyse_results(config_path)
 
