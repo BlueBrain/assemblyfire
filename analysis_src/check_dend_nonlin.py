@@ -154,6 +154,10 @@ def analyse_results(config_path):
         drop_gids = df.loc[(df["condition"] == "baseline") & (df["member"] == 0), "gid"].to_numpy()
         if len(drop_gids):
             df.drop(df.loc[df["gid"].isin(drop_gids)].index, inplace=True)
+        # drop gids that don't spike in modified conditions (probably due to bad e-model)
+        drop_gids = np.unique(df.loc[df["rate"] == 0, "gid"].to_numpy())
+        if len(drop_gids):
+            df.drop(df.loc[df["gid"].isin(drop_gids)].index, inplace=True)
 
         plot_across_conditions(df, "rate", os.path.join(config.fig_path, "spike_rate_across_conditions_%s.png" % seed))
         plot_across_conditions(df, "correlation", os.path.join(config.fig_path, "spike_corr_across_conditions_%s.png" % seed))
