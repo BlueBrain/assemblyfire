@@ -778,15 +778,18 @@ def plot_assembly_similarities(similarities, xlabel, ylabel, fig_name):
 def plot_across_conditions(df, y, fig_name):
     """Plots `y` features of spikes, across different condition (rerun in BGLibPy)"""
     order = np.sort(df["assembly"].unique())
+    hue_order = ["passivedend", "baseline", "noNMDA"]
     palette = {"passivedend": "tab:blue", "baseline": "gray", "noNMDA": "tab:purple"}
     fig = plt.figure(figsize=(20, 8))
     ax = fig.add_subplot(1, 1, 1)
-    sns.boxplot(x="assembly", y=y, hue="condition", order=order, hue_order=["passivedend", "baseline", "noNMDA"],
+    sns.boxplot(x="assembly", y=y, hue="condition", order=order, hue_order=hue_order,
                 palette=palette, fliersize=0, data=df, ax=ax)
-    sns.stripplot(x="assembly", y=y, hue="condition", order=order, hue_order=["passivedend", "baseline", "noNMDA"],
-                  dodge=True, palette="dark:black", data=df.loc[df["member"] == 1], ax=ax, legend=False)
-    sns.stripplot(x="assembly", y=y, hue="condition", order=order, hue_order=["passivedend", "baseline", "noNMDA"],
-                  dodge=True, palette="dark:red", data=df.loc[df["member"] == 0], ax=ax, legend=False)
+    sns.stripplot(x="assembly", y=y, hue="condition", order=order, hue_order=hue_order,
+                  dodge=True, palette=["black" for _ in range(len(hue_order))],
+                  data=df.loc[df["member"] == 1], ax=ax, legend=False)
+    sns.stripplot(x="assembly", y=y, hue="condition", order=order, hue_order=hue_order,
+                  dodge=True, palette=["red" for _ in range(len(hue_order))],
+                  data=df.loc[df["member"] == 0], ax=ax, legend=False)
     sns.despine(trim=True, offset=2, bottom=True)
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
