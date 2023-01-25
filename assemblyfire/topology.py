@@ -265,7 +265,7 @@ def _sign(bin_centers, probs, counts=None):
 def assembly_rel_frac_entropy_explained(gids, assembly_grp, bin_centers, bin_idx, seed, bin_min_n, sign_th):
     """Gets mutual information between assembly membership and structural innervation (using pre-binned indegrees)
     and gives it a sign (hence 'relative') based on fitting the probabilities with a line"""
-    if isinstance(seed, str):
+    if seed not in ["consensus", "average"]:
         seed = int(seed.split("seed")[1])
     keys = np.sort(list(bin_idx.keys()))
     assembly_idx = np.sort([assembly.idx[0] for assembly in assembly_grp.assemblies])
@@ -299,7 +299,7 @@ def assembly_rel_frac_entropy_explained(gids, assembly_grp, bin_centers, bin_idx
 def assembly_cond_frac_entropy_explained(gids, assembly_grp, bin_idx, bin_idx_cond, seed, sign_th):
     """Gets conditional mutual information between assembly membership and structural innervation
     (using pre-binned indegrees). (Unlike above here it would be hard to define the sign, so we just skip it...)"""
-    if isinstance(seed, str):
+    if seed not in ["consensus", "average"]:
         seed = int(seed.split("seed")[1])
     keys = np.sort(list(bin_idx.keys()))
     assembly_idx = np.sort([assembly.idx[0] for assembly in assembly_grp.assemblies])

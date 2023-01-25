@@ -216,7 +216,10 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, core_cell_th_pct, h5f_na
 
         # save to h5
         metadata = {"clusters": clusters}
-        assembly_lst = [Assembly(gids[core_cell_idx[:, i] == 1], index=(i, seed)) for i in assembly_idx]
+        assembly_lst = []
+        for i in assembly_idx:
+            index = (i, seed) if seed != "_average" else i  # "`_average` cannot be saved as h5 attr."
+            assembly_lst.append(Assembly(gids[core_cell_idx[:, i] == 1], index=index))
         assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=gids, label="seed%s" % seed, metadata=metadata)
         assemblies.to_h5(h5f_name, prefix=h5_prefix)
 
