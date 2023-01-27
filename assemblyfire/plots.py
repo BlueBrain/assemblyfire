@@ -767,7 +767,7 @@ def plot_assembly_similarities(similarities, xlabel, ylabel, fig_name):
     """Plots similarity matrix of assemblies"""
     fig = plt.figure(figsize=(10, 9))
     ax = fig.add_subplot(1, 1, 1)
-    i = ax.imshow(similarities, cmap="inferno", aspect="auto", interpolation="none",)
+    i = ax.imshow(similarities, cmap="inferno", aspect="auto", interpolation="none")
     fig.colorbar(i, label="Jaccard similarity")
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -791,6 +791,34 @@ def plot_across_conditions(df, y, fig_name):
                   dodge=True, palette=["red" for _ in range(len(hue_order))],
                   data=df.loc[df["member"] == 0], ax=ax, legend=False)
     sns.despine(trim=True, offset=2, bottom=True)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_dend_traces(basal_traces, apical_traces, basal_range, apical_range, t_range, fig_name):
+    """Plots traces from apical and basal dendrites"""
+    vmin = np.min([np.min(basal_traces), np.min(apical_traces)])
+    vmax = np.max([np.max(basal_traces), np.max(apical_traces)])
+    fig = plt.figure(figsize=(10, 8))
+    gs = gridspec.GridSpec(2, 2, width_ratios=[30, 1], height_ratios=[apical_traces.shape[0], basal_traces.shape[0]])
+    ax = fig.add_subplot(gs[0, 0])
+    i = ax.imshow(apical_traces, cmap="inferno", aspect="auto", origin="lower",
+                  interpolation="gaussian", vmin=vmin, vmax=vmax)
+    ax.set_xticks([])
+    ax.set_yticks([0, apical_traces.shape[0]])
+    ax.set_yticklabels(apical_range)
+    ax.set_ylabel("Apical\nSoma distance (um)")
+    ax2 = fig.add_subplot(gs[1, 0])
+    ax2.imshow(basal_traces, cmap="inferno", aspect="auto", interpolation="gaussian", vmin=vmin, vmax=vmax)
+    ax2.set_xticks([0, basal_traces.shape[1]])
+    ax2.set_xticklabels(t_range)
+    ax2.set_xlabel("Time to spike (ms)")
+    ax2.set_yticks([0, basal_traces.shape[0]])
+    ax2.set_yticklabels(basal_range)
+    ax2.set_ylabel("Basal\nSoma distance (um)")
+    cax = fig.add_subplot(gs[:, 1])
+    fig.colorbar(i, cax=cax, label="V_m (mV)")
+    fig.tight_layout(h_pad=0.1)
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)
 

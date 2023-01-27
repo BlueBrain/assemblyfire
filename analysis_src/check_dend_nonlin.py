@@ -16,11 +16,14 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 from pyrle import Rle
+import neurom as nm
+from neurom.core.morphology import iter_sections
+from neurom import NeuriteType
 
 import assemblyfire.utils as utils
 from assemblyfire.config import Config
 from assemblyfire.clustering import get_core_cell_idx
-from assemblyfire.plots import plot_across_conditions
+from assemblyfire.plots import plot_across_conditions, plot_dend_traces
 
 
 DSET_MEMBER = "member"
@@ -152,7 +155,7 @@ def analyse_spikes(config, seed, assembly_gids):
         df["condition"] = condition
         dfs.append(df)
     df = pd.concat(dfs, ignore_index=True)
-    # due to the random schuffled controls it can happen that neurons that were members of the assembly before,
+    # due to the random shuffled controls it can happen that neurons that were members of the assembly before,
     # won't be any longer, and we'll exclude those from the analysis...
     drop_gids = df.loc[(df["condition"] == "baseline") & (df["member"] == 0), "gid"].to_numpy()
     if len(drop_gids):
@@ -163,7 +166,7 @@ def analyse_spikes(config, seed, assembly_gids):
     if len(drop_gids):
         df.drop(df.loc[df["gid"].isin(drop_gids)].index, inplace=True)
         spikes.drop(spikes.loc[spikes["gid"].isin(drop_gids)].index, inplace=True)
-    return df, spikes
+    return df, spikes.drop_duplicates().sort_values("spike_times")
 
 
 def _find_consecutive_ranges(peak_idx):
@@ -229,21 +232,70 @@ def analyse_traces(results_dir, seed, spikes, threshold, sustain_for, pre_spike)
     return pd.concat(dfs, ignore_index=True)
 
 
+def get_dendritic_path_lengths(morphf_name):
+    """Gets path lengths of sections using NeuroM (used for ordering plots)"""
+    m = nm.load_morphology(morphf_name)
+    basal_flt = lambda n: n.type == NeuriteType.basal_dendrite
+    basal_df = pd.DataFrame(columns=["section", "path_length"])
+    for i, sec in enumerate(iter_sections(m, neurite_filter=basal_flt, neurite_order=nm.NeuriteIter.NRN)):
+        basal_df.loc[i, :] = ["dend[%i]" % i, nm.features.section.section_path_length(sec)]
+    apical_flt = lambda n: n.type == NeuriteType.apical_dendrite
+    apical_df = pd.DataFrame(columns=["section", "path_length"])
+    for i, sec in enumerate(iter_sections(m, neurite_filter=apical_flt, neurite_order=nm.NeuriteIter.NRN)):
+        apical_df.loc[i, :] = ["apic[%i]" % i, nm.features.section.section_path_length(sec)]
+    return basal_df.sort_values("path_length"), apical_df.sort_values("path_length")
+
+
+def plot_events(results_dir, seed, condition, spikes, events, morph_paths, pre_spike, fig_dir, min_events=5):
+    """Plot dendritic voltage traces in `pre_spike` intervals for `gids` if events are detected in at least
+    `min_events` dendritic sections"""
+    for gid in tqdm(events["gid"].unique(), desc="Plotting traces for selected events"):
+        gid_events = events.loc[(events["gid"] == gid) & (events["condition"] == condition)].sort_values("start")
+        spike_times = spikes.loc[(spikes["gid"] == gid) & (spikes["condition"] == condition), "spike_times"].to_numpy()
+        # count events before each spike (and only use the ones that are visible on enough dendritic sections)
+        counts = gid_events.groupby(pd.cut(gid_events["start"], spike_times))["start"].count()
+        counts = counts[counts >= min_events]
+        if len(counts):
+            pklf_name = os.path.join(results_dir, "%s_a%i_%s_voltages.pkl" % (seed, gid, condition))
+            traces = pd.read_pickle(pklf_name)
+            basal_df, apical_df = get_dendritic_path_lengths(morph_paths[gid])
+            basal_range = [basal_df.iloc[0]["path_length"].astype(int), basal_df.iloc[-1]["path_length"].astype(int)]
+            apical_range = [apical_df.iloc[0]["path_length"].astype(int), apical_df.iloc[-1]["path_length"].astype(int)]
+            basal_traces = traces[basal_df["section"].to_numpy()]
+            apical_traces = traces[apical_df["section"].to_numpy()]
+            for w, _ in counts.items():
+                plot_basal = basal_traces.loc[((w.right - pre_spike) < basal_traces.index)
+                                              & (basal_traces.index < w.right), :].to_numpy().transpose()
+                plot_apical = apical_traces.loc[((w.right - pre_spike) < apical_traces.index)
+                                                & (apical_traces.index < w.right), :].to_numpy().transpose()
+                fig_name = os.path.join(fig_dir, "a%i_%s_dendritic_traces_at%.1f.png" % (gid, condition, w.right))
+                plot_dend_traces(plot_basal, plot_apical, basal_range, apical_range, [-pre_spike, 0], fig_name)
+
+
 def main(config_path, threshold=-30, sustain_for=10, pre_spike=50):
     config = Config(config_path)
     sbatch_dir = os.path.join(config.root_path, "sbatch")
     results_dir = os.path.join(config.root_path, "analyses", "rerun_results")
     with open(os.path.join(sbatch_dir, "simulated_gids.pkl"), "rb") as f:
         simulated_gids = pickle.load(f)
+    c = utils.get_bluepy_circuit(utils.get_sim_path(config.root_path).iloc[0])
 
     for seed, assembly_gids in simulated_gids.items():
         df, spikes = analyse_spikes(config, seed, assembly_gids)
         plot_across_conditions(df, "rate", os.path.join(config.fig_path, "spike_rate_across_conditions_%s.png" % seed))
         plot_across_conditions(df, "correlation", os.path.join(config.fig_path, "spike_corr_across_conditions_%s.png" % seed))
 
-        df = analyse_traces(results_dir, seed, spikes, threshold, sustain_for, pre_spike)
+        events = analyse_traces(results_dir, seed, spikes, threshold, sustain_for, pre_spike)
         pklf_name = "%s_window_sustained_for%i_%ibefore_spikes.pkl" % (seed, sustain_for, pre_spike)
-        df.to_pickle(os.path.join(results_dir, pklf_name))
+        events.to_pickle(os.path.join(results_dir, pklf_name))
+        # plot events for L5 TTPCs in baseline conditions
+        mtypes = utils.get_mtypes(c, df["gid"].unique())
+        gids = mtypes[mtypes.isin(["L5_TPC:A", "L5_TPC:B"])].index.to_numpy()
+        morph_paths = {gid: c.morph.get_filepath(gid) for gid in gids}
+        fig_dir = os.path.join(config.fig_path, "%s_debug" % seed)
+        utils.ensure_dir(fig_dir)
+        plot_events(results_dir, seed, "baseline", spikes, events.loc[events["gid"].isin(gids)],
+                    morph_paths, pre_spike, fig_dir)
 
 
 if __name__ == "__main__":
