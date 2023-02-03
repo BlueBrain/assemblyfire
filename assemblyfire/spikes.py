@@ -76,6 +76,7 @@ def get_sign_rate_th(spike_matrix, surr_rate_method, nreps=100):
             stds = p(delayed(_sasaki_surr_rate_std)(shape, spiking_neuron_idx, spiking_bin_idx, spike_counts)
                      for _ in range(nreps))
     elif surr_rate_method == "keep_sc_rate":
+        nprocs = 10 if nprocs > 10 else nprocs  # limit processes to not run out of memory
         with Parallel(n_jobs=nprocs, prefer="threads") as p:
             stds = p(delayed(_keep_sc_rate_surr_rate_std)(shape, spiking_neuron_idx, spiking_bin_idx, spike_counts)
                      for _ in range(nreps))

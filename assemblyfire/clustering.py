@@ -67,7 +67,7 @@ def cluster_sim_mat(spike_matrix, min_n_clusts=5, max_n_clusts=20, n_method="DB"
 
 
 # core-cells and assemblies related functions (mostly calculating correlations)
-def pairwise_correlation_X(sparse_x):
+def pairwise_correlation_x(sparse_x):
     """Pairwise correlation between rows of a matrix `x` (assumed to be sparse)
     much faster than `1 - squareform(pdist(x, metrix="correlation"))`"""
     assert issparse(sparse_x), "Matrix is expected to be in sparse format"
@@ -78,41 +78,41 @@ def pairwise_correlation_X(sparse_x):
     return cov / (norm + 1e-40)
 
 
-def pairwise_correlation_XY(x, y):
-    """Pairwise correlation between rows of a matrix X and matrix Y
-    (Could be done in sparse format as `pairwise_correlation_X()` above but shuffling the columns (for random control)
-    and converting to the shuffled spikes to sparse format takes too much time...)"""
+def pairwise_correlation_xy(x, y):
+    """Pairwise correlation between rows of a matrix X and matrix Y"""
     corrs = 1 - cdist(x, y, metric="correlation")
     corrs[np.isnan(corrs)] = 0.
     return corrs
 
 
 def _convert_clusters(clusters):
-    """Convert clusters into a sparse matrix form for `cdist()`"""
+    """Convert cluster vector into a matrix form for `cdist()`"""
     sparse_clusters = np.zeros((len(np.unique(clusters)), clusters.shape[0]), dtype=int)
     for i in np.unique(clusters):
         sparse_clusters[i, clusters == i] = 1
     return sparse_clusters
 
 
-def corr_spike_matrix_clusters(spike_matrix, sparse_clusters):
+def corr_spike_matrix_clusters(spike_matrix, clusters):
     """Correlation of cells with clusters (of time bins)"""
-    return pairwise_correlation_XY(spike_matrix, sparse_clusters)
+    return pairwise_correlation_xy(spike_matrix, clusters)
 
 
-def corr_shuffled_spike_matrix_clusters(spike_matrix, sparse_clusters):
+def corr_shuffled_spike_matrix_clusters(spike_matrix, clusters):
     """Random shuffles columns of the spike matrix (keeps number of spikes per neuron)
     in order to create surrogate dataset for significance test for correlation"""
     spike_matrix_rnd = spike_matrix[:, np.random.permutation(spike_matrix.shape[1])]
-    return corr_spike_matrix_clusters(spike_matrix_rnd, sparse_clusters)
+    del spike_matrix
+    return corr_spike_matrix_clusters(spike_matrix_rnd, clusters)
 
 
-def sign_corr_ths(spike_matrix, sparse_clusters, th_pct, nreps=1000):
+def sign_corr_ths(spike_matrix, clusters, th_pct, nreps=1000):
     """Generates `N` surrogate datasets and calculates correlation coefficients
     then takes `th_pct`% percentile of the surrogate datasets as a significance threshold"""
     nprocs = nreps if os.cpu_count()-1 > nreps else os.cpu_count()-1
+    nprocs = 20 if nprocs > 20 and spike_matrix.shape[1] > 5000 else nprocs  # limit processes to not run out of memory
     with Parallel(n_jobs=nprocs, prefer="threads") as p:
-        corrs = p(delayed(corr_shuffled_spike_matrix_clusters)(spike_matrix, sparse_clusters) for _ in range(nreps))
+        corrs = p(delayed(corr_shuffled_spike_matrix_clusters)(spike_matrix, clusters) for _ in range(nreps))
     corrs = np.dstack(corrs)  # shape: ngids x nclusters x N
     # get sign threshold (compare to Monte-Carlo shuffles)
     corr_ths = np.percentile(corrs, th_pct, axis=2, overwrite_input=True)
@@ -121,11 +121,11 @@ def sign_corr_ths(spike_matrix, sparse_clusters, th_pct, nreps=1000):
 
 def get_core_cell_idx(spike_matrix, clusters, th_pct):
     """Finds cells whose spiking activity correlate with the activation of (clustered) time bins
-    (Just a combinations of functions above, made into yet an other function to be callable for other scripts...)"""
+    (Just a combinations of functions above, made into yet another function to be callable for other scripts...)"""
     assert spike_matrix.shape[1] == len(clusters)
-    sparse_clusters = _convert_clusters(clusters)
-    corrs = corr_spike_matrix_clusters(spike_matrix, sparse_clusters)
-    corr_ths = sign_corr_ths(spike_matrix, sparse_clusters, th_pct)
+    clusters = _convert_clusters(clusters)
+    corrs = corr_spike_matrix_clusters(spike_matrix, clusters)
+    corr_ths = sign_corr_ths(spike_matrix, clusters, th_pct)
     core_cell_idx = np.zeros_like(corrs, dtype=int)
     core_cell_idx[corrs > corr_ths] = 1
     return core_cell_idx, corrs
@@ -135,7 +135,7 @@ def within_cluster_correlations(spike_matrix, core_cell_idx):
     """Compares within cluster correlations (correlation of core cells)
     against the avg. correlation in the whole dataset
     if the within cluster correlation it's higher the cluster is an assembly"""
-    corrs = pairwise_correlation_X(spike_matrix)
+    corrs = pairwise_correlation_x(spike_matrix)
     np.fill_diagonal(corrs, np.nan)
     mean_corr = np.nanmean(corrs)
 
