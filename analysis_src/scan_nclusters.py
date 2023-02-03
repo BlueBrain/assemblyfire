@@ -85,7 +85,7 @@ def cluster_sim_mat(spike_matrix, t_bins, stim_times, patterns, input_pattern_na
     return n_clusters
 
 
-def main(config_path, seeds, save_assemblies=True):
+def main(config_path, seeds, save_assemblies=False):
     config = Config(config_path)
     if seeds == ["_average"]:
         spike_matrix_dict, project_metadata = utils.load_spikes_from_h5(config.h5f_name, config.h5_prefix_avg_spikes)
@@ -93,7 +93,8 @@ def main(config_path, seeds, save_assemblies=True):
         spike_matrix_dict, project_metadata = utils.load_spikes_from_h5(config.h5f_name, config.h5_prefix_spikes)
     stim_times, patterns = project_metadata["stim_times"], project_metadata["patterns"]
     input_pattern_names, input_dist = get_pattern_distance(config.pattern_locs_fname, config.pattern_gids_fname)
-    nrn_loc_df = utils.get_neuron_locs(utils.get_sim_path(config.root_path).iloc[0], config.target)
+    if save_assemblies:
+        nrn_loc_df = utils.get_neuron_locs(utils.get_sim_path(config.root_path).iloc[0], config.target)
 
     for seed in seeds:
         spike_matrix, t_bins = spike_matrix_dict["seed%s" % seed].spike_matrix, spike_matrix_dict["seed%s" % seed].t_bins
@@ -110,7 +111,7 @@ def main(config_path, seeds, save_assemblies=True):
 
 
 if __name__ == "__main__":
-    config_path = "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_10seeds_np.yaml"
-    seeds = [19]
+    config_path = "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_plastic_chunked.yaml"
+    seeds = [0, 1, 2, 3, 4]
     main(config_path, seeds)
 
