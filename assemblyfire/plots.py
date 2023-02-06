@@ -126,6 +126,21 @@ def plot_dendogram_silhouettes(clusters, linkage, silhouettes, fig_name):
     plt.close(fig)
 
 
+def plot_tsne(clusters, tsne, fig_name):
+    """Plot results of hierarchical clustering of the cosine similarity matrix (in terms of colors)
+    on the spike matrix projected with t-SNE (in 2D)"""
+    cmap = plt.cm.get_cmap("tab20", len(np.unique(clusters)))
+    colors = [cmap(i) for i in clusters]
+    fig = plt.figure(figsize=(6, 5))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.scatter(tsne[:, 0], tsne[:, 1], c=colors, alpha=0.8, marker='.', s=15, edgecolor="none")
+    ax.set_xlabel("t-SNE 1")
+    ax.set_ylabel("t-SNE 2")
+    sns.despine(trim=True, offset=2)
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def update(changed_image):
     """mpl hack to set 1 colorbar for multiple images"""
     for im in images:

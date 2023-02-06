@@ -1,6 +1,6 @@
 """
 Scan clustering n and saves plots dendograms, cluster seqs and assemblies for all of them
-last modified: András Ecker 01.2023
+last modified: András Ecker 02.2023
 """
 
 import os
@@ -10,11 +10,12 @@ from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.optimize import linear_sum_assignment
 from scipy.cluster.hierarchy import linkage, fcluster
 from sklearn.metrics import davies_bouldin_score
+from sklearn.manifold import TSNE
 
 from assemblyfire.config import Config
 import assemblyfire.utils as utils
 from assemblyfire.clustering import cosine_similarity, detect_assemblies
-from assemblyfire.plots import plot_dendogram_silhouettes, plot_cluster_seqs, plot_distance_corr, plot_db_scores
+from assemblyfire.plots import plot_dendogram_silhouettes, plot_tsne, plot_cluster_seqs, plot_distance_corr, plot_db_scores
 
 
 def get_pattern_distance(locf_name, pklf_name):
@@ -58,7 +59,9 @@ def get_assembly_count_distance(clusters, t_bins, stim_times, patterns, distance
 
 def cluster_sim_mat(spike_matrix, t_bins, stim_times, patterns, input_pattern_names, input_dist, fig_dir,
                     min_n_clusts=5, max_n_clusts=20):
-    """Modified version of `assemblyfire.clustering/cluster_sim_mat()` that plot results for all `n_clusts`"""
+    """Modified version of `assemblyfire.clustering/cluster_sim_mat()` that plot results for all `n_clusts`
+    and some extra stuff"""
+    tsne = TSNE(n_components=2, random_state=0).fit_transform(spike_matrix.T)
     sim_matrix = cosine_similarity(spike_matrix.T)
     dists = 1 - sim_matrix
     dists[dists < 1e-10] = 0.  # fixing numerical errors
@@ -76,6 +79,7 @@ def cluster_sim_mat(spike_matrix, t_bins, stim_times, patterns, input_pattern_na
 
         plot_dendogram_silhouettes(clusters, linkage_matrix, None, os.path.join(fig_dir, "ward_clustering_n%i.png" % n))
         plot_cluster_seqs(clusters, t_bins, stim_times, patterns, os.path.join(fig_dir, "cluster_seq_n%i.png" % n))
+        plot_tsne(clusters, tsne, os.path.join(fig_dir, "t-SNE_n%i.png" % n))
         if (input_pattern_names != output_pattern_names).all():
             warnings.warn("Input and output pattern names don't match!")
         else:
@@ -111,7 +115,7 @@ def main(config_path, seeds, save_assemblies=False):
 
 
 if __name__ == "__main__":
-    config_path = "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_plastic_chunked.yaml"
-    seeds = [0, 1, 2, 3, 4]
+    config_path = "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_plastic.yaml"
+    seeds = [1]
     main(config_path, seeds)
 
