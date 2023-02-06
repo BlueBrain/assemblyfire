@@ -8,6 +8,7 @@ h5_out:
     prefixes:
         spikes: "spikes"
         assemblies: "assemblies"
+        consensus_assemblies: "consensus"
         connectivity: "connectivity"
 
 root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures/v7_assemblies"
