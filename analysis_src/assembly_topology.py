@@ -85,7 +85,7 @@ def n_assemblies_from_projs(assembly_grp_dict, proj_indegrees, gids, fig_path, n
                 probs[i], probs_low[i], probs_high[i] = topology.prob_with_binom_ci(n_assemblies[bin_idx == i + 1], bin_min_n)
             assembly_probs[proj_name] = probs
             assembly_probs_low[proj_name], assembly_probs_high[proj_name] = probs_low, probs_high
-        fig_name = os.path.join(fig_path, "assembly_n_from_projections_seed%i.png" % seed)
+        fig_name = os.path.join(fig_path, "assembly_n_from_projections_seed%s.png" % seed)
         plots.plot_assembly_n_from(bin_centers_dict, assembly_probs, assembly_probs_low, assembly_probs_high,
                                    "In degree from projections", "projections", fig_name)
 
@@ -270,7 +270,7 @@ def assembly_prob_mi_from_indegree_groupedby_syn_nnd(assembly_grp_dict, h5f_name
             assembly_idx = syn_nnds.columns.get_level_values(0).unique().to_numpy()
             # quickly check if the syn nnd. strength and indegree are correlated
             fig_name = os.path.join(fig_path, "syn_nnd_indegree_corr_%s.png" % seed)
-            plots.plot_joint_dists(-1 * syn_nnds.loc[:, (assembly_idx, DSET_CLST)].to_numpy().flatten(),
+            plots.plot_joint_dists(syn_nnds.loc[:, (assembly_idx, DSET_CLST)].to_numpy().flatten(),
                                    syn_nnds.loc[:, (assembly_idx, DSET_DEG)].to_numpy().flatten(),
                                    DSET_CLST, DSET_DEG, fig_name)
 
@@ -300,18 +300,17 @@ def assembly_prob_mi_from_indegree_groupedby_syn_nnd(assembly_grp_dict, h5f_name
             plots.plot_frac_entropy_explained_by(mi, "Synapse nnd. strength | indegree from assembly", fig_name)
 
 
-if __name__ == "__main__":
-    config = Config("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_10seeds_np.yaml")
-    assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
-    conn_mat = topology.AssemblyTopology.from_h5(config.h5f_name, prefix=config.h5_prefix_connectivity)
+def main(config, assembly_grp_dict, plastic=False):
     fig_path = config.fig_path
+    if plastic:
+        assembly_efficacy(config, assembly_grp_dict)
 
     conn_matrices, proj_indegrees, pattern_indegrees, gids = get_proj_innervation(config)
     n_assemblies_from_projs(assembly_grp_dict, proj_indegrees, gids, fig_path)
     assembly_prob_mi_from_proj_ci(assembly_grp_dict, conn_matrices, gids, fig_path)
     assembly_prob_mi_from_patterns(assembly_grp_dict, pattern_indegrees, gids, fig_path)
 
-    # assembly_efficacy(config, assembly_grp_dict)
+    conn_mat = topology.AssemblyTopology.from_h5(config.h5f_name, prefix=config.h5_prefix_connectivity)
     assembly_in_degrees(assembly_grp_dict, conn_mat, fig_path)
     assembly_simplex_counts(assembly_grp_dict, conn_mat, fig_path)
     assembly_prob_mi_from_indegree(assembly_grp_dict, conn_mat, fig_path)
@@ -320,4 +319,12 @@ if __name__ == "__main__":
     assembly_prob_mi_from_indegree_groupedby_syn_nnd(assembly_grp_dict, config.h5f_name, fig_path)
 
 
+if __name__ == "__main__":
+    config = Config("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_plastic_chunked.yaml")
+    # assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+    assembly_grp = utils.consensus_dict2assembly_grp(utils.load_consensus_assemblies_from_h5(config.h5f_name,
+                                                           config.h5_prefix_consensus_assemblies))
+    assembly_grp_dict = {"consensus": assembly_grp}
+
+    main(config, assembly_grp_dict, True)
 
