@@ -233,7 +233,7 @@ def cond_assembly_membership_probability(gids, assembly_grp, bin_centers, bin_id
     """Reimplementation of `assembly_membership_probability()` above with some changes:
     1: it's not using pre-binned gids, but `bin_idx` (from `np.digitize`) and an extra condition passed in `cond_df`
     2: it doesn't do full cross assembly analysis (because that's a lot with extra condition), only within assembly."""
-    if isinstance(seed, str):
+    if isinstance(seed, str) and seed not in ["consensus", "average"]:
         seed = int(seed.split("seed")[1])
     chance_levels = {}
     keys = list(cond_keys.keys())
@@ -284,14 +284,17 @@ def assembly_rel_frac_entropy_explained(gids, assembly_grp, bin_centers, bin_idx
             for k in range(len(bin_centers[key])):
                 tmp = idx[bin_idx_ == k + 1]
                 counts[k], probs[k] = len(tmp), np.mean(tmp)
-            valid_n_idx = np.where(counts >= bin_min_n)
-            mi_sign = _sign(bin_centers[key][valid_n_idx], probs[valid_n_idx], counts[valid_n_idx])
-            mi_matrix[i, j] = mi_sign * mi
-            mi_ctrl_matrix[i, j] = mi_ctrl
+            valid_n_idx = np.where(counts >= bin_min_n)[0]
+            if len(valid_n_idx):
+                mi_sign = _sign(bin_centers[key][valid_n_idx], probs[valid_n_idx], counts[valid_n_idx])
+                mi_matrix[i, j] = mi_sign * mi
+                mi_ctrl_matrix[i, j] = mi_ctrl
+            else:
+                mi_matrix[i, j], mi_ctrl_matrix[i, j] = np.nan, np.nan
     # set values that are smaller than control mean + significance threshold * control std to nan...
     if sign_th > 0:
-        mi_matrix[np.abs(mi_matrix) < (np.mean(mi_ctrl_matrix) + sign_th * np.std(mi_ctrl_matrix))] = np.nan
-    ratio = (np.nanmean(np.abs(mi_matrix)) - np.mean(mi_ctrl_matrix)) / np.std(mi_ctrl_matrix)
+        mi_matrix[np.abs(mi_matrix) < (np.nanmean(mi_ctrl_matrix) + sign_th * np.nanstd(mi_ctrl_matrix))] = np.nan
+    ratio = (np.nanmean(np.abs(mi_matrix)) - np.nanmean(mi_ctrl_matrix)) / np.nanstd(mi_ctrl_matrix)
     print("MI ratio (between data and shuffled/control data): %.2f" % ratio)
     return pd.DataFrame(data=mi_matrix, columns=assembly_idx, index=keys)
 
