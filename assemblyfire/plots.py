@@ -686,33 +686,6 @@ def plot_consensus_r_spikes(df, fig_name):
     plt.close(fig)
 
 
-def plot_coreness_r_spike(r_spikes, coreness, fig_name):
-    """Plots corenss vs. spike time reliability"""
-    n = len(coreness)
-    cmap = plt.cm.get_cmap("tab20", n)
-    max_r = np.max([np.max(r_spikes_) for r_spikes_ in r_spikes])
-
-    fig = plt.figure(figsize=(20, 8))
-    gs = gridspec.GridSpec(np.floor_divide(n, 5)+1, 5)
-    for i in range(n):
-        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
-        ax.scatter(coreness[i], r_spikes[i], color=cmap(i), marker='.', s=10, edgecolor="none")
-        ax.set_title("union%i\n(n=%i)" % (i+1, coreness[i].shape[0]))
-        ax.axvline(4., color="gray", ls="--")
-        ax.set_xticks([0, 4, 5])
-        ax.set_xlim([0, 5.1])
-        ax.set_yticks([0, 0.3, 0.6])
-        ax.set_ylim([0, max_r])
-        sns.despine(ax=ax, offset=True, trim=True)
-    fig.tight_layout()
-    # fig.add_subplot(1, 1, 1, frameon=False)
-    # plt.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
-    # plt.xlabel("Coreness")
-    # plt.ylabel("r_spike")
-    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
-    plt.close(fig)
-
-
 def plot_consensus_vs_average_assembly_composition(intersection_at_n, diff_at_n, fig_name):
     """Plots intersection and (cons. - avg.) at different fractions contained"""
     x = np.arange(len(intersection_at_n)) + 1
