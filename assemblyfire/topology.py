@@ -135,41 +135,15 @@ def simplex_counts_assemblies(assembly_grp_dict, conn_mat):
     return simplex_counts, s_c_control
 
 
-def simplex_counts_consensus_instantiations(consensus_assemblies_dict, conn_mat):
+def simplex_counts_consensus_instantiations(assembly_grp, conn_mat):
     """Computes the simplices of all assemblies making up the consensus assemblies
     and a random control of the size of the average of instantiations"""
     simplex_count, s_c_control = {}, {}
-    for k, consensus_assembly in tqdm(consensus_assemblies_dict.items(), desc="Counting simplices"):
-        # Simplex count of instantiations within one cluster (under one key)
-        simplex_count[k] = [conn_mat.simplex_counts(inst.gids) for inst in consensus_assembly.instantiations]
-        # Comparison with random control of average size of the instantiations
-        mean_size = int(np.mean([len(inst.gids) for inst in consensus_assembly.instantiations]))
-        sample_gids = np.random.choice(conn_mat.gids, mean_size, replace=False)
-        s_c_control[k] = [conn_mat.simplex_counts(sample_gids)]
+    for assembly in tqdm(assembly_grp.assemblies, desc="Counting simplices"):
+        simplex_count[assembly.idx[0]] = [conn_mat.simplex_counts(inst.gids) for inst in assembly.instantiations]
+        ctrl_gids = conn_mat.random_n_gids(int(np.mean([len(inst.gids) for inst in assembly.instantiations])))
+        s_c_control[assembly.idx[0]] = [conn_mat.simplex_counts(ctrl_gids)]
     return simplex_count, s_c_control
-
-
-# TODO: maybe this should be moved to the ConsensusAssembly class
-def get_intersection_gids(consensus_assemblies_dict):
-    """Returns dictionary of intersection gids"""
-    intersection_gids_dict = {}
-    for k, consensus_assembly in consensus_assemblies_dict.items():
-        max_filtration = np.max(consensus_assembly.coreness)
-        intersection_gids_dict[k] = consensus_assembly.union.gids[
-                                    np.where(consensus_assembly.coreness == max_filtration)]
-        # TODO: Implement the above in a weighted assembly class where you can choose thresholds
-    return intersection_gids_dict
-
-
-def simplex_counts_consensus_core_union_intersection(consensus_assemblies_dict, conn_mat):
-    """Computes the simplex counts of the core and intersection of the consensus assemblies"""
-    intersection_gids_dict = get_intersection_gids(consensus_assemblies_dict)
-    s_c_core, s_c_union, s_c_intersection = {}, {}, {}
-    for k, consensus_assembly in tqdm(consensus_assemblies_dict.items(), desc="Counting simplices"):
-        s_c_core[k] = conn_mat.simplex_counts(consensus_assembly)
-        s_c_union[k] = conn_mat.simplex_counts(consensus_assembly.union)
-        s_c_intersection[k] = conn_mat.simplex_counts(intersection_gids_dict[k])
-    return s_c_core, s_c_intersection
 
 
 def bin_gids_by_innervation(all_indegrees, gids, n_bins):

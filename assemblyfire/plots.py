@@ -714,7 +714,7 @@ def plot_coreness_r_spike(r_spikes, coreness, fig_name):
 
 
 def plot_consensus_vs_average_assembly_composition(intersection_at_n, diff_at_n, fig_name):
-    """TODO"""
+    """Plots intersection and (cons. - avg.) at different fractions contained"""
     x = np.arange(len(intersection_at_n)) + 1
     fig = plt.figure(figsize=(6, 4))
     ax = fig.add_subplot(1, 1, 1)
@@ -738,10 +738,7 @@ def plot_simplex_counts_consensus(simplex_counts, simplex_counts_control, fig_na
     fig = plt.figure(figsize=(20, 8))
     n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
     gs = gridspec.GridSpec(n_rows, 5)
-    # for i, (label, simplex_counts_cons) in enumerate(simplex_counts.items()):
-    for i in range(n):
-        label = "cluster%i" % i
-        simplex_counts_cons = simplex_counts[label]
+    for i, (label, simplex_counts_cons) in enumerate(simplex_counts.items()):
         ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
         for simlex_count_inst in simplex_counts_cons:
             ax.plot(simlex_count_inst, color=cmap(i))
