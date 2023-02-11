@@ -89,15 +89,14 @@ def main(config_path):
     config = Config(config_path)
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
     consensus_assemblies = utils.load_consensus_assemblies_from_h5(config.h5f_name, config.h5_prefix_consensus_assemblies)
-    metadata = utils.read_cluster_seq_data(config.h5f_name)
     conn_mat = AssemblyTopology.from_h5(config.h5f_name, prefix=config.h5_prefix_connectivity)
     fig_path = config.fig_path
 
-    consensus_cluster_seqs(assembly_grp_dict, consensus_assemblies, metadata, fig_path)
+    consensus_cluster_seqs(assembly_grp_dict, consensus_assemblies, utils.read_cluster_seq_data(config.h5f_name), fig_path)
     consensus_botany(utils.consensus_dict2assembly_grp(consensus_assemblies), conn_mat, fig_path)
 
     if config.t_chunks is None:  # no single cell features for consensus over time
-        single_cell_features, _ = utils.load_single_cell_features_from_h5(config.h5f_name, config.h5_prefix_single_cell)
+        single_cell_features = utils.load_single_cell_features_from_h5(config.h5f_name, config.h5_prefix_single_cell)
         consensus_vs_single_cell_features(consensus_assemblies, single_cell_features, fig_path)
 
 
