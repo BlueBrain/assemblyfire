@@ -216,7 +216,7 @@ def group_clusters_by_patterns(clusters, t_bins, stim_times, patterns):
     for pattern, t_start, t_end in zip(patterns, stim_times[:-1], stim_times[1:]):
         idx = np.where((t_start <= t_bins) & (t_bins < t_end))[0]
         if len(idx):
-            t_idx = (((t_bins[idx] - t_start) / bin_size) - 1).astype(int)
+            t_idx = ((t_bins[idx] - t_start) / bin_size).astype(int)
             pattern_matrices[pattern][row_idx[pattern], t_idx] = clusters[idx]
         row_idx[pattern] += 1
     # find max length of sign. activity and cut all matrices there
