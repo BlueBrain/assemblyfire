@@ -39,10 +39,11 @@ def assemblies(config_path):
 
 @cli.command()
 @click.argument("config_path", required=True)
-def consensus(config_path):
+@click.argument("average", required=False, default=False)
+def consensus(config_path, average):
     """CLI for `find_consensus_assemblies.py/run()`"""
     from assemblyfire.find_consensus_assemblies import run
-    run(config_path)
+    run(config_path, average)
 
 
 @cli.command()
