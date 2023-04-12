@@ -28,16 +28,25 @@ def _get_label(h5f_name):
     return os.path.split(h5f_name)[1].split('.')[0]
 
 
-def assembly_similarities_from2configs(config1_path, config2_path):
+def assembly_similarities_from2configs(config1_path, config2_path, consensus=False):
     """Loads in assemblies and gets their Jaccard similarity (seed by seed)"""
     config1 = Config(config1_path)
-    assembly_grp_dict1, _ = utils.load_assemblies_from_h5(config1.h5f_name, config1.h5_prefix_assemblies)
     config2 = Config(config2_path)
-    assembly_grp_dict2, _ = utils.load_assemblies_from_h5(config2.h5f_name, config2.h5_prefix_assemblies)
     xlabel, ylabel = _get_label(config2.h5f_name), _get_label(config1.h5f_name)
-    for seed, assembly_grp1 in assembly_grp_dict1.items():
-        similarities = get_assembly_similarities(assembly_grp1, assembly_grp_dict2[seed])
-        fig_name = os.path.join(config2.fig_path, "assembly_similarities_%s.png" % seed)
+    if not consensus:
+        assembly_grp_dict1, _ = utils.load_assemblies_from_h5(config1.h5f_name, config1.h5_prefix_assemblies)
+        assembly_grp_dict2, _ = utils.load_assemblies_from_h5(config2.h5f_name, config2.h5_prefix_assemblies)
+        for seed, assembly_grp1 in assembly_grp_dict1.items():
+            similarities = get_assembly_similarities(assembly_grp1, assembly_grp_dict2[seed])
+            fig_name = os.path.join(config2.fig_path, "assembly_similarities_%s.png" % seed)
+            plot_assembly_similarities(similarities, xlabel, ylabel, fig_name)
+    else:
+        assembly_grp1 = utils.consensus_dict2assembly_grp(utils.load_consensus_assemblies_from_h5(config1.h5f_name,
+                                                                config1.h5_prefix_consensus_assemblies))
+        assembly_grp2 = utils.consensus_dict2assembly_grp(utils.load_consensus_assemblies_from_h5(config2.h5f_name,
+                                                                config2.h5_prefix_consensus_assemblies))
+        similarities = get_assembly_similarities(assembly_grp1, assembly_grp2)
+        fig_name = os.path.join(config2.fig_path, "consensus_assembly_similarities.png")
         plot_assembly_similarities(similarities, xlabel, ylabel, fig_name)
 
 
@@ -97,10 +106,10 @@ def consensus_vs_average_assembly_composition(config_path, avg_assembly_id, cons
 
 
 if __name__ == "__main__":
-    # config1_path = "../configs/v7_bbp-workflow.yaml"
-    # config2_path = "../configs/v7_bbp-workflow_L23.yaml"
-    # assembly_similarities_from2configs(config1_path, config2_path)
-    config_path = "../configs/v7_10seeds_np.yaml"
-    consensus_vs_average_assembly_similarity(config_path, frac_ths=[0.2, 0.4, 0.6, 0.8])
-    consensus_vs_average_assembly_composition(config_path, 7, 1)
+    config1_path = "../configs/v7_5seeds_np_before.yaml"
+    config2_path = "../configs/v7_5seeds_np_after.yaml"
+    assembly_similarities_from2configs(config1_path, config2_path, True)
+    # config_path = "../configs/v7_10seeds_np.yaml"
+    # consensus_vs_average_assembly_similarity(config_path, frac_ths=[0.2, 0.4, 0.6, 0.8])
+    # consensus_vs_average_assembly_composition(config_path, 7, 1)
 
