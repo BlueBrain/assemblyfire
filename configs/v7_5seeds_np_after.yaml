@@ -7,8 +7,10 @@ h5_out:
     file_name: "assemblies.h5"
     prefixes:
         spikes: "spikes"
+        average_spikes: "average_spikes"
         assemblies: "assemblies"
         consensus_assemblies: "consensus"
+        average_assemblies: "average_assemblies"
         connectivity: "connectivity"
         single_cell_features: "single_cell"
 
