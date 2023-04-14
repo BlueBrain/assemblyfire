@@ -1,6 +1,6 @@
 """
 Assembly detection related utility functions (mostly loading simulation related stuff)
-author: András Ecker, last update: 01.2023
+author: András Ecker, last update: 04.2023
 """
 
 import os

@@ -1,6 +1,6 @@
 """
 Main run function for finding synapse cluster on assembly neurons
-last modified: András Ecker 09.2022
+last modified: András Ecker 04.2023
 """
 
 import os

@@ -1,6 +1,6 @@
 """
 Config file class
-authors: Thomas Delemontex and András Ecker; last update 09.2022
+authors: Thomas Delemontex and András Ecker; last update 04.2023
 """
 
 import os
