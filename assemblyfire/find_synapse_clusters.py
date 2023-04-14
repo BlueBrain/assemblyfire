@@ -33,7 +33,7 @@ def _get_degree_sorted_assembly_gids(c, conn_mat, assembly, mtype_list, n_sample
     return mtypes.loc[mtypes.isin(mtype_list)].index.to_numpy()[:n_samples]
 
 
-def _get_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, assembly, mtype_list, n_samples, p_th=0.05, pre_assembly=None):
+def _get_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, assembly, mtype_list, n_samples, pre_assembly=None, p_th=0.05):
     """Helper function to select indegree sorted postsynaptic gids from assembly
     (Compared to above there is a preselection og gids by significant synapse nnd. 'strength')"""
     assembly_id = "assembly%i" % pre_assembly.idx[0] if pre_assembly is not None else "assembly%i" % assembly.idx[0]
@@ -55,7 +55,7 @@ def _get_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, assembly, mtype_list, 
 def _get_cross_degree_sorted_assembly_gids(c, conn_mat, cross_assembly_grp, assembly, mtype_list, n_samples):
     """Similar indegree based helper as above, but works for cross-assembly connections
     (It'll return `n_samples` gids per presynaptic assembly (i.e. `len(cross_assembly_grp)`), not in total...)"""
-    gids = [_get_degree_sorted_assembly_gids(c, conn_mat, assembly, mtype_list, n_samples, pre_assembly)
+    gids = [_get_degree_sorted_assembly_gids(c, conn_mat, assembly, mtype_list, n_samples, pre_assembly=pre_assembly)
             for pre_assembly in cross_assembly_grp.assemblies]
     return np.unique(np.concatenate(gids))
 
@@ -63,7 +63,8 @@ def _get_cross_degree_sorted_assembly_gids(c, conn_mat, cross_assembly_grp, asse
 def _get_cross_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, cross_assembly_grp, assembly, mtype_list, n_samples):
     """Similar synapse nnd. and indegree based helper as above, but works for cross-assembly connections
     (It'll return `n_samples` gids per presynaptic assembly (i.e. `len(cross_assembly_grp)`), not in total...)"""
-    gids = [_get_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, assembly, mtype_list, n_samples, pre_assembly)
+    gids = [_get_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, assembly,
+                                                     mtype_list, n_samples, pre_assembly=pre_assembly)
             for pre_assembly in cross_assembly_grp.assemblies]
     return np.unique(np.concatenate(gids))
 
@@ -116,6 +117,7 @@ def run(config_path, debug):
         except:
             syn_nnds = None
         cluster_dfs, cross_cluster_dfs = {}, {}
+        '''
         for assembly in tqdm(assembly_grp.assemblies, desc="%s syn. clusters" % seed, leave=False):
             if syn_nnds is not None:
                 gids = _get_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, assembly, mtypes, n_samples)
@@ -124,7 +126,6 @@ def run(config_path, debug):
             loc_df = utils.get_synloc_df(c, utils.get_syn_idx(c.config["connectome"], conn_mat.gids, gids))
             # create a fake assembly "group" in order to look for *within* assembly clusters only
             single_assembly_grp = AssemblyGroup([assembly], all_gids=assembly.gids)
-            # get clusters and save them to pickle
             if debug:
                 fig_dir = os.path.join(config.fig_path, "%s_debug" % seed)
                 utils.ensure_dir(fig_dir)
@@ -138,7 +139,7 @@ def run(config_path, debug):
             cluster_dfs[assembly.idx[0]] = cluster_df
         fig_name = os.path.join(config.fig_path, "rho0_syn_clusts_%s.png" % seed)
         plot_cond_rhos(cluster_dfs, fig_name)
-
+        '''
         if seed in cross_assemblies:
             # not optimal way to find postsynaptic cross assemblies, but better for progress bar...
             for assembly_id in tqdm(cross_assemblies[seed], desc="%s cross syn. clusters" % seed, leave=False):
@@ -150,7 +151,6 @@ def run(config_path, debug):
                         all_gids = np.unique(np.concatenate([assembly.gids for assembly in assembly_lst]))
                         cross_assembly_grp = AssemblyGroup(assembly_lst, all_gids=all_gids)
                         # sample gids (slightly differently) to have high indegree from `cross_assembly_grp`
-
                         if syn_nnds is not None:
                             gids = _get_cross_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, cross_assembly_grp,
                                                                                   assembly, mtypes, n_samples)
