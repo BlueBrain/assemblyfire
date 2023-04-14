@@ -117,7 +117,6 @@ def run(config_path, debug):
         except:
             syn_nnds = None
         cluster_dfs, cross_cluster_dfs = {}, {}
-        '''
         for assembly in tqdm(assembly_grp.assemblies, desc="%s syn. clusters" % seed, leave=False):
             if syn_nnds is not None:
                 gids = _get_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, assembly, mtypes, n_samples)
@@ -139,7 +138,7 @@ def run(config_path, debug):
             cluster_dfs[assembly.idx[0]] = cluster_df
         fig_name = os.path.join(config.fig_path, "rho0_syn_clusts_%s.png" % seed)
         plot_cond_rhos(cluster_dfs, fig_name)
-        '''
+
         if seed in cross_assemblies:
             # not optimal way to find postsynaptic cross assemblies, but better for progress bar...
             for assembly_id in tqdm(cross_assemblies[seed], desc="%s cross syn. clusters" % seed, leave=False):
