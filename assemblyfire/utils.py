@@ -283,32 +283,18 @@ def get_syn_properties(c, syn_idx, properties):
     return c.connectome.synapse_properties(syn_idx, properties)
 
 
+def get_synloc_df(c, syn_idx):
+    """Loads in synapse location properties needed for detecting synapse clusters"""
+    from bluepy.enums import Synapse
+    syn_properties = {Synapse.PRE_GID: "pre_gid", Synapse.POST_GID: "post_gid", Synapse.POST_SECTION_ID: "section_id",
+                      Synapse.POST_X_CENTER: "x", Synapse.POST_Y_CENTER: "y", Synapse.POST_Z_CENTER: "z"}
+    loc_df = get_syn_properties(c, syn_idx, list(syn_properties.keys()))
+    loc_df.rename(columns=syn_properties, inplace=True)
+    return loc_df
+
+
 def get_proj_properties(c, proj_name, syn_idx, properties):
     return c.projection(proj_name).synapse_properties(syn_idx, properties)
-
-
-def get_loc_df(loc_pklf_name, c, target, subtarget):
-    """Loads in synapse location related parameters for selected cells
-    (and if the target contains other cells than the selected ones get the values for those on the fly."""
-    loc_df = load_pkl_df(loc_pklf_name)  # load the saved version
-    df_gids = loc_df["post_gid"].unique()
-    target_gids = get_gids(c, subtarget)
-    # check if there are more gids stored than the target and if so, index out target only
-    idx = np.in1d(df_gids, target_gids)
-    if idx.sum() < len(idx):
-        loc_df = loc_df.loc[loc_df["post_gid"].isin(df_gids[idx])]
-    # check if there are any gids missing and if so, get their synapse idx and location related properties
-    extra_gids = np.setdiff1d(target_gids, df_gids)
-    if len(extra_gids):
-        from bluepy.enums import Synapse
-        syn_idx = get_syn_idx(c.config["connectome"], get_gids(c, target), extra_gids)
-        extra_loc_df = get_syn_properties(c, syn_idx, [Synapse.PRE_GID, Synapse.POST_GID, Synapse.POST_SECTION_ID,
-                                                       Synapse.POST_X_CENTER, Synapse.POST_Y_CENTER, Synapse.POST_Z_CENTER])
-        extra_loc_df.rename(columns={Synapse.PRE_GID: "pre_gid", Synapse.POST_GID: "post_gid",
-                                     Synapse.POST_SECTION_ID: "section_id", Synapse.POST_X_CENTER: "x",
-                                     Synapse.POST_Y_CENTER: "y", Synapse.POST_Z_CENTER: "z"}, inplace=True)
-        loc_df = pd.concat([loc_df, extra_loc_df]).sort_index()
-    return loc_df
 
 
 def get_rho0s(c, target):
@@ -321,7 +307,7 @@ def get_rho0s(c, target):
     return syn_df
 
 
-def save_syn_clusters(save_dir_root, assembly_idx, cluster_df, cross_assembly=True):
+def save_syn_clusters(save_dir_root, assembly_idx, cluster_df, cross_assembly=False):
     """Saves `cluster_df` with synapse clusters for given assembly"""
     save_dir = os.path.join(save_dir_root, "seed%i" % assembly_idx[1])
     ensure_dir(save_dir)
