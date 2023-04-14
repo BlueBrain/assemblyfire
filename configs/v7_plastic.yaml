@@ -23,6 +23,7 @@ preprocessing_protocol:
 clustering:
     overwrite_n_clusters: {"seed1": 15}
     synapses:
+        cross_assemblies: {"seed1": {0: [3, 5], 1: [0], 2: [0, 4, 6, 8], 4: [7, 9, 10, 11], 5: [12], 6: [13, 14]}}
         target_range: 10
         min_nsyns: 10
         n_neurons_sample: 10
