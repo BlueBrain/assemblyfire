@@ -770,6 +770,49 @@ def plot_assembly_similarities(similarities, xlabel, ylabel, fig_name):
     plt.close(fig)
 
 
+def plot_pw_corrs_pairs(corrs1, corrs2, xlabel, ylabel, xticks, yticks, xticklabels, yticklabels, fig_name):
+    """Plots pairs of pairwise correlations (of (avg.) neurons firing in (sign.) time bins)"""
+    np.fill_diagonal(corrs1, np.nan)
+    np.fill_diagonal(corrs2, np.nan)
+    max_corr = np.max([np.nanmax(np.abs(corrs1)), np.nanmax(np.abs(corrs2))])
+    diffs = corrs2 - corrs1
+    max_diff = np.nanmax(np.abs(diffs))
+    fig = plt.figure(figsize=(20, 6))
+    ax = fig.add_subplot(1, 3, 1)
+    i = ax.imshow(corrs2, cmap="coolwarm", aspect="auto", interpolation="none", vmin=-1 * max_corr, vmax=max_corr)
+    fig.colorbar(i, label="Pw. correlation")
+    ax.set_title(ylabel)
+    ax.set_xlabel("Assemblies %s" % xlabel)
+    ax.set_ylabel("Assemblies %s" % ylabel)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xticklabels)
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(yticklabels)
+    ax2 = fig.add_subplot(1, 3, 2)
+    i = ax2.imshow(corrs1, cmap="coolwarm", aspect="auto", interpolation="none", vmin=-1 * max_corr, vmax=max_corr)
+    fig.colorbar(i, label="Pw. correlation")
+    ax2.set_title(xlabel)
+    ax2.set_xlabel("Assemblies %s" % xlabel)
+    # ax2.set_ylabel("Assemblies %s" % ylabel)
+    ax2.set_xticks(xticks)
+    ax2.set_xticklabels(xticklabels)
+    ax2.set_yticks(yticks)
+    ax2.set_yticklabels(yticklabels)
+    ax3 = fig.add_subplot(1, 3, 3)
+    i = ax3.imshow(diffs, cmap="PiYG", aspect="auto", interpolation="none", vmin=-1 * max_diff, vmax=max_diff)
+    fig.colorbar(i, label="Difference in pw. correlation")
+    ax3.set_title("%s - %s" % (ylabel, xlabel))
+    ax3.set_xlabel("Assemblies %s" % xlabel)
+    # ax3.set_ylabel("Assemblies %s" % ylabel)
+    ax3.set_xticks(xticks)
+    ax3.set_xticklabels(xticklabels)
+    ax3.set_yticks(yticks)
+    ax3.set_yticklabels(yticklabels)
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_across_conditions(df, y, fig_name):
     """Plots `y` features of spikes, across different condition (rerun in BGLibPy)"""
     order = np.sort(df["assembly"].unique())

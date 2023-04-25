@@ -1,15 +1,18 @@
 """
 Load assemblies from (either from 2 HDF5 files, or from different prefixes) and compare them
-last modified: András Ecker 01.2023
+last modified: András Ecker 04.2023
 """
 
 import os
 import numpy as np
+from scipy.sparse import csr_matrix
 from scipy.spatial.distance import cdist
 
 import assemblyfire.utils as utils
 from assemblyfire.config import Config
-from assemblyfire.plots import plot_assembly_similarities, plot_consensus_vs_average_assembly_composition
+from assemblyfire.clustering import pairwise_correlation_x
+from assemblyfire.plots import plot_assembly_similarities, plot_pw_corrs_pairs,\
+                               plot_consensus_vs_average_assembly_composition
 
 
 def get_assembly_similarities(assembly_grp1, assembly_grp2):
@@ -33,20 +36,11 @@ def assembly_similarities_from2configs(config1_path, config2_path, consensus=Fal
     config1 = Config(config1_path)
     config2 = Config(config2_path)
     xlabel, ylabel = _get_label(config2.h5f_name), _get_label(config1.h5f_name)
-    if not consensus:
-        assembly_grp_dict1, _ = utils.load_assemblies_from_h5(config1.h5f_name, config1.h5_prefix_assemblies)
-        assembly_grp_dict2, _ = utils.load_assemblies_from_h5(config2.h5f_name, config2.h5_prefix_assemblies)
-        for seed, assembly_grp1 in assembly_grp_dict1.items():
-            similarities = get_assembly_similarities(assembly_grp1, assembly_grp_dict2[seed])
-            fig_name = os.path.join(config2.fig_path, "assembly_similarities_%s.png" % seed)
-            plot_assembly_similarities(similarities, xlabel, ylabel, fig_name)
-    else:
-        assembly_grp1 = utils.consensus_dict2assembly_grp(utils.load_consensus_assemblies_from_h5(config1.h5f_name,
-                                                                config1.h5_prefix_consensus_assemblies))
-        assembly_grp2 = utils.consensus_dict2assembly_grp(utils.load_consensus_assemblies_from_h5(config2.h5f_name,
-                                                                config2.h5_prefix_consensus_assemblies))
-        similarities = get_assembly_similarities(assembly_grp1, assembly_grp2)
-        fig_name = os.path.join(config2.fig_path, "consensus_assembly_similarities.png")
+    assembly_grp_dict1, _ = utils.load_assemblies_from_h5(config1.h5f_name, config1.h5_prefix_assemblies)
+    assembly_grp_dict2, _ = utils.load_assemblies_from_h5(config2.h5f_name, config2.h5_prefix_assemblies)
+    for seed, assembly_grp1 in assembly_grp_dict1.items():
+        similarities = get_assembly_similarities(assembly_grp1, assembly_grp_dict2[seed])
+        fig_name = os.path.join(config2.fig_path, "assembly_similarities_%s.png" % seed)
         plot_assembly_similarities(similarities, xlabel, ylabel, fig_name)
 
 
@@ -105,10 +99,75 @@ def consensus_vs_average_assembly_composition(config_path, avg_assembly_id, cons
     plot_consensus_vs_average_assembly_composition(intersection_at_n, diff_at_n, fig_name)
 
 
+def _load_avg_spikes(config):
+    """Load average assembly"""
+    spike_matrix_dict, _ = utils.load_spikes_from_h5(config.h5f_name, config.h5_prefix_avg_spikes)
+    return spike_matrix_dict["seed_average"].spike_matrix, spike_matrix_dict["seed_average"].gids
+
+
+def _group_gids(assembly_grp1, assembly_idx1, assembly_grp2, assembly_idx2):
+    """Group gids (based on assembly membership) for plotting"""
+    assembly_gids1 = [assembly_grp1.loc((assembly_id, "consensus")).gids for assembly_id in assembly_idx1]
+    assembly_gids2 = [assembly_grp2.loc((assembly_id, "consensus")).gids for assembly_id in assembly_idx2]
+    if len(assembly_gids1) == 1 and len(assembly_gids2) == 1:  # same assembly, different neurons
+        pass  # TODO
+    if len(assembly_gids2) > 1:  # split
+        # first intersect them with assembly1
+        assembly_gids2 = [np.intersect1d(assembly_gids1[0], assembly_gids2[i], assume_unique=True)
+                          for i in range(len(assembly_gids2))]
+        assert len(assembly_gids2) == 2, "atm. the ordering is based on 2 assemblies from %s" \
+                                         "(due to the intersection)" % config2.h5f_name
+        assembly2_inters = np.intersect1d(assembly_gids2[0], assembly_gids2[1], assume_unique=True)
+        gids = [np.setdiff1d(assembly_gids2[0], assembly2_inters, assume_unique=True), assembly2_inters,
+                np.setdiff1d(assembly_gids2[1], assembly2_inters, assume_unique=True)]
+        gids.append(np.setdiff1d(assembly_gids1[0], np.concatenate(gids), assume_unique=True))
+        xticks = [int((len(gids[0]) + len(gids[1])) / 2), int(len(gids[0]) + (len(gids[1]) + len(gids[2])) / 2)]
+        gids = np.concatenate(gids)
+        plotting = [xticks, [int(len(gids) / 2)], assembly_idx2.tolist(), assembly_idx1.tolist()]
+        return gids, plotting
+    if len(assembly_gids1) > 1:  # merge
+        pass  # TODO
+
+
+def analyze_corrs(config1_path, config2_path, xlabel=None, ylabel=None, sim_th=0.3):
+    """Analyse correlations of assembly pairs (after getting their similarities)"""
+    config1 = Config(config1_path)
+    config2 = Config(config2_path)
+    if xlabel is None and ylabel is None:  # TODO: handle separate cases
+        xlabel, ylabel = _get_label(config2.h5f_name), _get_label(config1.h5f_name)
+    # load consensus assemblies and average spikes
+    assembly_grp1 = utils.consensus_dict2assembly_grp(utils.load_consensus_assemblies_from_h5(config1.h5f_name,
+                                                            config1.h5_prefix_consensus_assemblies))
+    assembly_grp2 = utils.consensus_dict2assembly_grp(utils.load_consensus_assemblies_from_h5(config2.h5f_name,
+                                                            config2.h5_prefix_consensus_assemblies))
+    spike_matrix1, spiking_gids1 = _load_avg_spikes(config1)
+    spike_matrix2, spiking_gids2 = _load_avg_spikes(config2)
+    # get similarities
+    similarities = get_assembly_similarities(assembly_grp1, assembly_grp2)
+    fig_name = os.path.join(config2.fig_path, "consensus_assembly_similarities.png")
+    plot_assembly_similarities(similarities, "assemblies %s " % xlabel, "assemblies %s " % ylabel, fig_name)
+    # threshold similarities and detect splitting and merging
+    idx1, idx2 = np.where(similarities > sim_th)
+    vals1, counts1 = np.unique(idx1, return_counts=True)
+    vals2, counts2 = np.unique(idx2, return_counts=True)
+
+    if np.any(counts1 > 1):  # splitting
+        split_assembly_idx = vals1[counts1 > 1]
+        for assembly_id in split_assembly_idx:
+            assembly_idx = idx2[idx1 == assembly_id]
+            gids, plotting = _group_gids(assembly_grp1, np.array([assembly_id]), assembly_grp2, assembly_idx)
+            corrs1 = pairwise_correlation_x(csr_matrix(spike_matrix1[np.in1d(spiking_gids1, gids), :], dtype=np.float32))
+            corrs2 = pairwise_correlation_x(csr_matrix(spike_matrix2[np.in1d(spiking_gids2, gids), :], dtype=np.float32))
+            fig_name = os.path.join(config2.fig_path, "consensus_assembly%i_split.png" % assembly_id)
+            plot_pw_corrs_pairs(corrs1, corrs2, xlabel, ylabel, *plotting, fig_name)
+    # if np.any(counts2 > 1):  # merging
+    #     pass
+
+
 if __name__ == "__main__":
     config1_path = "../configs/v7_5seeds_np_before.yaml"
     config2_path = "../configs/v7_5seeds_np_after.yaml"
-    assembly_similarities_from2configs(config1_path, config2_path, True)
+    analyze_corrs(config1_path, config2_path, ylabel="before", xlabel="after")
     # config_path = "../configs/v7_10seeds_np.yaml"
     # consensus_vs_average_assembly_similarity(config_path, frac_ths=[0.2, 0.4, 0.6, 0.8])
     # consensus_vs_average_assembly_composition(config_path, 7, 1)
