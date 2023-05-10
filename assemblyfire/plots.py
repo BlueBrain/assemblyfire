@@ -770,17 +770,42 @@ def plot_assembly_similarities(similarities, xlabel, ylabel, fig_name):
     plt.close(fig)
 
 
-def plot_pw_corrs_pairs(corrs1, corrs2, xlabel, ylabel, xticks, yticks, xticklabels, yticklabels, fig_name):
+def _add_lines(ax, hlines, vlines):
+    """Puts horizontal and vertical lines on plot (used to show assembly boarders)"""
+    if hlines is not None:
+        for line in hlines:
+            if isinstance(line, list):
+                for line_ in line:
+                    ax.axhline(line_, color="black", lw=0.5)
+            else:
+                ax.axhline(line, color="black", lw=0.5)
+    if vlines is not None:
+        for line in vlines:
+            if isinstance(line, list):
+                for line_ in line:
+                    ax.axvline(line_, color="black", lw=0.5)
+            else:
+                ax.axvline(line, color="black", lw=0.5)
+
+
+def plot_pw_corrs_pairs(corrs1, corrs2, df, xlabel, ylabel,
+                        xticks, yticks, xticklabels, yticklabels, fig_name, hlines=None, vlines=None):
     """Plots pairs of pairwise correlations (of (avg.) neurons firing in (sign.) time bins)"""
     np.fill_diagonal(corrs1, np.nan)
     np.fill_diagonal(corrs2, np.nan)
-    max_corr = np.max([np.nanmax(np.abs(corrs1)), np.nanmax(np.abs(corrs2))])
-    diffs = corrs2 - corrs1
-    max_diff = np.nanmax(np.abs(diffs))
+    max_corr = df["corr"].max()
+    loc_names = df["loc"].unique().tolist()
+    palette = {"off-diag": colors.to_rgba("lightgray")}
+    loc_names.remove("off-diag")
+    cmap = plt.cm.get_cmap("tab20", len(loc_names))
+    for i, loc_name in enumerate(loc_names):
+        palette[loc_name] = cmap(i)
+
     fig = plt.figure(figsize=(20, 6))
     ax = fig.add_subplot(1, 3, 1)
     i = ax.imshow(corrs2, cmap="coolwarm", aspect="auto", interpolation="none", vmin=-1 * max_corr, vmax=max_corr)
     fig.colorbar(i, label="Pw. correlation")
+    _add_lines(ax, hlines, vlines)
     ax.set_title(ylabel)
     ax.set_xlabel("Assemblies %s" % xlabel)
     ax.set_ylabel("Assemblies %s" % ylabel)
@@ -791,6 +816,7 @@ def plot_pw_corrs_pairs(corrs1, corrs2, xlabel, ylabel, xticks, yticks, xticklab
     ax2 = fig.add_subplot(1, 3, 2)
     i = ax2.imshow(corrs1, cmap="coolwarm", aspect="auto", interpolation="none", vmin=-1 * max_corr, vmax=max_corr)
     fig.colorbar(i, label="Pw. correlation")
+    _add_lines(ax2, hlines, vlines)
     ax2.set_title(xlabel)
     ax2.set_xlabel("Assemblies %s" % xlabel)
     # ax2.set_ylabel("Assemblies %s" % ylabel)
@@ -799,15 +825,11 @@ def plot_pw_corrs_pairs(corrs1, corrs2, xlabel, ylabel, xticks, yticks, xticklab
     ax2.set_yticks(yticks)
     ax2.set_yticklabels(yticklabels)
     ax3 = fig.add_subplot(1, 3, 3)
-    i = ax3.imshow(diffs, cmap="PiYG", aspect="auto", interpolation="none", vmin=-1 * max_diff, vmax=max_diff)
-    fig.colorbar(i, label="Difference in pw. correlation")
-    ax3.set_title("%s - %s" % (ylabel, xlabel))
-    ax3.set_xlabel("Assemblies %s" % xlabel)
-    # ax3.set_ylabel("Assemblies %s" % ylabel)
-    ax3.set_xticks(xticks)
-    ax3.set_xticklabels(xticklabels)
-    ax3.set_yticks(yticks)
-    ax3.set_yticklabels(yticklabels)
+    sns.boxplot(x="cond", y="corr", hue="loc", order=[ylabel, xlabel], palette=palette, fliersize=1, data=df, ax=ax3)
+    ax3.axhline(0, ls="--", color="gray", alpha=0.5)
+    ax3.set_xlabel("")
+    ax3.set_ylabel("Pw. correlations")
+    sns.despine(ax=ax3, bottom=True, trim=True, offset=2)
     fig.tight_layout()
     fig.savefig(fig_name, dpi=100, bbox_inches="tight")
     plt.close(fig)

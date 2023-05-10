@@ -5,8 +5,10 @@ last modified: András Ecker 04.2023
 
 import os
 import numpy as np
+import pandas as pd
 from scipy.sparse import csr_matrix
 from scipy.spatial.distance import cdist
+from scipy.stats import ttest_ind
 
 import assemblyfire.utils as utils
 from assemblyfire.config import Config
@@ -105,7 +107,7 @@ def _load_avg_spikes(config):
     return spike_matrix_dict["seed_average"].spike_matrix, spike_matrix_dict["seed_average"].gids
 
 
-def _group_gids(assembly_grp1, assembly_idx1, assembly_grp2, assembly_idx2):
+def group_gids(assembly_grp1, assembly_idx1, assembly_grp2, assembly_idx2):
     """Group gids (based on assembly membership) for plotting"""
     assembly_gids1 = [assembly_grp1.loc((assembly_id, "consensus")).gids for assembly_id in assembly_idx1]
     assembly_gids2 = [assembly_grp2.loc((assembly_id, "consensus")).gids for assembly_id in assembly_idx2]
@@ -121,12 +123,47 @@ def _group_gids(assembly_grp1, assembly_idx1, assembly_grp2, assembly_idx2):
         gids = [np.setdiff1d(assembly_gids2[0], assembly2_inters, assume_unique=True), assembly2_inters,
                 np.setdiff1d(assembly_gids2[1], assembly2_inters, assume_unique=True)]
         gids.append(np.setdiff1d(assembly_gids1[0], np.concatenate(gids), assume_unique=True))
-        xticks = [int((len(gids[0]) + len(gids[1])) / 2), int(len(gids[0]) + (len(gids[1]) + len(gids[2])) / 2)]
+        idx_ranges = [[0, len(assembly_gids2[0])], [len(gids[0]), len(gids[0]) + len(assembly_gids2[1])]]
+        xticks = [int(np.mean(idx_ranges[0])), int(np.mean(idx_ranges[1]))]
         gids = np.concatenate(gids)
         plotting = [xticks, [int(len(gids) / 2)], assembly_idx2.tolist(), assembly_idx1.tolist()]
-        return gids, plotting
+        return gids, idx_ranges, plotting
     if len(assembly_gids1) > 1:  # merge
         pass  # TODO
+
+
+def _corrs2df(corrs, assembly_idx, idx_ranges):
+    """Splits correlation matrix to submatrices (defining assemblies and non-assemblies)
+    and puts values into a DataFrame (for easier plotting stat. testing afterwards)"""
+    assert (len(assembly_idx) == len(idx_ranges))
+    mask = np.ones_like(corrs, dtype=bool)
+    np.fill_diagonal(corrs, np.nan)
+    sub_corrs, locs = [], []
+    for assembly_id, idx_range in zip(assembly_idx, idx_ranges):
+        tmp = np.asarray(corrs[idx_range[0]:idx_range[1], idx_range[0]:idx_range[1]]).flatten()
+        sub_corrs.append(tmp)
+        locs.append(np.full(tmp.shape, "block-diag%i" % assembly_id, dtype="object"))
+        mask[idx_range[0]:idx_range[1], idx_range[0]:idx_range[1]] = False
+    sub_corrs.append(np.asarray(corrs[mask]).flatten())
+    locs.append(np.full(mask.sum(), "off-diag", dtype="object"))
+    df = pd.DataFrame(data=np.concatenate(sub_corrs), columns=["corr"])
+    df["loc"] = np.concatenate(locs)
+    return df
+
+
+def corrs2df(corrs1, corrs2, assembly_idx, idx_ranges, cond1, cond2):
+    """Wrapper of `_corrs2df()` above (to deal with 2 sets of conditions, as we compare 2 sets of assemblies)"""
+    df1 = _corrs2df(corrs1, assembly_idx, idx_ranges)
+    df1["cond"] = cond1
+    df2 = _corrs2df(corrs2, assembly_idx, idx_ranges)
+    df2["cond"] = cond2
+    '''
+    # some quick t-tests.... (which probably should be elsewhere)
+    for loc in df1["loc"].unique():
+        t, p = ttest_ind(df1.loc[df1["loc"] == loc, "corr"], df2.loc[df2["loc"] == loc, "corr"], nan_policy="omit")
+        print(loc, t, p)
+    '''
+    return pd.concat([df1, df2], ignore_index=True)
 
 
 def analyze_corrs(config1_path, config2_path, xlabel=None, ylabel=None, sim_th=0.3):
@@ -155,11 +192,12 @@ def analyze_corrs(config1_path, config2_path, xlabel=None, ylabel=None, sim_th=0
         split_assembly_idx = vals1[counts1 > 1]
         for assembly_id in split_assembly_idx:
             assembly_idx = idx2[idx1 == assembly_id]
-            gids, plotting = _group_gids(assembly_grp1, np.array([assembly_id]), assembly_grp2, assembly_idx)
+            gids, idx_ranges, plotting = group_gids(assembly_grp1, np.array([assembly_id]), assembly_grp2, assembly_idx)
             corrs1 = pairwise_correlation_x(csr_matrix(spike_matrix1[np.in1d(spiking_gids1, gids), :], dtype=np.float32))
             corrs2 = pairwise_correlation_x(csr_matrix(spike_matrix2[np.in1d(spiking_gids2, gids), :], dtype=np.float32))
+            df = corrs2df(corrs1.copy(), corrs2.copy(), assembly_idx, idx_ranges, ylabel, xlabel)
             fig_name = os.path.join(config2.fig_path, "consensus_assembly%i_split.png" % assembly_id)
-            plot_pw_corrs_pairs(corrs1, corrs2, xlabel, ylabel, *plotting, fig_name)
+            plot_pw_corrs_pairs(corrs1.copy(), corrs2.copy(), df, xlabel, ylabel, *plotting, fig_name, vlines=idx_ranges)
     # if np.any(counts2 > 1):  # merging
     #     pass
 
