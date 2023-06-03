@@ -29,7 +29,7 @@ def _get_degree_sorted_assembly_gids(c, conn_mat, assembly, mtype_list, n_sample
     else:
         indegrees = conn_mat.degree(pre_gids=pre_assembly.gids, post_gids=assembly.gids, kind="in")
     sorted_assembly_gids = assembly.gids[np.argsort(indegrees)[::-1]]
-    mtypes = utils.get_mtypes(c, sorted_assembly_gids)
+    mtypes = utils.get_mtypes(c, sorted_assembly_gids)  # could be loaded from `conn_mat` as well...
     return mtypes.loc[mtypes.isin(mtype_list)].index.to_numpy()[:n_samples]
 
 
