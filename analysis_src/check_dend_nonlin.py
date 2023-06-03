@@ -278,7 +278,7 @@ def main(config_path, threshold=-30, sustain_for=10, pre_spike=50):
     results_dir = os.path.join(config.root_path, "analyses", "rerun_results")
     with open(os.path.join(sbatch_dir, "simulated_gids.pkl"), "rb") as f:
         simulated_gids = pickle.load(f)
-    c = utils.get_bluepy_circuit(utils.get_sim_path(config.root_path).iloc[0])
+    c = utils.get_bluepy_circuit_from_root_path(config.root_path)
 
     for seed, assembly_gids in simulated_gids.items():
         df, spikes = analyse_spikes(config, seed, assembly_gids)
