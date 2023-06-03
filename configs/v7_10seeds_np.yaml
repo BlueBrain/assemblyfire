@@ -24,10 +24,8 @@ preprocessing_protocol:
     threshold_rate: True
 
 clustering:
-    overwrite_n_clusters: {"seed1": 10, "seed47": 9, "seed54": 12, "seed63": 11, "seed80": 9, "seed99": 13, "seed_average": 14}
+    overwrite_n_clusters: {"seed1": 10, "seed47": 9, "seed54": 12, "seed63": 11, "seed80": 9, "seed99": 13}
     synapses:
-        target: "hex_O1Excitatory_Sample10pct"
-        lookup_df_pklfname: "/gpfs/bbp.cscs.ch/project/proj96/circuits/plastic_v1/sample10pct_clustering_syn_df.pkl"
         target_range: 10
         min_nsyns: 10
         n_neurons_sample: 10
