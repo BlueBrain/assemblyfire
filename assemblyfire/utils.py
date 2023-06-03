@@ -71,6 +71,11 @@ def get_sim_path(root_path):
     return sim_paths
 
 
+def get_bluepy_circuit_from_root_path(root_path):
+    """Return bluepy circuit from the first simulation in the project root"""
+    return get_bluepy_circuit(get_sim_path(root_path).iloc[0])
+
+
 def get_stimulus_stream(f_name, t_start, t_end):
     """Reads the series of presented patterns from .txt file"""
     stim_times, patterns = [], []
@@ -95,25 +100,33 @@ def get_gids(c, target):
     return c.cells.ids({"$target": target})
 
 
-def get_mtype_gids(c, target, mtype):
-    from bluepy.enums import Cell
-    return c.cells.ids({"$target": target, Cell.MTYPE: mtype})
-
-
 def get_mtypes(c, gids):
     return c.cells.get(gids)["mtype"]
 
 
-def get_layer(c, gids):
-    return c.cells.get(gids)["layer"]
+def load_nrn_df(h5f_name, prefix="connectivity"):
+    """Loads neuron locations in (supersampled) flat space
+    (and a few extra stuff) from `conntility` object saved to HDF5"""
+    df = pd.read_hdf(h5f_name, "%s/full_matrix/vertex_properties" % prefix)
+    return df.drop(columns=["x", "y", "z"])
 
 
-def get_neuron_locs(circuit_config, target):
-    """Gets neuron locations in (supersampled) flat space"""
+def _get_nrn_df(c, target):
+    """Gets neuron locations (and a few extra stuff) in (supersampled) flat space"""
     from conntility.circuit_models.neuron_groups import load_neurons
-    c = get_bluepy_circuit(circuit_config)
-    nrn = load_neurons(c, ["layer", "x", "y", "z", "ss_flat_x", "ss_flat_y", "depth"], target)
-    return nrn.set_index("gid").drop(columns=["x", "y", "z"])
+    df = load_neurons(c, ["layer", "x", "y", "z", "mtype", "ss_flat_x", "ss_flat_y", "depth"], target)
+    return df.set_index("gid").drop(columns=["x", "y", "z"])
+
+
+def get_nrn_df(h5f_name, prefix, root_path, target):
+    """Tries to load neuron locations from saved connectivity matrix object, or calculates them if they aren't saved"""
+    h5f = h5py.File(h5f_name, "r")
+    if prefix in list(h5f.keys()):
+        h5f.close()
+        nrn_loc_df = load_nrn_df(h5f_name, prefix)
+    else:
+        nrn_loc_df = _get_nrn_df(get_bluepy_circuit_from_root_path(root_path), target)
+    return nrn_loc_df
 
 
 def get_spikes(sim, gids, t_start, t_end):
