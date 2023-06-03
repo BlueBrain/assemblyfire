@@ -145,7 +145,7 @@ def assembly_prob_mi_from_patterns(assembly_grp_dict, pattern_indegrees, gids, f
 
 def assembly_efficacy(config, assembly_grp_dict):
     """Plots synapses initialized at depressed (rho=0) and potentiated (rho=1) states"""
-    c = utils.get_bluepy_circuit(utils.get_sim_path(config.root_path).iloc[0])
+    c = utils.get_bluepy_circuit_from_root_path(config.root_path)
     rhos = utils.get_rho0s(c, config.target)  # get all rhos in one go and then index them as needed
 
     for seed, assembly_grp in tqdm(assembly_grp_dict.items(), desc="Getting efficacies"):
@@ -200,7 +200,7 @@ def assembly_prob_mi_from_sinks(assembly_grp_dict, conn_mat, palette, fig_path, 
     for seed, assembly_grp in assembly_grp_dict.items():
         # building simplex sink count lookup
         assembly_simplices = {dim: {} for dim in dims}
-        for assembly in tqdm(assembly_grp.assemblies, desc="Getting assembly simplex lists:"):
+        for assembly in tqdm(assembly_grp.assemblies, desc="Getting assembly simplex lists"):
             simplex_list = conn_mat.simplex_list(assembly.gids, gids)
             for dim in dims:
                 sink_counts, _ = np.histogram(simplex_list[dim][:, -1], np.arange(len(gids) + 1))
@@ -320,11 +320,11 @@ def main(config, assembly_grp_dict, plastic=False):
 
 
 if __name__ == "__main__":
-    config = Config("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_plastic_chunked.yaml")
-    # assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
-    assembly_grp = utils.consensus_dict2assembly_grp(utils.load_consensus_assemblies_from_h5(config.h5f_name,
-                                                           config.h5_prefix_consensus_assemblies))
-    assembly_grp_dict = {"consensus": assembly_grp}
+    config = Config("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_seed19_across_ns.yaml")
+    assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+    # assembly_grp = utils.consensus_dict2assembly_grp(utils.load_consensus_assemblies_from_h5(config.h5f_name,
+    #                                                        config.h5_prefix_consensus_assemblies))
+    # assembly_grp_dict = {"consensus": assembly_grp}
 
-    main(config, assembly_grp_dict, True)
+    main(config, assembly_grp_dict)
 
