@@ -50,7 +50,7 @@ def run(config_path, assembly_grp_name, buf_size, seed):
     config = Config(config_path)
     assembly_grp = _assembly_group_from_name(config, assembly_grp_name)
     conn_mat = AssemblyTopology.from_h5(config.h5f_name, prefix=config.h5_prefix_connectivity)
-    c = utils.get_bluepy_circuit(utils.get_sim_path(config.root_path).iloc[0])
+    c = utils.get_bluepy_circuit_from_root_path(config.root_path)
     gids = utils.get_gids(c, config.target)
     morph_root = os.path.join(os.path.split(c.config["morphologies"])[0], "h5")
     morphs = c.cells.get(gids, properties="morphology")

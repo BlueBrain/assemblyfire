@@ -7,7 +7,7 @@ import os
 import logging
 
 from assemblyfire.spikes import SpikeMatrixGroup, single_cell_features_to_h5
-from assemblyfire.utils import get_sim_path, get_neuron_locs
+from assemblyfire.utils import get_nrn_df
 from assemblyfire.plots import plot_r_spikes
 
 L = logging.getLogger("assemblyfire")
@@ -28,5 +28,5 @@ def run(config_path):
     single_cell_features_to_h5(spikes.h5f_name, gids, r_spikes, prefix=spikes.h5_prefix_single_cell)
 
     L.info(" Figures will be saved to: %s" % spikes.fig_path)
-    nrn_loc_df = get_neuron_locs(get_sim_path(spikes.root_path).iloc[0], spikes.target)
+    nrn_loc_df = get_nrn_df(spikes.h5f_name, spikes.h5_prefix_connectivity, spikes.root_path, spikes.target)
     plot_r_spikes(gids, r_spikes, nrn_loc_df, os.path.join(spikes.fig_path, "r_spikes.png"))
