@@ -61,7 +61,7 @@ def cluster_sim_mat(spike_matrix, t_bins, stim_times, patterns, input_pattern_na
                     min_n_clusts=5, max_n_clusts=20):
     """Modified version of `assemblyfire.clustering/cluster_sim_mat()` that plot results for all `n_clusts`
     and some extra stuff"""
-    tsne = TSNE(n_components=2, random_state=0).fit_transform(spike_matrix.T)
+    tsne = TSNE(n_components=2, metric="cosine").fit_transform(spike_matrix.T)
     sim_matrix = cosine_similarity(spike_matrix.T)
     dists = 1 - sim_matrix
     dists[dists < 1e-10] = 0.  # fixing numerical errors
@@ -98,7 +98,7 @@ def main(config_path, seeds, save_assemblies=False):
     stim_times, patterns = project_metadata["stim_times"], project_metadata["patterns"]
     input_pattern_names, input_dist = get_pattern_distance(config.pattern_locs_fname, config.pattern_gids_fname)
     if save_assemblies:
-        nrn_loc_df = utils.get_neuron_locs(utils.get_sim_path(config.root_path).iloc[0], config.target)
+        nrn_loc_df = utils.get_nrn_df(config.h5f_name, config.h5_prefix_connectivity, config.root_path, config.target)
 
     for seed in seeds:
         spike_matrix, t_bins = spike_matrix_dict["seed%s" % seed].spike_matrix, spike_matrix_dict["seed%s" % seed].t_bins
