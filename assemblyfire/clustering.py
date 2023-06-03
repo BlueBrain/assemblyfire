@@ -198,7 +198,7 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, core_cell_th_pct, h5f_na
     :param core_cell_th_pct: float - sign. threshold in surrogate dataset for core cell detection
     :param h5f_name: str - name of the HDF5 file (dumping the assemblies and their metadata)
     :param h5_prefix: str - directory name of assemblies within the HDF5 file
-    :param nrn_loc_df: DataFrame with neuron locations
+    :param nrn_loc_df: DataFrame with neuron locations or None to skip plotting
     :param fig_path: str - root path for figures
     """
     from assemblyfire.assemblies import Assembly, AssemblyGroup
@@ -222,10 +222,10 @@ def detect_assemblies(spike_matrix_dict, clusters_dict, core_cell_th_pct, h5f_na
             assembly_lst.append(Assembly(gids[core_cell_idx[:, i] == 1], index=index))
         assemblies = AssemblyGroup(assemblies=assembly_lst, all_gids=gids, label="seed%s" % seed, metadata=metadata)
         assemblies.to_h5(h5f_name, prefix=h5_prefix)
-
         # plot (only spatial location at this point)
-        fig_name = os.path.join(fig_path, "assemblies_seed%s.png" % seed)
-        plot_assemblies(core_cell_idx, assembly_idx, gids, nrn_loc_df, fig_name)
+        if nrn_loc_df is not None:
+            fig_name = os.path.join(fig_path, "assemblies_seed%s.png" % seed)
+            plot_assemblies(core_cell_idx, assembly_idx, gids, nrn_loc_df, fig_name)
 
 
 def _check_seed_separation(clusters, n_assemblies_cum):
