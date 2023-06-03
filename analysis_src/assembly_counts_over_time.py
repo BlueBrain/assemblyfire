@@ -6,7 +6,7 @@ last modified: András Ecker 01.2022
 import os
 import numpy as np
 
-import assemblyfire.utils as utils
+from assemblyfire.utils import load_spikes_from_h5, load_assemblies_from_h5
 from assemblyfire.config import Config
 from assemblyfire.plots import plot_n_assemblies
 
@@ -16,12 +16,12 @@ def count_assemblies(config_path):
     for every pattern presentation"""
 
     config = Config(config_path)
-    spike_matrices, project_metadata = utils.load_spikes_from_h5(config.h5f_name, config.h5_prefix_spikes)
+    spike_matrices, project_metadata = load_spikes_from_h5(config.h5f_name, config.h5_prefix_spikes)
     stim_times, patterns = project_metadata["stim_times"], project_metadata["patterns"]
     t_chunks = project_metadata["t"]
     if len(t_chunks) == 2:
         raise RuntimeError("This script only works for chunked simulations!")
-    _, assembly_metadata = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+    _, assembly_metadata = load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
 
     i, n_assemblies = 0, np.zeros_like(stim_times, dtype=int)
     for seed, t_start, t_end in zip(project_metadata["seeds"], t_chunks[:-1], t_chunks[1:]):
