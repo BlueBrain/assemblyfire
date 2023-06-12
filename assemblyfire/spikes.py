@@ -24,12 +24,12 @@ from assemblyfire.config import Config
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
 
 
-def load_spikes(blueconfig_path, target, t_start, t_end):
+def load_spikes(sim_config_path, target, t_start, t_end, node_pop="S1nonbarrel_neurons"):
     """Loads in spikes from simulations using bluepy"""
-    from assemblyfire.utils import get_bluepy_simulation, get_gids, get_spikes
-    sim = get_bluepy_simulation(blueconfig_path)
-    gids = get_gids(sim.circuit, target)
-    spike_times, spiking_gids = get_spikes(sim, gids, t_start, t_end)
+    from assemblyfire.utils import get_bluepy_simulation, get_node_idx, get_spikes
+    sim = get_bluepy_simulation(sim_config_path)
+    gids = get_node_idx(sim.circuit, node_pop, target)
+    spike_times, spiking_gids = get_spikes(sim, node_pop, gids, t_start, t_end)
     return spike_times, spiking_gids
 
 
@@ -86,10 +86,10 @@ def get_sign_rate_th(spike_matrix, surr_rate_method, nreps=100):
     return np.percentile(stds, 95)
 
 
-def convolve_spike_matrix(blueconfig_path, target, t_start, t_end, bin_size=1, std=10):
+def convolve_spike_matrix(sim_config_path, target, t_start, t_end, bin_size=1, std=10):
     """Bins spikes and convolves it with a 1D Gaussian kernel row-by-row
     (default bin size = 1 ms comes from Nolte et al. 2019 but the kernel's std = 10 ms is set by Daniela's tests)"""
-    spike_times, spiking_gids = load_spikes(blueconfig_path, target, t_start, t_end)
+    spike_times, spiking_gids = load_spikes(sim_config_path, target, t_start, t_end)
     spike_matrix, gids, _ = spikes2mat(spike_times, spiking_gids, t_start, t_end, bin_size)
     assert (spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1)))
     nprocs = spike_matrix.shape[0] if os.cpu_count() - 1 > spike_matrix.shape[0] else os.cpu_count() - 1
@@ -125,9 +125,9 @@ def single_cell_features_to_h5(h5f_name, gids, r_spikes, prefix):
 class SpikeMatrixGroup(Config):
     """Class that bins rasters, finds significant time bins and extract single cell features"""
 
-    def get_sign_spike_matrix(self, blueconfig_path, t_start, t_end):
+    def get_sign_spike_matrix(self, sim_config_path, t_start, t_end):
         """Bins spikes and thresholds population firing rate to get significant time bins"""
-        spike_times, spiking_gids = load_spikes(blueconfig_path, self.target, t_start, t_end)
+        spike_times, spiking_gids = load_spikes(sim_config_path, self.target, t_start, t_end)
         spike_matrix, gids, t_bins = spikes2mat(spike_times, spiking_gids, t_start, t_end, self.bin_size)
         assert (spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1)))
         rate = np.sum(spike_matrix, axis=0)
@@ -177,9 +177,9 @@ class SpikeMatrixGroup(Config):
             spikes_to_h5(self.h5f_name, spike_matrix_dict, project_metadata, prefix=self.h5_prefix_spikes)
         return spike_matrix_dict, project_metadata
 
-    def get_mean_sign_spike_matrix(self, save=True):
+    def get_mean_sign_spike_matrix(self, node_pop="S1nonbarrel_neurons", save=True):
         """Same as above, but instead of doing it seed-by-seed it averages spikes over seeds"""
-        from assemblyfire.utils import get_sim_path, get_bluepy_circuit, get_gids, get_stimulus_stream
+        from assemblyfire.utils import get_sim_path, get_bluepy_circuit_from_root_path, get_node_idx, get_stimulus_stream
         from assemblyfire.plots import plot_rate
 
         assert self.t_chunks is None, "Chunked results only work for a single seed is atm."
@@ -187,7 +187,7 @@ class SpikeMatrixGroup(Config):
         seeds = np.sort(sim_paths.index.to_numpy())
         ignore_seeds = np.array(self.ignore_seeds)
         seeds = np.setdiff1d(seeds, ignore_seeds, assume_unique=True)
-        all_gids = get_gids(get_bluepy_circuit(sim_paths.loc[seeds[0]]), self.target)
+        all_gids = get_node_idx(get_bluepy_circuit_from_root_path(self.root_path), node_pop, self.target)
         nt_bins = int(((self.t_end + self.bin_size - self.t_start) / self.bin_size) - 1)
         spike_matrices = np.zeros((len(all_gids), nt_bins, len(seeds)), dtype=int)
 
@@ -233,10 +233,10 @@ class SpikeMatrixGroup(Config):
         # one can't simply np.dstack() them because it's not guaranteed that all gids spike in all trials
         gid_dict, convolved_spike_matrix_dict = {}, {}
         sim_paths = get_sim_path(self.root_path)
-        for seed, blueconfig_path in tqdm(sim_paths.items(), desc="Loading in simulation results"):
+        for seed, sim_config_path in tqdm(sim_paths.items(), desc="Loading in simulation results"):
             if seed in self.ignore_seeds:
                 pass
-            convolved_spike_matrix, gids = convolve_spike_matrix(blueconfig_path, self.target, self.t_start, self.t_end)
+            convolved_spike_matrix, gids = convolve_spike_matrix(sim_config_path, self.target, self.t_start, self.t_end)
             convolved_spike_matrix_dict[seed], gid_dict[seed] = convolved_spike_matrix, gids
             del convolved_spike_matrix
             gc.collect()
