@@ -22,18 +22,19 @@ DSET_CLST = "strength"
 DSET_PVALUE = "pvalue"
 
 
-def _get_degree_sorted_assembly_gids(c, conn_mat, assembly, mtype_list, n_samples, pre_assembly=None):
+def _get_degree_sorted_assembly_gids(c, node_pop, conn_mat, assembly, mtype_list, n_samples, pre_assembly=None):
     """Helper function to select indegree sorted postsynaptic gids from assembly"""
     if pre_assembly is None:
         indegrees = conn_mat.degree(assembly.gids, kind="in")
     else:
         indegrees = conn_mat.degree(pre_gids=pre_assembly.gids, post_gids=assembly.gids, kind="in")
     sorted_assembly_gids = assembly.gids[np.argsort(indegrees)[::-1]]
-    mtypes = utils.get_mtypes(c, sorted_assembly_gids)  # could be loaded from `conn_mat` as well...
+    mtypes = utils.get_node_properties(c, node_pop, sorted_assembly_gids, ["mtype"])  # could be loaded from `conn_mat`
     return mtypes.loc[mtypes.isin(mtype_list)].index.to_numpy()[:n_samples]
 
 
-def _get_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, assembly, mtype_list, n_samples, pre_assembly=None, p_th=0.05):
+def _get_syn_nnd_degree_sorted_assembly_gids(c, node_pop, syn_nnds, assembly, mtype_list, n_samples,
+                                             pre_assembly=None, p_th=0.05):
     """Helper function to select indegree sorted postsynaptic gids from assembly
     (Compared to above there is a preselection og gids by significant synapse nnd. 'strength')"""
     assembly_id = "assembly%i" % pre_assembly.idx[0] if pre_assembly is not None else "assembly%i" % assembly.idx[0]
@@ -48,22 +49,24 @@ def _get_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, assembly, mtype_list, 
         df = df.iloc[np.in1d(df.index.to_numpy(), assembly.gids), :]
     df = df.sort_values(DSET_DEG, ascending=False)
     # index out mtypes, and take the first `n_samples`
-    mtypes = utils.get_mtypes(c, df.index.to_numpy())
+    mtypes = utils.get_node_properties(c, node_pop, df.index.to_numpy(), ["mtype"])
     return mtypes.loc[mtypes.isin(mtype_list)].index.to_numpy()[:n_samples]
 
 
-def _get_cross_degree_sorted_assembly_gids(c, conn_mat, cross_assembly_grp, assembly, mtype_list, n_samples):
+def _get_cross_degree_sorted_assembly_gids(c, node_pop, conn_mat, cross_assembly_grp, assembly, mtype_list, n_samples):
     """Similar indegree based helper as above, but works for cross-assembly connections
     (It'll return `n_samples` gids per presynaptic assembly (i.e. `len(cross_assembly_grp)`), not in total...)"""
-    gids = [_get_degree_sorted_assembly_gids(c, conn_mat, assembly, mtype_list, n_samples, pre_assembly=pre_assembly)
+    gids = [_get_degree_sorted_assembly_gids(c, node_pop, conn_mat, assembly, mtype_list,
+                                             n_samples, pre_assembly=pre_assembly)
             for pre_assembly in cross_assembly_grp.assemblies]
     return np.unique(np.concatenate(gids))
 
 
-def _get_cross_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, cross_assembly_grp, assembly, mtype_list, n_samples):
+def _get_cross_syn_nnd_degree_sorted_assembly_gids(c, node_pop, syn_nnds, cross_assembly_grp, assembly,
+                                                   mtype_list, n_samples):
     """Similar synapse nnd. and indegree based helper as above, but works for cross-assembly connections
     (It'll return `n_samples` gids per presynaptic assembly (i.e. `len(cross_assembly_grp)`), not in total...)"""
-    gids = [_get_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, assembly,
+    gids = [_get_syn_nnd_degree_sorted_assembly_gids(c, node_pop, syn_nnds, assembly,
                                                      mtype_list, n_samples, pre_assembly=pre_assembly)
             for pre_assembly in cross_assembly_grp.assemblies]
     return np.unique(np.concatenate(gids))
@@ -100,14 +103,14 @@ def run(config_path, debug):
 
     config = Config(config_path)
     L.info(" Load in assemblies and connectivity matrix from %s" % config.h5f_name)
-    sim_paths = utils.get_sim_path(config.root_path)
-    c = utils.get_bluepy_circuit(sim_paths.iloc[0])
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
     conn_mat = AssemblyTopology.from_h5(config.h5f_name,
                                         prefix=config.h5_prefix_connectivity, group_name="full_matrix")
+    node_pop, edge_pop = config.node_pop, config.edge_pop
     target_range, min_nsyns = config.syn_clustering_target_range, config.syn_clustering_min_nsyns
     mtypes, n_samples = config.syn_clustering_mtypes, config.syn_clustering_n_neurons_sample
     cross_assemblies = config.syn_clustering_cross_assemblies
+    c = utils.get_bluepy_circuit_from_root_path(config.root_path)
 
     L.info(" Detecting synapse clusters and saving them to files")
     for seed, assembly_grp in tqdm(assembly_grp_dict.items(), desc="Iterating over seeds"):
@@ -119,10 +122,11 @@ def run(config_path, debug):
         cluster_dfs, cross_cluster_dfs = {}, {}
         for assembly in tqdm(assembly_grp.assemblies, desc="%s syn. clusters" % seed, leave=False):
             if syn_nnds is not None:
-                gids = _get_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, assembly, mtypes, n_samples)
+                gids = _get_syn_nnd_degree_sorted_assembly_gids(c, node_pop, syn_nnds, assembly, mtypes, n_samples)
             else:
-                gids = _get_degree_sorted_assembly_gids(c, conn_mat, assembly, mtypes, n_samples)
-            loc_df = utils.get_synloc_df(c, utils.get_syn_idx(c.config["connectome"], conn_mat.gids, gids))
+                gids = _get_degree_sorted_assembly_gids(c, node_pop, conn_mat, assembly, mtypes, n_samples)
+            syn_idx = utils.get_syn_idx(utils.get_edgef_name(c, edge_pop), conn_mat.gids, gids)
+            loc_df = utils.get_synloc_df(c, syn_idx, edge_pop)
             # create a fake assembly "group" in order to look for *within* assembly clusters only
             single_assembly_grp = AssemblyGroup([assembly], all_gids=assembly.gids)
             if debug:
@@ -134,7 +138,7 @@ def run(config_path, debug):
                 cluster_df = cluster_synapses(loc_df, single_assembly_grp, target_range, min_nsyns)
             utils.save_syn_clusters(config.syn_clustering_save_dir, assembly.idx, cluster_df)
             # some extra stuff for plotting
-            cluster_df["rho"] = utils.get_syn_properties(c, cluster_df.index.to_numpy(), ["rho0_GB"])["rho0_GB"]
+            cluster_df["rho"] = utils.get_edge_properties(c, cluster_df.index.to_numpy(), ["rho0_GB"])["rho0_GB"]
             cluster_dfs[assembly.idx[0]] = cluster_df
         fig_name = os.path.join(config.fig_path, "rho0_syn_clusts_%s.png" % seed)
         plot_cond_rhos(cluster_dfs, fig_name)
@@ -151,12 +155,14 @@ def run(config_path, debug):
                         cross_assembly_grp = AssemblyGroup(assembly_lst, all_gids=all_gids)
                         # sample gids (slightly differently) to have high indegree from `cross_assembly_grp`
                         if syn_nnds is not None:
-                            gids = _get_cross_syn_nnd_degree_sorted_assembly_gids(c, syn_nnds, cross_assembly_grp,
-                                                                                  assembly, mtypes, n_samples)
+                            gids = _get_cross_syn_nnd_degree_sorted_assembly_gids(c, node_pop, syn_nnds,
+                                                                                  cross_assembly_grp, assembly,
+                                                                                  mtypes, n_samples)
                         else:
-                            gids = _get_cross_degree_sorted_assembly_gids(c, conn_mat, cross_assembly_grp,
+                            gids = _get_cross_degree_sorted_assembly_gids(c, node_pop, conn_mat, cross_assembly_grp,
                                                                           assembly, mtypes, n_samples)
-                        loc_df = utils.get_synloc_df(c, utils.get_syn_idx(c.config["connectome"], conn_mat.gids, gids))
+                        syn_idx = utils.get_syn_idx(utils.get_edgef_name(c, edge_pop), conn_mat.gids, gids)
+                        loc_df = utils.get_synloc_df(c, syn_idx, edge_pop)
                         if debug:
                             cross_cluster_df = cluster_synapses(loc_df, cross_assembly_grp, target_range, min_nsyns,
                                                                 fig_dir=fig_dir, base_assembly_idx=assembly_id, c=c)
@@ -164,8 +170,8 @@ def run(config_path, debug):
                             cross_cluster_df = cluster_synapses(loc_df, cross_assembly_grp, target_range, min_nsyns)
                         utils.save_syn_clusters(config.syn_clustering_save_dir, assembly.idx, cross_cluster_df,
                                                 cross_assembly=True)
-                        cross_cluster_df["rho"] = utils.get_syn_properties(c, cross_cluster_df.index.to_numpy(),
-                                                                           ["rho0_GB"])["rho0_GB"]
+                        cross_cluster_df["rho"] = utils.get_edge_properties(c, cross_cluster_df.index.to_numpy(),
+                                                                            ["rho0_GB"])["rho0_GB"]
                         cross_cluster_dfs[assembly_id] = cross_cluster_df
             fig_name = os.path.join(config.fig_path, "rho0_cross_syn_clusts_%s.png" % seed)
             plot_cond_rhos(_update_cross_cluster_dfs_for_plotting(cross_cluster_dfs), fig_name)

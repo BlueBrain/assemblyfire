@@ -44,16 +44,16 @@ def _get_assembly_indegrees(assembly_grp, conn_mat, gids):
 
 
 def run(config_path, assembly_grp_name, buf_size, seed):
-    """TODO"""
-    from bluepy.enums import Synapse
+    """Calculates synapse nearest neighbour distances for assembly synapses and random controls,
+    and keeps writing the results to HDF5"""
 
     config = Config(config_path)
     assembly_grp = _assembly_group_from_name(config, assembly_grp_name)
     conn_mat = AssemblyTopology.from_h5(config.h5f_name, prefix=config.h5_prefix_connectivity)
     c = utils.get_bluepy_circuit_from_root_path(config.root_path)
-    gids = utils.get_gids(c, config.target)
-    morph_root = os.path.join(os.path.split(c.config["morphologies"])[0], "h5")
-    morphs = c.cells.get(gids, properties="morphology")
+    morph_root = c.config["components"]["morphologies_dir"]
+    gids = utils.get_node_idx(c, config.node_pop, config.target)
+    morphs = c.nodes[config.node_pop].get(gids, "morphology")
     results = SynNNDResults(config.h5f_name, len(assembly_grp), prefix="%s_syn_nnd" % assembly_grp_name)
 
     # check which gids are already done, and shuffle the (order of the) remaining ones
@@ -72,10 +72,9 @@ def run(config_path, assembly_grp_name, buf_size, seed):
     for gid, gid_indegrees in zip(gids_rnd, indegree_mat):
         pbar.update()
         # prepare args, and calculate synapse nearest neighbour distance
-        mpdc = MorphologyPathDistanceCalculator(Morphology(os.path.join(morph_root, morphs.loc[gid]) + ".h5"))
-        syn_loc_df = c.connectome.afferent_synapses(gid, properties=["afferent_section_id", "afferent_segment_id",
-                                                                     "afferent_segment_offset", Synapse.PRE_GID
-                                                                     ]).set_index(Synapse.PRE_GID)
+        mpdc = MorphologyPathDistanceCalculator(Morphology(os.path.join(morph_root, morphs.loc[gid]) + ".asc"))
+        # TODO: replace this with the snap version
+        syn_loc_df = utils.get_gid_synloc_df(c, gid, config.edge_pop)
         syn_loc_df = syn_loc_df.loc[syn_loc_df.index.intersection(gids)]
         clst_dict = syn_nearest_neighbour_distances(gid, mpdc, syn_loc_df, assembly_grp)
         # adding assembly indegrees to the dataset (for faster analysis afterwards)
