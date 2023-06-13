@@ -1,0 +1,24 @@
+root_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/Zenodo_O1"
+
+input_sequence_fname: "input_spikes/stimulus_stream.txt"
+pattern_nodes_fname: "input_spikes/patterns.json"
+patterns_edges: {"proj_Thalamocortical_VPM_Source": "VPM__S1nonbarrel_neurons__chemical"}
+
+edge_pop: "S1nonbarrel_neurons__S1nonbarrel_neurons__chemical"
+
+h5_out:
+    file_name: "assemblies.h5"
+    prefixes:
+        spikes: "spikes"
+        assemblies: "assemblies"
+        connectivity: "connectivity"
+
+root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures/v7_assemblies"
+
+preprocessing_protocol:
+    node_pop: "S1nonbarrel_neurons"
+    target: "Excitatory"
+    t_start: 1500
+    t_end: 126000
+    bin_size: 20
+    threshold_rate: True

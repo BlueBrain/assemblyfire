@@ -25,28 +25,18 @@ class Config(object):
         return self.config["root_path"]
 
     @property
-    def input_patterns_fname(self):
-        f_name = self.config["input_patterns_fname"]
+    def input_sequence_fname(self):
+        f_name = self.config["input_sequence_fname"]
         return f_name if os.path.isabs(f_name) else os.path.join(self.root_path, f_name)
 
     @property
-    def pattern_gids_fname(self):
-        f_name = self.config["pattern_gids_fname"]
+    def pattern_nodes_fname(self):
+        f_name = self.config["pattern_nodes_fname"]
         return f_name if os.path.isabs(f_name) else os.path.join(self.root_path, f_name)
 
     @property
-    def pattern_locs_fname(self):
-        pattern_locs_fname = None
-        proj_dir = os.path.join(self.root_path, "projections")
-        if os.path.isdir(proj_dir):
-            for f_name in os.listdir(proj_dir):
-                if f_name.split(".txt")[0] in self.pattern_gids_fname:
-                    pattern_locs_fname = os.path.join(proj_dir, f_name)
-        return pattern_locs_fname
-
-    @property
-    def patterns_projection_name(self):
-        return os.path.split(self.pattern_gids_fname)[1].split('__')[0]
+    def patterns_edges(self):
+        return self.config["patterns_edges"] if "patterns_edges" in self.config else {}
 
     @property
     def h5f_name(self):
@@ -96,6 +86,15 @@ class Config(object):
             return os.path.join(self.root_fig_path, os.path.split(self.root_path)[1])
         else:
             return os.path.join(self.root_fig_path, os.path.split(self.root_path)[1] + h5f_name.split("assemblies")[1])
+
+    @property
+    def node_pop(self):
+        return self.config["preprocessing_protocol"]["node_pop"]\
+            if "node_pop" in self.config["preprocessing_protocol"] else None
+
+    @property
+    def edge_pop(self):
+        return self.config["edge_pop"] if "edge_pop" in self.config else None
 
     @property
     def target(self):
