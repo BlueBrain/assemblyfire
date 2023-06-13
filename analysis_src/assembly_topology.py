@@ -8,6 +8,7 @@ import h5py
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
+from conntility.circuit_models import circuit_connection_matrix
 
 from assemblyfire.config import Config
 import assemblyfire.utils as utils
@@ -19,47 +20,44 @@ DSET_CLST = "strength"
 DSET_PVALUE = "pvalue"
 
 
-def _get_spiking_proj_gids(config, sim_config):
-    """Loads grouped (to patterns + non-specific) TC gids
-    (Could be done easier with adding stuff to the yaml config... but whatever)"""
-    tc_spikes = utils.get_grouped_tc_spikes(config.pattern_gids_fname, sim_config, config.t_start, config.t_end)
-    _, patterns = utils.get_stimulus_stream(config.input_patterns_fname, config.t_start, config.t_end)
-    pattern_names = np.unique(patterns)
-    projf_names = list(utils.get_projf_names(sim_config).keys())
-    assert len(projf_names) <= 2, "The code assumes max 2 projections, one pattern specific and one non-specific"
-    ns_projf_name = np.setdiff1d(projf_names, [config.patterns_projection_name])[0]
-    pattern_gids, ns_gids = {}, []
-    for name, data in tc_spikes.items():
-        if name in pattern_names:
-            pattern_gids[name] = np.unique(data["spiking_gids"])
+def _get_spiking_proj_gids(config, sim_config, circuit_config):
+    """Loads grouped (to patterns + non-specific) TC gids (that spike at least once)"""
+    proj_edge_pops = utils.get_proj_edge_pops(circuit_config, config.edge_pop)
+    assert len(proj_edge_pops) <= 2, "The code assumes max 2 projections, one pattern specific and one non-specific"
+    patterns_edge_pop = list(config.patterns_edges.values())[0]
+    ns_edge_pop = np.setdiff1d(proj_edge_pops, [patterns_edge_pop])[0]
+    pattern_gids = utils.get_pattern_node_idx(config.pattern_nodes_fname)
+
+    proj_spikes = utils.get_proj_spikes(sim_config, config.t_start, config.t_end)
+    spiking_pattern_gids = {}
+    for node_pop, spikes in proj_spikes.items():
+        if node_pop == list(config.patterns_edges.keys())[0]:
+            spiking_gids = spikes["spiking_gids"]
+            for pattern_name, gids in pattern_gids.items():
+                spiking_pattern_gids[pattern_name] = np.unique(spiking_gids[np.in1d(spiking_gids, gids)])
         else:
-            ns_gids.extend(np.unique(data["spiking_gids"]))
-    all_pattern_gids = []
-    for pattern_name, gids in pattern_gids.items():
-        all_pattern_gids.extend(gids)
-    return {config.patterns_projection_name: np.unique(all_pattern_gids), ns_projf_name: np.unique(ns_gids)}, pattern_gids
+            ns_gids = np.unique(spikes["spiking_gids"])
+    return {patterns_edge_pop: np.unique(spiking_gids), ns_edge_pop: ns_gids}, spiking_pattern_gids
 
 
 def get_proj_innervation(config):
     """Looks up how many projection fibers, and pattern fibers innervate the neurons"""
-    from conntility.circuit_models import circuit_connection_matrix
-
     sim = utils.get_bluepy_simulation(utils.get_sim_path(config.root_path).iloc[0])
-    proj_gids, pattern_gids = _get_spiking_proj_gids(config, sim.config)
     c = sim.circuit
-    post_gids = utils.get_gids(c, config.target)
+    proj_gids, pattern_gids = _get_spiking_proj_gids(config, sim.config, c.config)
+    post_gids = utils.get_node_idx(c, config.node_pop, config.target)
+
     conn_matrices, proj_indegrees, pattern_indegrees = {}, {}, {}
-    for proj, pre_gids in proj_gids.items():
+    for edge_pop, pre_gids in proj_gids.items():
         # get (sparse) connectivity matrix between the input fibers and neurons in the circuit
-        input_conn_mat = circuit_connection_matrix(c, proj, pre_gids, post_gids).tocsr()
-        conn_matrices[proj] = input_conn_mat
-        proj_indegrees[proj] = np.array(input_conn_mat.sum(axis=0)).flatten()
-        if proj == config.patterns_projection_name:
+        input_conn_mat = circuit_connection_matrix(c, edge_pop, pre_gids, post_gids, load_full=True).tocsr()
+        conn_matrices[edge_pop] = input_conn_mat
+        proj_indegrees[edge_pop] = np.array(input_conn_mat.sum(axis=0)).flatten()
+        if edge_pop == list(config.patterns_edges.values())[0]:
             # for each pattern get how many pattern fibers innervate the neurons
             for pattern_name, gids in pattern_gids.items():
                 pattern_idx = np.in1d(pre_gids, gids, assume_unique=True)
                 pattern_indegrees[pattern_name] = np.array(input_conn_mat[pattern_idx].sum(axis=0)).flatten()
-
     return conn_matrices, proj_indegrees, pattern_indegrees, post_gids
 
 
@@ -146,7 +144,8 @@ def assembly_prob_mi_from_patterns(assembly_grp_dict, pattern_indegrees, gids, f
 def assembly_efficacy(config, assembly_grp_dict):
     """Plots synapses initialized at depressed (rho=0) and potentiated (rho=1) states"""
     c = utils.get_bluepy_circuit_from_root_path(config.root_path)
-    rhos = utils.get_rho0s(c, config.target)  # get all rhos in one go and then index them as needed
+    # get all rhos in one go and then index them as needed
+    rhos = utils.get_rho0s(c, config.node_pop, config.target, config.edge_pop)
 
     for seed, assembly_grp in tqdm(assembly_grp_dict.items(), desc="Getting efficacies"):
         efficacies = {assembly.idx[0]: rhos.loc[rhos["pre_gid"].isin(assembly.gids)
