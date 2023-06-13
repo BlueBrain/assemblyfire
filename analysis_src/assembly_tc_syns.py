@@ -13,40 +13,45 @@ import assemblyfire.utils as utils
 from assemblyfire.plots import plot_tc_syn_properties
 
 
-def _get_tc_data(config, sim_config):
-    """Loads grouped (to patterns + non-specific) TC spikes, and the edge file name associated with the projection
-    (Could be done easier with adding stuff to the yaml config... but whatever)"""
-    tc_spikes = utils.get_grouped_tc_spikes(config.pattern_gids_fname, sim_config, config.t_start, config.t_end)
-    _, patterns = utils.get_stimulus_stream(config.input_patterns_fname, config.t_start, config.t_end)
-    pattern_names = np.unique(patterns)
-    projf_names = utils.get_projf_names(sim_config)
-    assert len(projf_names) <= 2, "The code assumes max 2 projections, one pattern specific and one non-specific"
-    ns_proj_name = np.setdiff1d(list(projf_names.keys()), [config.patterns_projection_name])[0]
-    for name, data in tc_spikes.items():
-        if name in pattern_names:
-            data["proj_name"] = config.patterns_projection_name
-            data["edgef_name"] = projf_names[config.patterns_projection_name]
+def _get_spiking_proj_gids(config, sim_config, circuit_config):
+    """Loads grouped (to patterns + non-specific) TC gids (that spike at least once)
+    (Almost the same as in `assembly_topology.py`)"""
+    proj_edge_pops = utils.get_proj_edge_pops(circuit_config, config.edge_pop)
+    assert len(proj_edge_pops) <= 2, "The code assumes max 2 projections, one pattern specific and one non-specific"
+    patterns_edge_pop = list(config.patterns_edges.values())[0]
+    ns_edge_pop = np.setdiff1d(proj_edge_pops, [patterns_edge_pop])[0]
+    pattern_gids = utils.get_pattern_node_idx(config.pattern_nodes_fname)
+
+    proj_spikes = utils.get_proj_spikes(sim_config, config.t_start, config.t_end)
+    proj_gids = {}
+    for node_pop, spikes in proj_spikes.items():
+        if node_pop == list(config.patterns_edges.keys())[0]:
+            spiking_gids = spikes["spiking_gids"]
+            for pattern_name, gids in pattern_gids.items():
+                proj_gids[pattern_name] = {"edge_pop": patterns_edge_pop}
+                proj_gids[pattern_name]["gids"] = np.unique(spiking_gids[np.in1d(spiking_gids, gids)])
         else:
-            data["proj_name"] = ns_proj_name
-            data["edgef_name"] = projf_names[ns_proj_name]
-    return tc_spikes
+            # ns_edge_pop[:3] gives "POm" which is just a bit less arbitrary than hard coding it...
+            proj_gids[ns_edge_pop[:3]] = {"edge_pop": ns_edge_pop}
+            proj_gids[ns_edge_pop[:3]]["gids"] = np.unique(spikes["spiking_gids"])
+    return proj_gids
 
 
 def get_tc2assembly_syn_properties(config, sim, assembly):
     """Finds synapse idx of patterns (+ non-specific stim) to assembly and loads synapse properties
     (loaded properties are hard coded atm. and require bluepy enums, but by this time bluepy should be installed)"""
-    from bluepy.enums import Cell, Synapse
-    tc_spikes = _get_tc_data(config, sim.config)
     c = sim.circuit
+    proj_gids = _get_spiking_proj_gids(config, sim.config, c.config)
     dfs = []
-    for name, data in tqdm(tc_spikes.items(), desc="Iterating over patterns"):
-        syn_idx = utils.get_syn_idx(data["edgef_name"], np.unique(data["spiking_gids"]), assembly.gids)
-        print(len(syn_idx))
-        syn_df = utils.get_proj_properties(c, data["proj_name"], syn_idx,
-                                           [Synapse.POST_GID, Synapse.G_SYNX, Synapse.POST_NEURITE_DISTANCE])
-        nrn_df = c.cells.get(syn_df[Synapse.POST_GID], [Cell.LAYER, Cell.MTYPE])
-        data = np.concatenate((syn_df[[Synapse.G_SYNX, Synapse.POST_NEURITE_DISTANCE]].to_numpy(),
-                               nrn_df.loc[syn_df[Synapse.POST_GID]].to_numpy()), axis=1)
+    for name, tmp in tqdm(proj_gids.items(), desc="Iterating over patterns"):
+        syn_idx = utils.get_syn_idx(utils.get_edgef_name(c, tmp["edge_pop"]), tmp["gids"], assembly.gids)
+        # print(len(syn_idx))
+        # TODO: get rid of Synapse.POST_NEURITE_DISTANCE
+        syn_df = utils.get_edge_properties(c, tmp["edge_pop"], syn_idx,
+                                           ["@target_node", "conductance", Synapse.POST_NEURITE_DISTANCE])
+        nrn_df = utils.get_node_properties(c, config.node_pop, syn_df["@target_node"].to_numpy(), ["layer", "mtype"])
+        data = np.concatenate((syn_df[["conductance", Synapse.POST_NEURITE_DISTANCE]].to_numpy(),
+                               nrn_df.loc[syn_df["@target_node"]].to_numpy()), axis=1)
         df = pd.DataFrame(data=data, index=syn_df.index.to_numpy(), columns=["g_syn", "path distance", "layer", "mtype"])
         df["name"] = name
         dfs.append(df.astype(dtype={"g_syn": np.float32, "path distance": np.float32, "layer": int}))
