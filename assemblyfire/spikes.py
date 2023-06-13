@@ -24,7 +24,7 @@ from assemblyfire.config import Config
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
 
 
-def load_spikes(sim_config_path, target, t_start, t_end, node_pop="S1nonbarrel_neurons"):
+def load_spikes(sim_config_path, node_pop, target, t_start, t_end):
     """Loads in spikes from simulations using bluepy"""
     from assemblyfire.utils import get_bluepy_simulation, get_node_idx, get_spikes
     sim = get_bluepy_simulation(sim_config_path)
@@ -86,10 +86,10 @@ def get_sign_rate_th(spike_matrix, surr_rate_method, nreps=100):
     return np.percentile(stds, 95)
 
 
-def convolve_spike_matrix(sim_config_path, target, t_start, t_end, bin_size=1, std=10):
+def convolve_spike_matrix(sim_config_path, node_pop, target, t_start, t_end, bin_size=1, std=10):
     """Bins spikes and convolves it with a 1D Gaussian kernel row-by-row
     (default bin size = 1 ms comes from Nolte et al. 2019 but the kernel's std = 10 ms is set by Daniela's tests)"""
-    spike_times, spiking_gids = load_spikes(sim_config_path, target, t_start, t_end)
+    spike_times, spiking_gids = load_spikes(sim_config_path, node_pop, target, t_start, t_end)
     spike_matrix, gids, _ = spikes2mat(spike_times, spiking_gids, t_start, t_end, bin_size)
     assert (spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1)))
     nprocs = spike_matrix.shape[0] if os.cpu_count() - 1 > spike_matrix.shape[0] else os.cpu_count() - 1
@@ -127,7 +127,7 @@ class SpikeMatrixGroup(Config):
 
     def get_sign_spike_matrix(self, sim_config_path, t_start, t_end):
         """Bins spikes and thresholds population firing rate to get significant time bins"""
-        spike_times, spiking_gids = load_spikes(sim_config_path, self.target, t_start, t_end)
+        spike_times, spiking_gids = load_spikes(sim_config_path, self.node_pop, self.target, t_start, t_end)
         spike_matrix, gids, t_bins = spikes2mat(spike_times, spiking_gids, t_start, t_end, self.bin_size)
         assert (spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1)))
         rate = np.sum(spike_matrix, axis=0)
@@ -170,7 +170,7 @@ class SpikeMatrixGroup(Config):
                 gc.collect()
                 fig_name = os.path.join(self.fig_path, "rate_seed%s.png" % seed)
                 plot_rate(rate, rate_th, t_start, t_end, fig_name)
-        stim_times, patterns = get_stimulus_stream(self.input_patterns_fname, self.t_start, self.t_end)
+        stim_times, patterns = get_stimulus_stream(self.input_sequence_fname, self.t_start, self.t_end)
         project_metadata = {"root_path": self.root_path, "seeds": seeds, "t": ts,
                             "stim_times": stim_times, "patterns": patterns.tolist()}
         if save:
@@ -192,7 +192,8 @@ class SpikeMatrixGroup(Config):
         spike_matrices = np.zeros((len(all_gids), nt_bins, len(seeds)), dtype=int)
 
         for i, seed in enumerate(tqdm(seeds, desc="Loading in simulation results")):
-            spike_times, spiking_gids = load_spikes(sim_paths.loc[seed], self.target, self.t_start, self.t_end)
+            spike_times, spiking_gids = load_spikes(sim_paths.loc[seed], self.node_pop, self.target,
+                                                    self.t_start, self.t_end)
             spike_matrix, gids, t_bins = spikes2mat(spike_times, spiking_gids, self.t_start, self.t_end, self.bin_size)
             assert spike_matrix.shape[0] == np.sum(spike_matrix.any(axis=1))
             assert spike_matrix.shape[1] == nt_bins
@@ -218,7 +219,7 @@ class SpikeMatrixGroup(Config):
         fig_name = os.path.join(self.fig_path, "rate_seed_average.png")
         plot_rate(rate / rate_norm, rate_th / rate_norm, self.t_start, self.t_end, fig_name)
 
-        stim_times, patterns = get_stimulus_stream(self.input_patterns_fname, self.t_start, self.t_end)
+        stim_times, patterns = get_stimulus_stream(self.input_sequence_fname, self.t_start, self.t_end)
         project_metadata = {"root_path": self.root_path, "seeds": seeds, "t": np.array([self.t_start, self.t_end]),
                             "stim_times": stim_times, "patterns": patterns.tolist()}
         if save:
@@ -236,7 +237,8 @@ class SpikeMatrixGroup(Config):
         for seed, sim_config_path in tqdm(sim_paths.items(), desc="Loading in simulation results"):
             if seed in self.ignore_seeds:
                 pass
-            convolved_spike_matrix, gids = convolve_spike_matrix(sim_config_path, self.target, self.t_start, self.t_end)
+            convolved_spike_matrix, gids = convolve_spike_matrix(sim_config_path, self.node_pop, self.target,
+                                                                 self.t_start, self.t_end)
             convolved_spike_matrix_dict[seed], gid_dict[seed] = convolved_spike_matrix, gids
             del convolved_spike_matrix
             gc.collect()
