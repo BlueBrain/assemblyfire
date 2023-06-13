@@ -4,6 +4,7 @@ author: András Ecker, last update: 06.2023
 """
 
 import os
+import json
 import pickle
 import h5py
 import warnings
@@ -68,19 +69,19 @@ def get_stimulus_stream(f_name, t_start, t_end):
     return stim_times[idx], patterns[idx]
 
 
-def get_pattern_gids(pklf_name):
-    """Loads VPM gids corresponding to patterns from .pkl file"""
-    with open(pklf_name, "rb") as f:
-        pattern_gids = pickle.load(f)
-    return pattern_gids
+def get_pattern_node_idx(jf_name):
+    """Loads gids corresponding to patterns from JSON"""
+    with open(jf_name, "r") as f:
+        node_idx = json.load(f)
+    return {pattern_name: np.array(tmp["node_id"]) for pattern_name, tmp in node_idx.items()}
 
 
 def get_node_idx(c, node_pop, target):
     return c.nodes[node_pop].ids(target)
 
 
-def get_mtypes(c, node_pop, node_idx):
-    return c.nodes[node_pop].get(node_idx, ["mtype"])
+def get_node_properties(c, node_pop, node_idx, properties):
+    return c.nodes[node_pop].get(node_idx, properties)
 
 
 def load_nrn_df(h5f_name, prefix="connectivity"):
@@ -117,65 +118,43 @@ def get_spikes(sim, node_pop, gids, t_start, t_end):
     return spikes.index.to_numpy(), spikes.to_numpy()
 
 
-def get_projf_names(sim_config):
-    """Gets the name and edge file path of projections from bluepy.Simulation.config object"""
-    projf_names = {}
-    projs = sim_config.typed_sections("Projection")
-    for proj in projs:
-        if hasattr(proj, "Path"):
-            projf_names[proj.name] = proj.Path
-    return projf_names
+def get_proj_edge_pops(circuit_config, local_edge_pop):
+    """Gets the name of projection (non-local edge)
+    edge populations from `bluepysnap.Circuit.config` object"""
+    return [list(tmp["populations"].keys())[0] for tmp in circuit_config["networks"]["edges"]
+            if list(tmp["populations"].keys())[0] != local_edge_pop]
 
 
-def _get_spikef_name(sim_config):
+def _get_spikef_names(sim_config):
     """Gets the name of the SpikeFile from bluepy.Simulation.config object"""
-    f_name = None
-    stims = sim_config.typed_sections("Stimulus")
-    for stim in stims:
-        if hasattr(stim, "SpikeFile"):
-            f_name = stim.SpikeFile
-            break  # atm. it handles only a single (the first in order) SpikeFile... TODO: extend this
-    if f_name is not None:
-        f_name = f_name if os.path.isabs(f_name) else os.path.join(sim_config.Run["CurrentDir"], f_name)
-    return f_name
+    spikef_names = {}
+    for _, input in sim_config["inputs"].items():
+        if input["input_type"] == "spikes" and input["module"] == "synapse_replay":
+            node_pop, f_name = input["source"], input["spike_file"]
+            if not os.path.isabs(f_name):
+                warnings.warn("Spike file used for replay is a relative one,"
+                              "which will probably break the code when trying to load it")
+            spikef_names[node_pop] = f_name
+    return spikef_names
 
 
-def get_tc_spikes(sim_config, t_start, t_end):
-    """Loads in input spikes (on projections) using the bluepy.Simulation.config object.
-    Returns the format used for plotting rasters and population rates"""
-    f_name = _get_spikef_name(sim_config)
-    if f_name is not None:
+def get_proj_spikes(sim_config, t_start, t_end):
+    """Loads in input spikes (on projections) using the `bluepysnap.Simulation.config` object"""
+    spikef_names = _get_spikef_names(sim_config)
+    spikes = {}
+    for node_pop, f_name in spikef_names.items():
         tmp = np.loadtxt(f_name, skiprows=1)
         spike_times, spiking_gids = tmp[:, 0], tmp[:, 1].astype(int)
         idx = np.where((t_start < spike_times) & (spike_times < t_end))[0]
-        return spike_times[idx], spiking_gids[idx]
-    else:
-        warnings.warn("No SpikeFile found in the BlueConfig, returning empty arrays.")
-        return np.array([]), np.array([], dtype=int)
-
-
-def get_grouped_tc_spikes(pklf_name, sim_config, t_start, t_end):
-    """Loads in input spikes (on projections) and groups them by pattern (and POm)"""
-    spike_times, spiking_gids = get_tc_spikes(sim_config, t_start, t_end)
-    pattern_gids = get_pattern_gids(pklf_name)
-    tc_spikes = {pattern_name: {} for pattern_name, _ in pattern_gids.items()}
-    tc_spikes["POm"] = {}
-    patterns_mask = np.zeros_like(spiking_gids).astype(bool)
-    for pattern_name, gids in pattern_gids.items():
-        mask = np.in1d(spiking_gids, gids)
-        if mask.sum() > 0:
-            patterns_mask += mask
-            tc_spikes[pattern_name] = {"spike_times": spike_times[mask], "spiking_gids": spiking_gids[mask]}
-    pom_mask = ~patterns_mask
-    if pom_mask.sum() > 0:
-        tc_spikes["POm"] = {"spike_times": spike_times[pom_mask], "spiking_gids": spiking_gids[pom_mask]}
-    return tc_spikes
+        # -1 because spike replay still has an offset in `py-neurodamus`... get rid of it once that's fixed
+        spikes[node_pop] = {"spike_times": spike_times[idx], "spiking_gids": spiking_gids[idx] - 1}
+    return spikes
 
 
 # copy-pasted from bglibpy/ssim.py (until BGLibPy will support adding spikes from SpikeFile!)
 def _parse_outdat(f_name):
     """Parse the replay spiketrains in a out.dat formatted file"""
-    from bluepy.impl.spike_report import SpikeReport
+    from bluepy.impl.spike_report import SpikeReport  # TODO: fix this
     spikes = SpikeReport.load(f_name).get()
     # convert Series to DataFrame with 2 columns for `groupby` operation
     spike_df = spikes.to_frame().reset_index()
@@ -186,15 +165,14 @@ def _parse_outdat(f_name):
     return outdat.to_dict()
 
 
-def get_tc_spikes_bglibpy(sim_config):
+def get_tc_spikes_bglibpy(sim_config):  # TODO: test this!
     """Loads in input spikes (on projections) using the bluepy.Simulation.config object.
     Returns the format used in BGLibPy spike replay"""
-    f_name = _get_spikef_name(sim_config)
-    if f_name is not None:
-        return _parse_outdat(f_name)
-    else:
-        warnings.warn("No SpikeFile found in the BlueConfig, returning empty dict.")
-        return {}
+    spikef_names = _get_spikef_names(sim_config)
+    spikes = {}
+    for _, f_name in spikef_names.items():
+        spikes.update(_parse_outdat(f_name))
+    return spikes
 
 
 def group_clusters_by_patterns(clusters, t_bins, stim_times, patterns):
@@ -271,17 +249,25 @@ def get_syn_idx(edgef_name, pre_node_idx, post_node_idx, parallel=True):
     return afferents_edges.flatten()[flt]
 
 
-def get_syn_properties(c, edge_pop, syn_idx, properties):
+def get_edge_properties(c, edge_pop, syn_idx, properties):
     return c.edges[edge_pop].properties(syn_idx, properties)
 
 
-def get_synloc_df(c, syn_idx, edge_pop="S1nonbarrel_neurons__S1nonbarrel_neurons__chemical"):
-    """Loads in synapse location properties needed for detecting synapse clusters"""
+def get_synloc_df(c, syn_idx, edge_pop):
+    """Loads in synapse location properties (based on precalculated synapse idx)
+    needed for detecting synapse clusters"""
     syn_properties = {"@source_node": "pre_gid", "@target_node": "post_gid", "afferent_section_id": "section_id",
                       "afferent_center_x": "x", "afferent_center_y": "y", "afferent_center_z": "z"}
-    loc_df = get_syn_properties(c, edge_pop, syn_idx, list(syn_properties.keys()))
+    loc_df = get_edge_properties(c, edge_pop, syn_idx, list(syn_properties.keys()))
     loc_df.rename(columns=syn_properties, inplace=True)
     return loc_df
+
+
+def get_gid_synloc_df(c, node_id, edge_pop):
+    """Loads in synapse location properties (for all afferents of the `node_id`)
+    needed for calculating synapses neighbour distances"""
+    return c.edges[edge_pop].afferent_edges(node_id, ["@source_node", "afferent_section_id",
+                                            "afferent_segment_id", "afferent_segment_offset"]).set_index("@source_node")
 
 
 def get_edgef_name(c, edge_pop):
@@ -292,11 +278,11 @@ def get_edgef_name(c, edge_pop):
     raise ValueError("Edge population: %s not found in circuit config" % edge_pop)
 
 
-def get_rho0s(c, target, node_pop="S1nonbarrel_neurons", edge_pop="S1nonbarrel_neurons__S1nonbarrel_neurons__chemical"):
+def get_rho0s(c, node_pop, target, edge_pop):
     """Get initial efficacies (rho0_GB in the SONATA file) for all synapses in the `target`"""
     gids = get_node_idx(c, node_pop, target)
     syn_idx = get_syn_idx(get_edgef_name(c, edge_pop), gids, gids)
-    syn_df = get_syn_properties(c, edge_pop, syn_idx, ["@source_node", "@target_node", "rho0_GB"])
+    syn_df = get_edge_properties(c, edge_pop, syn_idx, ["@source_node", "@target_node", "rho0_GB"])
     syn_df.rename(columns={"@source_node": "pre_gid", "@target_node": "post_gid", "rho0_GB": "rho"}, inplace=True)
     return syn_df
 
