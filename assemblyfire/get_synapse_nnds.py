@@ -73,7 +73,6 @@ def run(config_path, assembly_grp_name, buf_size, seed):
         pbar.update()
         # prepare args, and calculate synapse nearest neighbour distance
         mpdc = MorphologyPathDistanceCalculator(Morphology(os.path.join(morph_root, morphs.loc[gid]) + ".asc"))
-        # TODO: replace this with the snap version
         syn_loc_df = utils.get_gid_synloc_df(c, gid, config.edge_pop)
         syn_loc_df = syn_loc_df.loc[syn_loc_df.index.intersection(gids)]
         clst_dict = syn_nearest_neighbour_distances(gid, mpdc, syn_loc_df, assembly_grp)
