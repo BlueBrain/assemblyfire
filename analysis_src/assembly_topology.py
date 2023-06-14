@@ -1,6 +1,6 @@
 """
 Connectivity analysis (mostly wrappers around `assemblyfire.topology` functions)
-last modified: András Ecker 01.2023
+last modified: András Ecker 06.2023
 """
 
 import os
@@ -20,7 +20,7 @@ DSET_CLST = "strength"
 DSET_PVALUE = "pvalue"
 
 
-def _get_spiking_proj_gids(config, sim_config, circuit_config):
+def get_spiking_proj_gids(config, sim_config, circuit_config):
     """Loads grouped (to patterns + non-specific) TC gids (that spike at least once)"""
     proj_edge_pops = utils.get_proj_edge_pops(circuit_config, config.edge_pop)
     assert len(proj_edge_pops) <= 2, "The code assumes max 2 projections, one pattern specific and one non-specific"
@@ -44,7 +44,7 @@ def get_proj_innervation(config):
     """Looks up how many projection fibers, and pattern fibers innervate the neurons"""
     sim = utils.get_bluepy_simulation(utils.get_sim_path(config.root_path).iloc[0])
     c = sim.circuit
-    proj_gids, pattern_gids = _get_spiking_proj_gids(config, sim.config, c.config)
+    proj_gids, pattern_gids = get_spiking_proj_gids(config, sim.config, c.config)
     post_gids = utils.get_node_idx(c, config.node_pop, config.target)
 
     conn_matrices, proj_indegrees, pattern_indegrees = {}, {}, {}
