@@ -22,3 +22,6 @@ preprocessing_protocol:
     t_end: 126000
     bin_size: 20
     threshold_rate: True
+
+clustering:
+    overwrite_n_clusters: {"seed12345": 12}
