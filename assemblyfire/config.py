@@ -155,7 +155,7 @@ class Config(object):
     @property
     def overwrite_seeds(self):
         overwrite_seeds = {}
-        if "clustering" in config:
+        if "clustering" in self.config:
             if "overwrite_n_clusters" in self.config["clustering"]:
                 overwrite_seeds = self.config["clustering"]["overwrite_n_clusters"]
         return overwrite_seeds
