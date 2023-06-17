@@ -18,11 +18,11 @@ from assemblyfire.clustering import cosine_similarity, detect_assemblies
 from assemblyfire.plots import plot_dendogram_silhouettes, plot_tsne, plot_cluster_seqs, plot_distance_corr, plot_db_scores
 
 
-def get_pattern_distance(locf_name, pklf_name):
+def get_pattern_distance(locf_name, jf_name):
     """Gets Earth mover's distance of the input pattern fibers"""
     tmp = np.loadtxt(locf_name)
     gids, pos = tmp[:, 0].astype(int), tmp[:, 1:]
-    pattern_gids = utils.get_pattern_gids(pklf_name)
+    pattern_gids = utils.get_pattern_node_idx(jf_name)
     pattern_pos = {pattern_name: pos[np.in1d(gids, gids_, assume_unique=True), :]
                    for pattern_name, gids_ in pattern_gids.items()}
     pattern_names = np.sort(list(pattern_pos.keys()))
@@ -61,7 +61,7 @@ def cluster_sim_mat(spike_matrix, t_bins, stim_times, patterns, input_pattern_na
                     min_n_clusts=5, max_n_clusts=20):
     """Modified version of `assemblyfire.clustering/cluster_sim_mat()` that plot results for all `n_clusts`
     and some extra stuff"""
-    tsne = TSNE(n_components=2, metric="cosine").fit_transform(spike_matrix.T)
+    tsne = TSNE(n_components=2, metric="cosine", square_distances=True).fit_transform(spike_matrix.T)
     sim_matrix = cosine_similarity(spike_matrix.T)
     dists = 1 - sim_matrix
     dists[dists < 1e-10] = 0.  # fixing numerical errors
@@ -96,7 +96,7 @@ def main(config_path, seeds, save_assemblies=False):
     else:
         spike_matrix_dict, project_metadata = utils.load_spikes_from_h5(config.h5f_name, config.h5_prefix_spikes)
     stim_times, patterns = project_metadata["stim_times"], project_metadata["patterns"]
-    input_pattern_names, input_dist = get_pattern_distance(config.pattern_locs_fname, config.pattern_gids_fname)
+    input_pattern_names, input_dist = get_pattern_distance(config.pattern_locs_fname, config.pattern_nodes_fname)
     if save_assemblies:
         nrn_loc_df = utils.get_nrn_df(config.h5f_name, config.h5_prefix_connectivity, config.root_path, config.target)
 
@@ -115,7 +115,7 @@ def main(config_path, seeds, save_assemblies=False):
 
 
 if __name__ == "__main__":
-    config_path = "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_plastic.yaml"
-    seeds = [1]
+    config_path = "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/Zenodo_SONATA_np.yaml"
+    seeds = [12345]
     main(config_path, seeds)
 

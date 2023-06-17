@@ -5,7 +5,6 @@ author: András Ecker, last update: 06.2023
 
 import os
 import json
-import pickle
 import h5py
 import warnings
 from collections import namedtuple
@@ -112,9 +111,9 @@ def get_nrn_df(h5f_name, prefix, root_path, target, node_pop="S1nonbarrel_neuron
 def get_spikes(sim, node_pop, gids, t_start, t_end):
     """Extracts spikes (using bluepy)"""
     if gids is None:
-        spikes = sim.spikes[node_pop].get(t_start=t_start, t_end=t_end)
+        spikes = sim.spikes[node_pop].get(t_start=t_start, t_stop=t_end)
     else:
-        spikes = sim.spikes[node_pop].get(gids, t_start=t_start, t_end=t_end)
+        spikes = sim.spikes[node_pop].get(gids, t_start=t_start, t_stop=t_end)
     return spikes.index.to_numpy(), spikes.to_numpy()
 
 

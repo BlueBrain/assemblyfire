@@ -39,6 +39,14 @@ class Config(object):
         return self.config["patterns_edges"] if "patterns_edges" in self.config else {}
 
     @property
+    def pattern_locs_fname(self):
+        if len(self.patterns_edges):
+            return os.path.join(os.path.split(self.pattern_nodes_fname)[0],
+                                "%s.txt" % list(self.patterns_edges.keys())[0])
+        else:
+            return None
+
+    @property
     def h5f_name(self):
         f_name = self.config["h5_out"]["file_name"]
         return f_name if os.path.isabs(f_name) else os.path.join(self.root_path, f_name)
@@ -146,10 +154,11 @@ class Config(object):
 
     @property
     def overwrite_seeds(self):
-        if "overwrite_n_clusters" in self.config["clustering"]:
-            return self.config["clustering"]["overwrite_n_clusters"]
-        else:
-            return {}
+        overwrite_seeds = {}
+        if "clustering" in config:
+            if "overwrite_n_clusters" in self.config["clustering"]:
+                overwrite_seeds = self.config["clustering"]["overwrite_n_clusters"]
+        return overwrite_seeds
 
     @property
     def syn_clustering_target_range(self):
