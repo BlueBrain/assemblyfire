@@ -330,7 +330,7 @@ def _get_depth_yticks(loc_df):
     """Gets mean depth for each layer (used for setting ticks for depth based plots)"""
     gb_locs = loc_df.groupby("layer")
     yticks = gb_locs["depth"].mean().to_numpy()
-    yticklabels = ["L%i\n(%i)" % (l, n) for l, n in gb_locs.size().items()]
+    yticklabels = ["L%s\n(%i)" % (l, n) for l, n in gb_locs.size().items()]
     return yticks, yticklabels
 
 
