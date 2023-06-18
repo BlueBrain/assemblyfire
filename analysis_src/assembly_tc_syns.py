@@ -22,7 +22,7 @@ def get_tc2assembly_syn_properties(config, sim, assembly):
     (loaded properties are hard coded atm. and require bluepy enums, but by this time bluepy should be installed)"""
     c = sim.circuit
     proj_gids, pattern_gids = get_spiking_proj_gids(config, sim.config, c.config)
-    morph_root = c.config["components"]["morphologies_dir"]
+    morph_root = c.nodes[config.node_pop].config["alternate_morphologies"]["neurolucida-asc"]
     morphs = c.nodes[config.node_pop].get(assembly.gids, "morphology")
     soma_loc = pd.DataFrame({"afferent_section_id": [0], "afferent_segment_id": [0], "afferent_segment_offset": [0.0]})
 

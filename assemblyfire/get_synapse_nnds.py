@@ -51,7 +51,7 @@ def run(config_path, assembly_grp_name, buf_size, seed):
     assembly_grp = _assembly_group_from_name(config, assembly_grp_name)
     conn_mat = AssemblyTopology.from_h5(config.h5f_name, prefix=config.h5_prefix_connectivity)
     c = utils.get_bluepy_circuit_from_root_path(config.root_path)
-    morph_root = c.config["components"]["morphologies_dir"]
+    morph_root = c.nodes[config.node_pop].config["alternate_morphologies"]["neurolucida-asc"]
     gids = utils.get_node_idx(c, config.node_pop, config.target)
     morphs = c.nodes[config.node_pop].get(gids, "morphology")
     results = SynNNDResults(config.h5f_name, len(assembly_grp), prefix="%s_syn_nnd" % assembly_grp_name)
