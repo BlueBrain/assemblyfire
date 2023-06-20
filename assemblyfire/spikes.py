@@ -24,12 +24,22 @@ from assemblyfire.config import Config
 SpikeMatrixResult = namedtuple("SpikeMatrixResult", ["spike_matrix", "gids", "t_bins"])
 
 
-def load_spikes(sim_config_path, node_pop, target, t_start, t_end):
+def load_spikes(f_name, node_pop, target, t_start, t_end):
     """Loads in spikes from simulations using bluepy"""
-    from assemblyfire.utils import get_bluepy_simulation, get_node_idx, get_spikes
-    sim = get_bluepy_simulation(sim_config_path)
-    gids = get_node_idx(sim.circuit, node_pop, target)
-    spike_times, spiking_gids = get_spikes(sim, node_pop, gids, t_start, t_end)
+    ext = os.path.splitext(f_name)[1]
+    if ext == ".json":  # assumes valid SONATA simulation_config file
+        from assemblyfire.utils import get_bluepy_simulation, get_node_idx, get_spikes
+        sim = get_bluepy_simulation(f_name)
+        gids = get_node_idx(sim.circuit, node_pop, target)
+        spike_times, spiking_gids = get_spikes(sim, node_pop, gids, t_start, t_end)
+    elif ext == ".h5":  # assumes valid SONATA spike file
+        from libsonata import SpikeReader
+        reader = SpikeReader(f_name)[node_pop]
+        spikes = np.array(reader.get(tstart=t_start, tstop=t_end))
+        spike_times = spikes[:, 1]
+        spiking_gids = spikes[:, 0].astype(int)
+    else:
+        NotImplementedError("Handling file extension: %s is not implemented")
     return spike_times, spiking_gids
 
 
