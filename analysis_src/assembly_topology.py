@@ -303,12 +303,10 @@ def main(config, assembly_grp_dict, plastic=False):
     fig_path = config.fig_path
     if plastic:
         assembly_efficacy(config, assembly_grp_dict)
-
     conn_matrices, proj_indegrees, pattern_indegrees, gids = get_proj_innervation(config)
     n_assemblies_from_projs(assembly_grp_dict, proj_indegrees, gids, fig_path)
     assembly_prob_mi_from_proj_ci(assembly_grp_dict, conn_matrices, gids, fig_path)
     assembly_prob_mi_from_patterns(assembly_grp_dict, pattern_indegrees, gids, fig_path)
-
     conn_mat = topology.AssemblyTopology.from_h5(config.h5f_name, prefix=config.h5_prefix_connectivity)
     assembly_in_degrees(assembly_grp_dict, conn_mat, fig_path)
     assembly_simplex_counts(assembly_grp_dict, conn_mat, fig_path)
@@ -319,7 +317,7 @@ def main(config, assembly_grp_dict, plastic=False):
 
 
 if __name__ == "__main__":
-    config = Config("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_seed19_across_ns.yaml")
+    config = Config("../configs/np_10seeds.yaml")
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
     # assembly_grp = utils.consensus_dict2assembly_grp(utils.load_consensus_assemblies_from_h5(config.h5f_name,
     #                                                        config.h5_prefix_consensus_assemblies))
