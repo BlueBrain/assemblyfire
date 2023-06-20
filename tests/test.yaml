@@ -1,0 +1,19 @@
+root_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/assembly_pipeline_test/"
+
+input_sequence_fname: "stimulus_stream.txt"
+
+h5_out:
+    file_name: "assemblies.h5"
+    prefixes:
+        spikes: "spikes"
+        assemblies: "assemblies"
+
+root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures/v7_assemblies"
+
+preprocessing_protocol:
+    node_pop: "test"
+    target: ""
+    t_start: 0
+    t_end: 20000
+    bin_size: 20
+    threshold_rate: True
