@@ -1,21 +1,19 @@
 Changelog
 =========
 
-Version 0.1
+Version 0.2
 -----------
 
 New Features
 ~~~~~~~~~~~~
-- Example code in Python
+- None
 
 
 Bug Fixes
 ~~~~~~~~~
-- Describe Bug Fixes here
-- Remove this subsection if there are no Bug Fixes
+- None
 
 
 Improvements
 ~~~~~~~~~~~~
-- Describe Improvements here
-- Remove this subsection if there are no Improvements
+- Replaced closed source `bluepy` with open source `bluepysnap`
