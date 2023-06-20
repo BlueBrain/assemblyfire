@@ -55,7 +55,7 @@ def get_bluepy_circuit_from_root_path(root_path):
     return get_bluepy_simulation(get_sim_path(root_path).iloc[0]).circuit
 
 
-def get_stimulus_stream(f_name, t_start, t_end):
+def get_stimulus_stream(f_name, t_start=None, t_end=None):
     """Reads the series of presented patterns from .txt file"""
     stim_times, patterns = [], []
     with open(f_name, "r") as f:
@@ -64,8 +64,11 @@ def get_stimulus_stream(f_name, t_start, t_end):
             stim_times.append(float(tmp[0]))
             patterns.append(tmp[1])
     stim_times, patterns = np.asarray(stim_times), np.asarray(patterns)
-    idx = np.where((t_start < stim_times) & (stim_times < t_end))[0]
-    return stim_times[idx], patterns[idx]
+    if t_start is None and t_end is None:  # TODO: handle them separately as well...
+        return stim_times, patterns
+    else:
+        idx = np.where((t_start < stim_times) & (stim_times < t_end))[0]
+        return stim_times[idx], patterns[idx]
 
 
 def get_pattern_node_idx(jf_name):
