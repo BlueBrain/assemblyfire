@@ -17,7 +17,7 @@ import seaborn as sns
 sns.set(style="ticks", context="notebook")
 PATTERN_COLORS = {"A": "#234091", "B": "#57B4D0", "C": "#C4A943", "D": "#7E1F19", "E": "#3F7AB3",
                   "F": "#8CAD8A", "G": "#A1632E", "H": "#66939D", "I": "#66939D", "J": "#665869"}
-PROJ_COLORS = {"Thalamocortical_input_VPM": "tab:purple", "Thalamocortical_input_POM": "black"}
+PROJ_COLORS = {"VPM__S1nonbarrel_neurons__chemical": "black", "POm__S1nonbarrel_neurons__chemical": "tab:purple"}
 RED, BLUE = "#e32b14", "#3271b8"
 
 
