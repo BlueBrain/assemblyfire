@@ -56,10 +56,9 @@ Atm. everything is hard coded to our simulation pipeline, thus `assemblyfire` wi
 
 
 ## Installation
-Simply run 
-  > pip install .
+Simply run `pip install .`
 
-All dependencies are declared in the setup.py and (except [ConnectomeUtilities](https://github.com/BlueBrain/ConnectomeUtilities)) are available from [pypi](https://pypi.org/)
+All dependencies are declared in the `setup.py` and (except [ConnectomeUtilities](https://github.com/BlueBrain/ConnectomeUtilities)) are available from [pypi](https://pypi.org/)
 
 
 ## Citation
@@ -70,7 +69,7 @@ If you use this software, kindly use the following BIBTEX entry for citation:
 author = {Ecker, Andr{\'{a}}s and Santander, Daniela Egas and Bola{\~{n}}os-Puchet, Sirio and Isbister, James B. and Reimann, Michael W.},
 doi = {https://doi.org/10.1101/2023.02.24.529863},
 journal = {bioRxiv},
-title = {{Cortical cell assemblies and their underlying connectivity : an in silico study}},
+title = {{Cortical cell assemblies and their underlying connectivity: an in silico study}},
 year = {2023}
 }
 ```
