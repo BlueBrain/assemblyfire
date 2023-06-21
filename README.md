@@ -13,7 +13,16 @@ assemblyfire -v syn-nnd configs/np_10seeds.yaml seed19  # get normalized synapse
 assemblyfire -v single-cell configs/v7_10seeds.yaml  # calculate spike time reliability (across repetitions)
 ```
 
-Once all the features are saved into a single HDF5 file, one can run more analysis:
+Once all the features are saved into a single HDF5 file, one can just simply load them, e.g. with the snippet below:
+```
+from assemblyfire.config import Config
+from assemblyfire.utils import load_assemblies_from_h5
+config = Config("configs/np_10seeds.yaml")
+assembly_grp_dict, _ = load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
+for assembly in assembly_grp["seed19"].assemblies:
+    assembly_neurons = assembly.gids
+```
+or do more involved analyses:
 ```
 cd analysis_src
 python assembly_topology.py  # diverse topological analyses
