@@ -1,4 +1,4 @@
-root_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/Zenodo_O1"
+root_path: "<PATH-TO-SIMULATION-FOLDER>"
 
 input_sequence_fname: "input_spikes/stimulus_stream.txt"
 pattern_nodes_fname: "input_spikes/patterns.json"
@@ -7,21 +7,23 @@ patterns_edges: {"proj_Thalamocortical_VPM_Source": "VPM__S1nonbarrel_neurons__c
 edge_pop: "S1nonbarrel_neurons__S1nonbarrel_neurons__chemical"
 
 h5_out:
-    file_name: "assemblies.h5"
+    file_name: "assemblies_chunked.h5"
     prefixes:
         spikes: "spikes"
         assemblies: "assemblies"
+        consensus_assemblies: "consensus"
         connectivity: "connectivity"
 
-root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures/v7_assemblies"
+root_fig_path: "<PATH-TO-FIGURES-FOLDER>"
 
 preprocessing_protocol:
-    node_pop: "S1nonbarrel_neurons"
     target: "Excitatory"
     t_start: 1500
-    t_end: 126000
+    t_end: 602000
+    t_chunks: 5
     bin_size: 20
     threshold_rate: True
+    surr_rate_method: "keep_sc_rate"
 
 clustering:
-    overwrite_n_clusters: {"seed12345": 12}
+    overwrite_n_clusters: {"seed2": 8, "seed3": 8}

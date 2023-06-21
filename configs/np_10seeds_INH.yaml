@@ -1,0 +1,27 @@
+root_path: "<PATH-TO-SIMULATION-FOLDER>"
+
+input_sequence_fname: "input_spikes/stimulus_stream.txt"
+pattern_nodes_fname: "input_spikes/patterns.json"
+patterns_edges: {"proj_Thalamocortical_VPM_Source": "VPM__S1nonbarrel_neurons__chemical"}
+
+edge_pop: "S1nonbarrel_neurons__S1nonbarrel_neurons__chemical"
+
+h5_out:
+    file_name: "assemblies_INH.h5"
+    prefixes:
+        spikes: "spikes"
+        assemblies: "assemblies"
+        consensus_assemblies: "consensus"
+        single_cell_features: "single_cell"
+
+root_fig_path: "<PATH-TO-FIGURES-FOLDER>"
+
+preprocessing_protocol:
+    target: "Inhibitory"
+    t_start: 1500
+    t_end: 126000
+    bin_size: 20
+    threshold_rate: True
+
+clustering:
+    overwrite_n_clusters: {"seed1": 15, "seed63": 11, "seed78": 14, "seed80": 15}

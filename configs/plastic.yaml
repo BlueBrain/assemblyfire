@@ -1,7 +1,10 @@
-root_path: "/gpfs/bbp.cscs.ch/project/proj96/scratch/home/ecker/simulations/3e3ef5bc-b474-408f-8a28-ea90ac446e24"
+root_path: "<PATH-TO-SIMULATION-FOLDER>"
 
-input_patterns_fname: "input_spikes/stimulus_stream__start2000__end601501__rate2__seed9.txt"
-pattern_gids_fname: "input_spikes/Thalamocortical_input_VPM__hex_O1__supersample__nc100__pct12__seed9__pattern_gids.pkl"
+input_sequence_fname: "input_spikes/stimulus_stream.txt"
+pattern_nodes_fname: "input_spikes/patterns.json"
+patterns_edges: {"proj_Thalamocortical_VPM_Source": "VPM__S1nonbarrel_neurons__chemical"}
+
+edge_pop: "S1nonbarrel_neurons__S1nonbarrel_neurons__chemical"
 
 h5_out:
     file_name: "assemblies.h5"
@@ -10,10 +13,10 @@ h5_out:
         assemblies: "assemblies"
         connectivity: "connectivity"
 
-root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures/v7_assemblies"
+root_fig_path: "<PATH-TO-FIGURES-FOLDER>"
 
 preprocessing_protocol:
-    target: "hex_O1Excitatory"
+    target: "Excitatory"
     t_start: 1500
     t_end: 602000
     bin_size: 20
