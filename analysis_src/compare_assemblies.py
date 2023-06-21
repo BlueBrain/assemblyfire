@@ -84,7 +84,7 @@ def consensus_vs_average_assembly_similarity(config_path, frac_ths):
 
 
 def consensus_vs_average_assembly_composition(config_path, avg_assembly_id, consensus_assembly_id):
-    """TODO"""
+    """Checks if cells in consensus union are present in the average as well"""
     config = Config(config_path)
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_avg_assemblies)
     avg_assembly_grp = assembly_grp_dict["seed_average"]
@@ -186,10 +186,8 @@ def analyze_corrs(config1_path, config2_path, xlabel=None, ylabel=None, sim_th=0
 
 
 if __name__ == "__main__":
-    config1_path = "../configs/v7_5seeds_np_before.yaml"
-    config2_path = "../configs/v7_5seeds_np_after.yaml"
-    analyze_corrs(config1_path, config2_path, ylabel="before", xlabel="after")
-    # config_path = "../configs/v7_10seeds_np.yaml"
-    # consensus_vs_average_assembly_similarity(config_path, frac_ths=[0.2, 0.4, 0.6, 0.8])
-    # consensus_vs_average_assembly_composition(config_path, 7, 1)
+    config_path = "../configs/np_10seeds.yaml"
+    assembly_similarities_from2configs(config_path, "../configs/np_10seeds_L23.yaml")
+    consensus_vs_average_assembly_similarity(config_path, frac_ths=[0.2, 0.4, 0.6, 0.8])
+    consensus_vs_average_assembly_composition(config_path, 7, 1)
 

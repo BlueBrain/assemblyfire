@@ -115,7 +115,7 @@ def main(config_path, seeds, save_assemblies=False):
 
 
 if __name__ == "__main__":
-    config_path = "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/Zenodo_SONATA_np.yaml"
-    seeds = [12345]
+    config_path = "../configs/np_10seeds.yaml"
+    seeds = [19]
     main(config_path, seeds)
 

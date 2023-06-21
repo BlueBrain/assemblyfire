@@ -1,5 +1,5 @@
 """
-Functionalities to investigate the relationship between synaptc clustering and dendritic nonlinearities
+Functionalities to investigate the relationship between synaptic clustering and dendritic nonlinearities
 1st step: writes launch scripts that rerun selected cells in BGLibPy (see `assemblyfire/rerun_single_cell.py`)
           (with extra reporting and some modifications)
 2nd step: load spiking data from sims. with modified conditions (and baseline), check rates, and
@@ -279,6 +279,7 @@ def main(config_path, threshold=-30, sustain_for=10, pre_spike=50):
     with open(os.path.join(sbatch_dir, "simulated_gids.pkl"), "rb") as f:
         simulated_gids = pickle.load(f)
     c = utils.get_bluepy_circuit_from_root_path(config.root_path)
+    morph_root = c.nodes[config.node_pop].config["alternate_morphologies"]["neurolucida-asc"]
 
     for seed, assembly_gids in simulated_gids.items():
         df, spikes = analyse_spikes(config, seed, assembly_gids)
@@ -289,9 +290,11 @@ def main(config_path, threshold=-30, sustain_for=10, pre_spike=50):
         pklf_name = "%s_window_sustained_for%i_%ibefore_spikes.pkl" % (seed, sustain_for, pre_spike)
         events.to_pickle(os.path.join(results_dir, pklf_name))
         # plot events for L5 TTPCs in baseline conditions
-        mtypes = utils.get_mtypes(c, df["gid"].unique())
+
+        mtypes = utils.get_node_properties(c, config.node_pop, df["gid"].unique(), "mtype")
         gids = mtypes[mtypes.isin(["L5_TPC:A", "L5_TPC:B"])].index.to_numpy()
-        morph_paths = {gid: c.morph.get_filepath(gid) for gid in gids}
+        morphs = utils.get_node_properties(c, config.node_pop, gids, "morphology")
+        morph_paths = {gid: os.path.join(morph_root, morphs.loc[gid] + ".asc") for gid in gids}
         fig_dir = os.path.join(config.fig_path, "%s_debug" % seed)
         utils.ensure_dir(fig_dir)
         plot_events(results_dir, seed, "baseline", spikes, events.loc[events["gid"].isin(gids)],
@@ -299,7 +302,7 @@ def main(config_path, threshold=-30, sustain_for=10, pre_spike=50):
 
 
 if __name__ == "__main__":
-    config_path = "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_10seeds_np.yaml"
+    config_path = "../configs/np_10seeds.yaml"
     # write_launchscripts(config_path)
     main(config_path)
 

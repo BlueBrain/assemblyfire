@@ -50,5 +50,5 @@ def main(config_path):
 
 
 if __name__ == "__main__":
-    main("../configs/v7_plastic.yaml")
+    main("../configs/plastic.yaml")
 

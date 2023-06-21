@@ -23,7 +23,7 @@ def get_tc2assembly_syn_properties(config, sim, assembly):
     c = sim.circuit
     proj_gids, pattern_gids = get_spiking_proj_gids(config, sim.config, c.config)
     morph_root = c.nodes[config.node_pop].config["alternate_morphologies"]["neurolucida-asc"]
-    morphs = c.nodes[config.node_pop].get(assembly.gids, "morphology")
+    morphs = utils.get_node_properties(c, config.node_pop, assembly.gids, "morphology")
     soma_loc = pd.DataFrame({"afferent_section_id": [0], "afferent_segment_id": [0], "afferent_segment_offset": [0.0]})
 
     dfs = []
@@ -71,7 +71,7 @@ def main(config_path, seed, assembly_id):
 
 
 if __name__ == "__main__":
-    config_path = "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_10seeds_np.yaml"
+    config_path = "../configs/np_10seeds.yaml"
     seed, assembly_id = 19, 8
     main(config_path, seed, assembly_id)
 
