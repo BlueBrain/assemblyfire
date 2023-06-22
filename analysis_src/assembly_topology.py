@@ -320,11 +320,11 @@ def main(config, assembly_grp_dict, plastic=False):
 
 
 if __name__ == "__main__":
-    config = Config("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_seed19_across_ns.yaml")
+    config = Config("/gpfs/bbp.cscs.ch/project/proj96/home/ecker/assemblyfire/configs/v7_plastic.yaml")
     assembly_grp_dict, _ = utils.load_assemblies_from_h5(config.h5f_name, config.h5_prefix_assemblies)
     # assembly_grp = utils.consensus_dict2assembly_grp(utils.load_consensus_assemblies_from_h5(config.h5f_name,
     #                                                        config.h5_prefix_consensus_assemblies))
     # assembly_grp_dict = {"consensus": assembly_grp}
 
-    main(config, assembly_grp_dict)
+    main(config, assembly_grp_dict, True)
 
