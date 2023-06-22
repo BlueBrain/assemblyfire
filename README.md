@@ -30,6 +30,8 @@ python compare_assemblies.py  # compare assemblies (within one config, or across
 python consensus_botany.py  # features of "consensus" assemblies, and their correlation to spike time reliability
 python scan_nclusters.py  # detect different number of clusters of time bins (and corresponding assemblies)
 ```
+To download the assemblies linked to `configs/np_10seeds.yaml` and used in our manuscript (see BibTeX below) use the following Zenodo link:
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8052722.svg)](https://doi.org/10.5281/zenodo.8052722)
 
 
 ## Setting up one's own pipeline
@@ -71,7 +73,7 @@ All dependencies are declared in the `setup.py` and (except [ConnectomeUtilities
 
 
 ## Citation
-If you use this software, kindly use the following BIBTEX entry for citation:
+If you use this software, kindly use the following BibTeX entry for citation:
 
 ```
 @article{Ecker2023,
