@@ -1,6 +1,6 @@
 # Assemblyfire
 
-Detection of cell assemblies, and analyis of their connectome.
+Detection of cell assemblies, and analysis of their connectome.
 
 
 ## Examples
