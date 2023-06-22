@@ -32,13 +32,13 @@ setup(
                       "numpy>=1.24.3",
                       "scipy>=1.10.1",
                       "pandas>=2.0.2",
-                      "scikit-learn<=0.24",  # pyitlib cannot handle later versions...
+                      "scikit-learn",  # let `pyitlib` figure out the version...
                       "pyitlib>=0.2.3",
                       "libsonata>=0.1.21",
                       "neurom>=3.2.2",
                       "morph-tool>=2.9.1",
                       "bluepysnap>=1.0.5",
-                      "ConnectomeUtilities @ git+https://github.com/BlueBrain/ConnectomeUtilities",
+                      "Connectome-Utilities @ git+https://github.com/BlueBrain/ConnectomeUtilities",
                       "pyflagser>=0.4.5",
                       "pyflagsercount>=0.3.3",
                       "matplotlib>=3.7.1",
