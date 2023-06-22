@@ -194,3 +194,10 @@ class Config(object):
             return self.config["clustering"]["synapses"]["cross_assemblies"]
         else:
             return {}
+
+    @property
+    def manuscript_assembly_sequences(self):
+        if "manuscript_figures" in self.config:
+            return self.config["manuscript_figures"]["assembly_sequences"]
+        else:
+            return {}
