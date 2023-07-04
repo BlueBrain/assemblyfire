@@ -1,6 +1,6 @@
 """
 Main run function for finding synapse cluster on assembly neurons
-last modified: András Ecker 04.2023
+last modified: András Ecker 07.2023
 """
 
 import os
@@ -13,7 +13,7 @@ import assemblyfire.utils as utils
 from assemblyfire.assemblies import AssemblyGroup
 from assemblyfire.topology import AssemblyTopology
 from assemblyfire.clustering import cluster_synapses
-from assemblyfire.plots import plot_cond_rhos
+# from assemblyfire.plots import plot_cond_rhos
 
 L = logging.getLogger("assemblyfire")
 DSET_MEMBER = "member"
@@ -29,7 +29,7 @@ def _get_degree_sorted_assembly_gids(c, node_pop, conn_mat, assembly, mtype_list
     else:
         indegrees = conn_mat.degree(pre_gids=pre_assembly.gids, post_gids=assembly.gids, kind="in")
     sorted_assembly_gids = assembly.gids[np.argsort(indegrees)[::-1]]
-    mtypes = utils.get_node_properties(c, node_pop, sorted_assembly_gids, ["mtype"])  # could be loaded from `conn_mat`
+    mtypes = utils.get_node_properties(c, node_pop, sorted_assembly_gids, "mtype")  # could be loaded from `conn_mat`
     return mtypes.loc[mtypes.isin(mtype_list)].index.to_numpy()[:n_samples]
 
 
@@ -49,7 +49,7 @@ def _get_syn_nnd_degree_sorted_assembly_gids(c, node_pop, syn_nnds, assembly, mt
         df = df.iloc[np.in1d(df.index.to_numpy(), assembly.gids), :]
     df = df.sort_values(DSET_DEG, ascending=False)
     # index out mtypes, and take the first `n_samples`
-    mtypes = utils.get_node_properties(c, node_pop, df.index.to_numpy(), ["mtype"])
+    mtypes = utils.get_node_properties(c, node_pop, df.index.to_numpy(), "mtype")
     return mtypes.loc[mtypes.isin(mtype_list)].index.to_numpy()[:n_samples]
 
 
@@ -119,7 +119,7 @@ def run(config_path, debug):
             L.info(" Using saved synapse nnds. (%i cells) for gid selection" % len(syn_nnds))
         except:
             syn_nnds = None
-        cluster_dfs, cross_cluster_dfs = {}, {}
+        # cluster_dfs, cross_cluster_dfs = {}, {}
         for assembly in tqdm(assembly_grp.assemblies, desc="%s syn. clusters" % seed, leave=False):
             if syn_nnds is not None:
                 gids = _get_syn_nnd_degree_sorted_assembly_gids(c, node_pop, syn_nnds, assembly, mtypes, n_samples)
@@ -133,15 +133,14 @@ def run(config_path, debug):
                 fig_dir = os.path.join(config.fig_path, "%s_debug" % seed)
                 utils.ensure_dir(fig_dir)
                 cluster_df = cluster_synapses(loc_df, single_assembly_grp, target_range, min_nsyns,
-                                              fig_dir=fig_dir, base_assembly_idx=assembly.idx[0], c=c)
+                                              fig_dir=fig_dir, base_assembly_idx=assembly.idx[0])
             else:
                 cluster_df = cluster_synapses(loc_df, single_assembly_grp, target_range, min_nsyns)
             utils.save_syn_clusters(config.syn_clustering_save_dir, assembly.idx, cluster_df)
-            # some extra stuff for plotting
-            cluster_df["rho"] = utils.get_edge_properties(c, cluster_df.index.to_numpy(), ["rho0_GB"])["rho0_GB"]
-            cluster_dfs[assembly.idx[0]] = cluster_df
-        fig_name = os.path.join(config.fig_path, "rho0_syn_clusts_%s.png" % seed)
-        plot_cond_rhos(cluster_dfs, fig_name)
+            # cluster_df["rho"] = utils.get_edge_properties(c, edge_pop, cluster_df.index.to_numpy(), "rho0_GB")
+            # cluster_dfs[assembly.idx[0]] = cluster_df
+        # fig_name = os.path.join(config.fig_path, "rho0_syn_clusts_%s.png" % seed)
+        # plot_cond_rhos(cluster_dfs, fig_name)
 
         if seed in cross_assemblies:
             # not optimal way to find postsynaptic cross assemblies, but better for progress bar...
@@ -165,14 +164,15 @@ def run(config_path, debug):
                         loc_df = utils.get_synloc_df(c, syn_idx, edge_pop)
                         if debug:
                             cross_cluster_df = cluster_synapses(loc_df, cross_assembly_grp, target_range, min_nsyns,
-                                                                fig_dir=fig_dir, base_assembly_idx=assembly_id, c=c)
+                                                                fig_dir=fig_dir, base_assembly_idx=assembly_id)
                         else:
                             cross_cluster_df = cluster_synapses(loc_df, cross_assembly_grp, target_range, min_nsyns)
                         utils.save_syn_clusters(config.syn_clustering_save_dir, assembly.idx, cross_cluster_df,
                                                 cross_assembly=True)
-                        cross_cluster_df["rho"] = utils.get_edge_properties(c, cross_cluster_df.index.to_numpy(),
-                                                                            ["rho0_GB"])["rho0_GB"]
-                        cross_cluster_dfs[assembly_id] = cross_cluster_df
-            fig_name = os.path.join(config.fig_path, "rho0_cross_syn_clusts_%s.png" % seed)
-            plot_cond_rhos(_update_cross_cluster_dfs_for_plotting(cross_cluster_dfs), fig_name)
+                        # cross_cluster_df["rho"] = utils.get_edge_properties(c, edge_pop,
+                        #                                                     cross_cluster_df.index.to_numpy(),
+                        #                                                     "rho0_GB")
+                        # cross_cluster_dfs[assembly_id] = cross_cluster_df
+            # fig_name = os.path.join(config.fig_path, "rho0_cross_syn_clusts_%s.png" % seed)
+            # plot_cond_rhos(_update_cross_cluster_dfs_for_plotting(cross_cluster_dfs), fig_name)
 

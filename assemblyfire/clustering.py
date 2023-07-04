@@ -6,7 +6,7 @@ Then "core-cells" and cell assemblies are detected with correlation
 based methods from (Montijn et al. 2016 and) Herzog et al. 2021.
 Assemblies are clustered into consensus assemblies via hierarchical clustering.
 Also implements methods to cluster synapses based on their location on the dendrites
-authors: András Ecker, Michael W. Reimann; last modified: 01.2023
+authors: András Ecker, Michael W. Reimann; last modified: 07.2023
 """
 
 import os
@@ -439,7 +439,7 @@ def merge_clusters(clusters):
 
 
 def cluster_synapses(loc_df, assembly_grp, target_range, min_nsyns, log_sign_th=5.0,
-                     fig_dir=None, base_assembly_idx=None, c=None):
+                     fig_dir=None, base_assembly_idx=None):
     """
     Finds `min_nsyns` sized clusters of synapses within `target_range` (um) and tests their significance
     against a Poisson model (see `distance_model()` above) on all post_gids (passed in `loc_df`) from the assemblies
@@ -453,7 +453,6 @@ def cluster_synapses(loc_df, assembly_grp, target_range, min_nsyns, log_sign_th=
     :param fig_dir: optional debugging - if a proper dir. name is passed figures will be saved there
     :param base_assembly_idx: ID of the base assembly in the group (if more than 1 is passed in `assembly_grp`)
                               (This is only used for naming figures if `fig_dir` is not None)
-    :param c: bleupy Circuit object (used only for getting the morphologies if `fig_dir` is not None)
     :return: cluster_df: pandas DataFrame with one row per synapse and one column per 'label'
                          (for labels see `_create_lookups()` above)
                          placeholder: -100, synapse belonging to the label: -1, and synapse cluster idx start at 0
@@ -486,10 +485,5 @@ def cluster_synapses(loc_df, assembly_grp, target_range, min_nsyns, log_sign_th=
                 results[syn_idx[row_idx], i] = col_idx  # set cluster labels (starting at 0)
         data = np.concatenate((loc_df_gid[["pre_gid", "post_gid"]].to_numpy(), results), axis=1)
         cluster_df = pd.DataFrame(data=data, index=loc_df_gid.index, columns=["pre_gid", "post_gid"] + labels)
-        if fig_dir is not None:
-            from assemblyfire.plots import plot_synapse_clusters
-            morph = c.morph.get(int(gid), transform=True)
-            fig_name = os.path.join(fig_dir, "assembly%i_a%i_synapse_clusters.png" % (base_assembly_idx, gid))
-            plot_synapse_clusters(morph, pd.concat((cluster_df[labels], loc_df_gid[XYZ]), axis=1), XYZ, fig_name)
         cluster_dfs.append(cluster_df)
     return pd.concat(cluster_dfs)
