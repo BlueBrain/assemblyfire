@@ -1,6 +1,7 @@
 # Assemblyfire
 
 Detection of cell assemblies, and analysis of their connectome.
+[![DOI](https://zenodo.org/badge/315388334.svg)](https://zenodo.org/badge/latestdoi/315388334)
 
 
 ## Examples
