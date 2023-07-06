@@ -116,8 +116,7 @@ def group_gids(assembly_grp1, assembly_idx1, assembly_grp2, assembly_idx2):
         # first intersect them with assembly1
         assembly_gids2 = [np.intersect1d(assembly_gids1[0], assembly_gids2[i], assume_unique=True)
                           for i in range(len(assembly_gids2))]
-        assert len(assembly_gids2) == 2, "atm. the ordering is based on 2 assemblies from %s" \
-                                         "(due to the intersection)" % config2.h5f_name
+        assert len(assembly_gids2) == 2, "atm. the ordering is based on 2 resulting assemblies (due to the intersection)"
         assembly2_inters = np.intersect1d(assembly_gids2[0], assembly_gids2[1], assume_unique=True)
         gids = [np.setdiff1d(assembly_gids2[0], assembly2_inters, assume_unique=True), assembly2_inters,
                 np.setdiff1d(assembly_gids2[1], assembly2_inters, assume_unique=True)]
