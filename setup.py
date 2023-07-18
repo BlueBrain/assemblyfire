@@ -38,7 +38,8 @@ setup(
                       "neurom>=3.2.2",
                       "morph-tool>=2.9.1",
                       "bluepysnap>=1.0.5",
-                      "Connectome-Utilities @ git+https://github.com/BlueBrain/ConnectomeUtilities",
+                      "Connectome-Utilities>=0.3.1",
+                      "bluecellulab>=1.2.6",
                       "pyflagser>=0.4.5",
                       "pyflagsercount>=0.3.3",
                       "matplotlib>=3.7.1",
@@ -47,8 +48,7 @@ setup(
     python_requires=">=3.8",
     entry_points={"console_scripts": ["assemblyfire=assemblyfire.cli:cli"]},
     extras_require={
-        "docs": ["sphinx", "sphinx-bluebrain-theme"],
-        "bglibpy": ["bglibpy>=4.9.10"]  # this should be replaced once open sourced as `bluecellulab`
+        "docs": ["sphinx", "sphinx-bluebrain-theme"]
     },
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
