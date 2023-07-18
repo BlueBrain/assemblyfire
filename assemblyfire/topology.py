@@ -252,7 +252,7 @@ def assembly_rel_frac_entropy_explained(gids, assembly_grp, bin_centers, bin_idx
             mi = drv.information_mutual(idx, bin_idx_) / drv.entropy(idx)
             mi_ctrl = drv.information_mutual(idx, np.random.permutation(bin_idx_)) / drv.entropy(idx)
             # recalculate assembly probability for line fitting
-            # (could be passed from `get_assembly_membership_probability()` but whatever...)
+            # (could be passed from `assembly_membership_probability()` but whatever...)
             probs = np.zeros_like(bin_centers[key], dtype=np.float32)
             counts = np.zeros_like(probs, dtype=int)
             for k in range(len(bin_centers[key])):
