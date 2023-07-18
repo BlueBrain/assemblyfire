@@ -101,4 +101,4 @@ def main(config_path):
 
 
 if __name__ == "__main__":
-    main("../configs/v7_10seeds_np.yaml")
+    main("../configs/v7_5seeds_np_after.yaml")
