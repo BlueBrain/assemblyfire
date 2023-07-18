@@ -140,17 +140,19 @@ class Config(object):
 
     @property
     def core_cell_th_pct(self):
-        if "core_cell_th_pct" in self.config["clustering"]:
-            return self.config["clustering"]["core_cell_th_pct"]
-        else:
-            return 95  # default hard coded here to 95% percentile as in Herzog et al. 2021
+        core_cell_th_pct = 95  # default 95% percentile from Herzog et al. 2021
+        if "clustering" in self.config:
+            if "core_cell_th_pct" in self.config["clustering"]:
+                core_cell_th_pct = self.config["clustering"]["core_cell_th_pct"]
+        return core_cell_th_pct
 
     @property
     def overwrite_seeds(self):
-        if "overwrite_n_clusters" in self.config["clustering"]:
-            return self.config["clustering"]["overwrite_n_clusters"]
-        else:
-            return {}
+        overwrite_seeds = {}
+        if "clustering" in self.config:
+            if "overwrite_n_clusters" in self.config["clustering"]:
+                overwrite_seeds = self.config["clustering"]["overwrite_n_clusters"]
+        return overwrite_seeds
 
     @property
     def syn_clustering_target_range(self):
