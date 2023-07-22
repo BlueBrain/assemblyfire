@@ -40,7 +40,7 @@ def run_sim(ssim, gid, pre_gids, pre_spike_trains, spike_loc, passive_dends=Fals
     nc = cell.create_netcon_spikedetector(None, location=spike_loc)
     spike_vec = bglibpy.neuron.h.Vector()
     nc.record(spike_vec)
-    # record voltage from all sections (not just the soma...) built in BGLibPy fn. ignore `record_dt`
+    # record voltage from all sections (not just the soma...) built in BGLibPy fn. ignores `record_dt`
     for section in cell.all:
         cell.add_recording("neuron.h." + section.name() + "(0.5)._ref_v", dt=ssim.record_dt)
 
