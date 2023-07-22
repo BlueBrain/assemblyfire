@@ -254,7 +254,7 @@ def plot_cons_cluster_seqs(clusters, t_bins, stim_times, patterns, n_clusters, f
 def plot_cons_cluster_seqs_all_seeds(clusters, t_bins, stim_times, patterns, n_clusters, fig_name):
     """Plots heatmaps of consensus assembly counts across seeds"""
     count_matrices, seeds, cons_assembly_idx = count_clusters_by_patterns_across_seeds(clusters, t_bins,
-                                                                                          stim_times, patterns, n_clusters)
+                                                                                       stim_times, patterns, n_clusters)
     vmax = np.max([np.max(count_matrix) for _, count_matrix in count_matrices.items()])
 
     fig = plt.figure(figsize=(20, 8))
