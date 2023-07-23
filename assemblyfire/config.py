@@ -118,10 +118,8 @@ class Config(object):
 
     @property
     def t_chunks(self):
-        if "t_chunks" in self.config["preprocessing_protocol"]:
-            return self.config["preprocessing_protocol"]["t_chunks"]
-        else:
-            return None
+        return self.config["preprocessing_protocol"]["t_chunks"]\
+            if "t_chunks" in self.config["preprocessing_protocol"] else None
 
     @property
     def bin_size(self):
@@ -129,24 +127,18 @@ class Config(object):
 
     @property
     def threshold_rate(self):
-        if "threshold_rate" in self.config["preprocessing_protocol"]:
-            return self.config["preprocessing_protocol"]["threshold_rate"]
-        else
-            return True
+        return return self.config["preprocessing_protocol"]["threshold_rate"] \
+            if "threshold_rate" in self.config["preprocessing_protocol"] else True
 
     @property
     def surr_rate_method(self):
-        if "surr_rate_method" in self.config["preprocessing_protocol"]:
-            return self.config["preprocessing_protocol"]["surr_rate_method"]
-        else:
-            return "Sasaki"
+        return return self.config["preprocessing_protocol"]["surr_rate_method"] \
+            if "surr_rate_method" in self.config["preprocessing_protocol"] else "Sasaki"
 
     @property
     def ignore_seeds(self):
-        if "ignore_seeds" in self.config["preprocessing_protocol"]:
-            return self.config["preprocessing_protocol"]["ignore_seeds"]
-        else:
-            return []
+        return self.config["preprocessing_protocol"]["ignore_seeds"] \
+            if "ignore_seeds" in self.config["preprocessing_protocol"] else []
 
     @property
     def core_cell_th_pct(self):
@@ -174,10 +166,8 @@ class Config(object):
 
     @property
     def syn_clustering_mtypes(self):
-        if "mtypes" in self.config["clustering"]["synapses"]:
-            return self.config["clustering"]["synapses"]["mtypes"]
-        else:
-            return ["L5_TPC:A", "L5_TPC:B"]
+        return self.config["clustering"]["synapses"]["mtypes"]\
+                if "mtypes" in self.config["clustering"]["synapses"] else ["L5_TPC:A", "L5_TPC:B"]
 
     @property
     def syn_clustering_n_neurons_sample(self):
@@ -193,14 +183,10 @@ class Config(object):
 
     @property
     def syn_clustering_cross_assemblies(self):
-        if "cross_assemblies" in self.config["clustering"]["synapses"]:
-            return self.config["clustering"]["synapses"]["cross_assemblies"]
-        else:
-            return {}
+        return self.config["clustering"]["synapses"]["cross_assemblies"]\
+                if "cross_assemblies" in self.config["clustering"]["synapses"] else {}
 
     @property
     def manuscript_assembly_sequences(self):
-        if "manuscript_figures" in self.config:
-            return self.config["manuscript_figures"]["assembly_sequences"]
-        else:
-            return {}
+        return self.config["manuscript_figures"]["assembly_sequences"]\
+                if "manuscript_figures" in self.config else {}
