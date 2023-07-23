@@ -15,11 +15,11 @@ h5_out:
 root_fig_path: "<PATH-TO-FIGURES-FOLDER>"
 
 preprocessing_protocol:
+    node_pop: "S1nonbarrel_neurons"
     target: "Layer23Excitatory"
     t_start: 1500
     t_end: 126000
     bin_size: 20
-    threshold_rate: True
 
 manuscript_figures:
     assembly_sequences: {"seed19": [0, 5, 7, 11, 6, 9, 8, 3, 4, 12, 1, 10, 2, 13]}

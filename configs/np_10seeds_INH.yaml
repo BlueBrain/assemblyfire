@@ -17,11 +17,11 @@ h5_out:
 root_fig_path: "<PATH-TO-FIGURES-FOLDER>"
 
 preprocessing_protocol:
+    node_pop: "S1nonbarrel_neurons"
     target: "Inhibitory"
     t_start: 1500
     t_end: 126000
     bin_size: 20
-    threshold_rate: True
 
 clustering:
     overwrite_n_clusters: {"seed1": 15, "seed63": 11, "seed78": 14, "seed80": 15}
