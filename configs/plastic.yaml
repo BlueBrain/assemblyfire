@@ -16,11 +16,11 @@ h5_out:
 root_fig_path: "<PATH-TO-FIGURES-FOLDER>"
 
 preprocessing_protocol:
+    node_pop: "S1nonbarrel_neurons"
     target: "Excitatory"
     t_start: 1500
     t_end: 602000
     bin_size: 20
-    threshold_rate: True
     surr_rate_method: "keep_sc_rate"
 
 clustering:
@@ -30,3 +30,6 @@ clustering:
         target_range: 10
         min_nsyns: 10
         n_neurons_sample: 10
+
+manuscript_figures:
+    assembly_sequences: {"seed1": [3, 14, 10, 7, 13, 9, 11, 12, 8, 6, 4, 5, 0, 1, 2]}

@@ -17,12 +17,12 @@ h5_out:
 root_fig_path: "<PATH-TO-FIGURES-FOLDER>"
 
 preprocessing_protocol:
+    node_pop: "S1nonbarrel_neurons"
     target: "Excitatory"
     t_start: 1500
     t_end: 602000
     t_chunks: 5
     bin_size: 20
-    threshold_rate: True
     surr_rate_method: "keep_sc_rate"
 
 clustering:
