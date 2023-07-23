@@ -71,7 +71,7 @@ Atm. everything is hard coded to our simulation pipeline, thus `assemblyfire` wi
 ## Installation
 Simply run `pip install .`
 
-All dependencies are declared in the `setup.py` and (except [ConnectomeUtilities](https://github.com/BlueBrain/ConnectomeUtilities)) are available from [pypi](https://pypi.org/)
+All dependencies are declared in the `setup.py` and are available from [pypi](https://pypi.org/)
 
 
 ## Citation
