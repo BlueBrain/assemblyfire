@@ -127,12 +127,12 @@ class Config(object):
 
     @property
     def threshold_rate(self):
-        return return self.config["preprocessing_protocol"]["threshold_rate"] \
+        return self.config["preprocessing_protocol"]["threshold_rate"] \
             if "threshold_rate" in self.config["preprocessing_protocol"] else True
 
     @property
     def surr_rate_method(self):
-        return return self.config["preprocessing_protocol"]["surr_rate_method"] \
+        return self.config["preprocessing_protocol"]["surr_rate_method"] \
             if "surr_rate_method" in self.config["preprocessing_protocol"] else "Sasaki"
 
     @property
