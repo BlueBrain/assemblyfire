@@ -78,6 +78,24 @@ def get_pattern_node_idx(jf_name):
     return {pattern_name: np.array(tmp["node_id"]) for pattern_name, tmp in node_idx.items()}
 
 
+def get_pattern_distance(locf_name, jf_name):
+    """Gets Earth mover's distance of the input pattern fibers"""
+    from scipy.spatial.distance import cdist
+    from scipy.optimize import linear_sum_assignment
+    tmp = np.loadtxt(locf_name)
+    gids, pos = tmp[:, 0].astype(int), tmp[:, 1:]
+    pattern_gids = get_pattern_node_idx(jf_name)
+    pattern_pos = {pattern_name: pos[np.in1d(gids, gids_, assume_unique=True), :]
+                   for pattern_name, gids_ in pattern_gids.items()}
+    pattern_names = np.sort(list(pattern_pos.keys()))
+    row_idx, col_idx = np.triu_indices(len(pattern_names), k=1)
+    emd = np.zeros_like(row_idx, dtype=np.float32)
+    for i, (row_id, col_id) in enumerate(zip(row_idx, col_idx)):
+        dists = cdist(pattern_pos[pattern_names[row_id]], pattern_pos[pattern_names[col_id]])
+        emd[i] = np.sum(dists[linear_sum_assignment(dists)]) / len(pattern_pos[pattern_names[row_id]])
+    return pattern_names, emd
+
+
 def get_node_idx(c, node_pop, target):
     return c.nodes[node_pop].ids(target)
 

@@ -6,8 +6,7 @@ last modified: András Ecker 02.2023
 import os
 import warnings
 import numpy as np
-from scipy.spatial.distance import pdist, cdist, squareform
-from scipy.optimize import linear_sum_assignment
+from scipy.spatial.distance import pdist, squareform
 from scipy.cluster.hierarchy import linkage, fcluster
 from sklearn.metrics import davies_bouldin_score
 from sklearn.manifold import TSNE
@@ -16,22 +15,6 @@ from assemblyfire.config import Config
 import assemblyfire.utils as utils
 from assemblyfire.clustering import cosine_similarity, detect_assemblies
 from assemblyfire.plots import plot_dendogram_silhouettes, plot_tsne, plot_cluster_seqs, plot_distance_corr, plot_db_scores
-
-
-def get_pattern_distance(locf_name, jf_name):
-    """Gets Earth mover's distance of the input pattern fibers"""
-    tmp = np.loadtxt(locf_name)
-    gids, pos = tmp[:, 0].astype(int), tmp[:, 1:]
-    pattern_gids = utils.get_pattern_node_idx(jf_name)
-    pattern_pos = {pattern_name: pos[np.in1d(gids, gids_, assume_unique=True), :]
-                   for pattern_name, gids_ in pattern_gids.items()}
-    pattern_names = np.sort(list(pattern_pos.keys()))
-    row_idx, col_idx = np.triu_indices(len(pattern_names), k=1)
-    emd = np.zeros_like(row_idx, dtype=np.float32)
-    for i, (row_id, col_id) in enumerate(zip(row_idx, col_idx)):
-        dists = cdist(pattern_pos[pattern_names[row_id]], pattern_pos[pattern_names[col_id]])
-        emd[i] = np.sum(dists[linear_sum_assignment(dists)]) / len(pattern_pos[pattern_names[row_id]])
-    return pattern_names, emd
 
 
 def get_assembly_count_distance(clusters, t_bins, stim_times, patterns, distance_metric="normalized_euclidean"):
@@ -96,7 +79,7 @@ def main(config_path, seeds, save_assemblies=False):
     else:
         spike_matrix_dict, project_metadata = utils.load_spikes_from_h5(config.h5f_name, config.h5_prefix_spikes)
     stim_times, patterns = project_metadata["stim_times"], project_metadata["patterns"]
-    input_pattern_names, input_dist = get_pattern_distance(config.pattern_locs_fname, config.pattern_nodes_fname)
+    input_pattern_names, input_dist = utils.get_pattern_distance(config.pattern_locs_fname, config.pattern_nodes_fname)
     if save_assemblies:
         nrn_loc_df = utils.get_nrn_df(config.h5f_name, config.h5_prefix_connectivity, config.root_path, config.target)
 
