@@ -200,7 +200,8 @@ def group_clusters_by_patterns(clusters, t_bins, stim_times, patterns):
     # get basic info (passing them would be difficult...) and initialize empty matrices
     pattern_names, counts = np.unique(patterns, return_counts=True)
     isi, bin_size = np.max(np.diff(stim_times)), np.min(np.diff(t_bins))
-    pattern_matrices = {pattern: np.full((np.max(counts), int(isi / bin_size)), np.nan) for pattern in pattern_names}
+    pattern_matrices = {pattern: np.full((np.max(counts), int(np.ceil(isi / bin_size))), np.nan)
+                        for pattern in pattern_names}
     # group sign. activity clusters based on patterns
     row_idx = {pattern: 0 for pattern in pattern_names}
     for pattern, t_start, t_end in zip(patterns, stim_times[:-1], stim_times[1:]):

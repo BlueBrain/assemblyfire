@@ -42,7 +42,7 @@ def cluster_sim_mat(spike_matrix, min_n_clusts=5, max_n_clusts=20, n_method="DB"
 
     sim_matrix = cosine_similarity(spike_matrix.T)
     dists = 1 - sim_matrix
-    dists[dists < 1e-10] = 0.  # fixing numerical errors
+    dists[dists < 1e-5] = 0.  # fixing numerical errors
     cond_dists = squareform(dists)  # squareform implements its inverse if the input is a square matrix
 
     linkage_matrix = linkage(cond_dists, method="ward")
