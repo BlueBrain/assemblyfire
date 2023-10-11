@@ -1,0 +1,20 @@
+root_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/simulations/d21efd45-7740-4268-b06f-e1de35f2b6cf"
+
+input_patterns_fname: "input_spikes/stimulus_stream__start2000__end126501__rate2__seed9.txt"
+pattern_gids_fname: "input_spikes/Thalamocortical_input_VPM__hex_O1__supersample__nc100__pct12__seed9__pattern_gids.pkl"
+
+h5_out:
+    file_name: "assemblies_L2-5_sparse.h5"
+    prefixes:
+        spikes: "spikes"
+        assemblies: "assemblies"
+        connectivity: "connectivity"
+
+root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures/v7_assemblies"
+
+preprocessing_protocol:
+    target: "hex_O1L2-5Excitatory_Sample3pct"
+    t_start: 1500
+    t_end: 126000
+    bin_size: 20
+    threshold_rate: True
