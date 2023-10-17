@@ -456,6 +456,34 @@ def plot_in_degrees(in_degrees, in_degrees_control, fig_name, xlabel="In degree"
     plt.close(fig)
 
 
+def plot_in_degree_boxes(in_degrees, in_degrees_control, fig_name):
+    """Boxplots in degrees for assemblies (within one seed) and selected random controls"""
+    import pandas as pd
+    assembly_labels = list(in_degrees.keys())
+    n = len(assembly_labels)
+    cmap = plt.cm.get_cmap("tab20", np.max([assembly_label[0] for assembly_label in assembly_labels])+1)
+
+    fig = plt.figure(figsize=(20, 8))
+    n_rows = np.floor_divide(n, 5) + 1 if np.mod(n, 5) != 0 else int(n/5)
+    gs = gridspec.GridSpec(n_rows, 5)
+    for i, assembly_label in enumerate(assembly_labels):
+        ax = fig.add_subplot(gs[np.floor_divide(i, 5), np.mod(i, 5)])
+        # convert it to DataFrame for easier plotting
+        data, data_ctrl = in_degrees[assembly_label], in_degrees_control["mtypes"][assembly_label]
+        df = pd.DataFrame(data=np.concatenate([data, data_ctrl]), columns=["In degree"])
+        label = np.full(data.shape, "assembly", dtype="object")
+        label_ctrl = np.full(data_ctrl.shape, "ctrl. mtype comp.", dtype="object")
+        df["label"] = np.concatenate([label, label_ctrl])
+        sns.boxplot(x="label", y="In degree", order=["assembly", "ctrl. mtype comp."],
+                    palette={"assembly": cmap(assembly_label[0]), "ctrl. mtype comp.": "gray"},
+                    fliersize=2, data=df, ax=ax)
+        ax.set_xlabel("")
+    sns.despine(bottom=True, offset=2)
+    fig.tight_layout()
+    fig.savefig(fig_name, dpi=100, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_simplex_counts(simplex_counts, simplex_counts_control, fig_name):
     """Plots simplex counts for assemblies (within one seed) and random controls"""
     assembly_labels = list(simplex_counts.keys())
