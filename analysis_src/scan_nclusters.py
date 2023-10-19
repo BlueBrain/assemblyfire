@@ -64,7 +64,7 @@ def cluster_sim_mat(spike_matrix, t_bins, stim_times, patterns, input_pattern_na
     tsne = TSNE(n_components=2, metric="cosine").fit_transform(spike_matrix.T)
     sim_matrix = cosine_similarity(spike_matrix.T)
     dists = 1 - sim_matrix
-    dists[dists < 1e-10] = 0.  # fixing numerical errors
+    dists[dists < 1e-5] = 0.  # fixing numerical errors
     cond_dists = squareform(dists)  # squareform implements its inverse if the input is a square matrix
     linkage_matrix = linkage(cond_dists, method="ward")
 

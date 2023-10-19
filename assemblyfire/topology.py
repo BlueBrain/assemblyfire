@@ -165,7 +165,12 @@ def bin_gids_by_innervation(all_indegrees, gids, n_bins):
         bin_idx = np.digitize(indegrees, bin_edges, right=True)
         bin_idx_dict[key] = bin_idx
         for i, center in enumerate(bin_centers):
-            binned_gids[key][center] = gids[bin_idx == i+1]
+            if i == 0:  # put lowest values in the first bin
+                binned_gids[key][center] = np.concatenate([gids[bin_idx == i], gids[bin_idx == i + 1]])
+            elif i == n_bins - 1:  # put highest values in the last bin
+                binned_gids[key][center] = np.concatenate([gids[bin_idx == i + 1], gids[bin_idx == i + 2]])
+            else:
+                binned_gids[key][center] = gids[bin_idx == i+1]
     return binned_gids, bin_centers_dict, bin_idx_dict
 
 

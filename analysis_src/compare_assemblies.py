@@ -32,7 +32,7 @@ def _get_label(h5f_name):
     return os.path.split(h5f_name)[1].split('.')[0]
 
 
-def assembly_similarities_from2configs(config1_path, config2_path, consensus=False):
+def assembly_similarities_from2configs(config1_path, config2_path):
     """Loads in assemblies and gets their Jaccard similarity (seed by seed)"""
     config1 = Config(config1_path)
     config2 = Config(config2_path)
@@ -191,4 +191,5 @@ if __name__ == "__main__":
     # config_path = "../configs/v7_10seeds_np.yaml"
     # consensus_vs_average_assembly_similarity(config_path, frac_ths=[0.2, 0.4, 0.6, 0.8])
     # consensus_vs_average_assembly_composition(config_path, 7, 1)
+    assembly_similarities_from2configs("../configs/v7_10seeds_np.yaml", "../configs/v7_10seeds_np_L2-5_sparse.yaml")
 
