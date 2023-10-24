@@ -16,15 +16,24 @@ from assemblyfire.plots import plot_assembly_similarities, plot_pw_corrs_pairs,\
                                plot_consensus_vs_average_assembly_composition
 
 
-def get_assembly_similarities(assembly_grp1, assembly_grp2):
+def get_assembly_similarities(assembly_grp1, assembly_grp2, restrict2gids=None):
     """Gets Jaccard distance of assembly neurons"""
     # creating ID matrices with the union of the gids
     gids1, gids2 = assembly_grp1.all, assembly_grp2.all
     gids = np.union1d(gids1, gids2)
-    assembly_idx1 = np.zeros((len(assembly_grp1), len(gids)), dtype=int)
-    assembly_idx1[:, np.in1d(gids, gids1, assume_unique=True)] = assembly_grp1.as_bool().transpose().astype(int)
-    assembly_idx2 = np.zeros((len(assembly_grp2), len(gids)), dtype=int)
-    assembly_idx2[:, np.in1d(gids, gids2, assume_unique=True)] = assembly_grp2.as_bool().transpose().astype(int)
+    if restrict2gids is not None:
+        gids = gids[np.in1d(gids, restrict2gids, assume_unique=True)]
+        assembly_idx1 = np.zeros((len(assembly_grp1), len(gids)), dtype=int)
+        for assembly in assembly_grp1.assemblies:
+            assembly_idx1[assembly.idx[0], np.in1d(gids, assembly.gids, assume_unique=True)] = 1
+        assembly_idx2 = np.zeros((len(assembly_grp2), len(gids)), dtype=int)
+        for assembly in assembly_grp2.assemblies:
+            assembly_idx2[assembly.idx[0], np.in1d(gids, assembly.gids, assume_unique=True)] = 1
+    else:
+        assembly_idx1 = np.zeros((len(assembly_grp1), len(gids)), dtype=int)
+        assembly_idx1[:, np.in1d(gids, gids1, assume_unique=True)] = assembly_grp1.as_bool().transpose().astype(int)
+        assembly_idx2 = np.zeros((len(assembly_grp2), len(gids)), dtype=int)
+        assembly_idx2[:, np.in1d(gids, gids2, assume_unique=True)] = assembly_grp2.as_bool().transpose().astype(int)
     return 1 - cdist(assembly_idx1, assembly_idx2, "jaccard")
 
 
@@ -32,7 +41,7 @@ def _get_label(h5f_name):
     return os.path.split(h5f_name)[1].split('.')[0]
 
 
-def assembly_similarities_from2configs(config1_path, config2_path):
+def assembly_similarities_from2configs(config1_path, config2_path, restrict=True):
     """Loads in assemblies and gets their Jaccard similarity (seed by seed)"""
     config1 = Config(config1_path)
     config2 = Config(config2_path)
@@ -40,7 +49,9 @@ def assembly_similarities_from2configs(config1_path, config2_path):
     assembly_grp_dict1, _ = utils.load_assemblies_from_h5(config1.h5f_name, config1.h5_prefix_assemblies)
     assembly_grp_dict2, _ = utils.load_assemblies_from_h5(config2.h5f_name, config2.h5_prefix_assemblies)
     for seed, assembly_grp1 in assembly_grp_dict1.items():
-        similarities = get_assembly_similarities(assembly_grp1, assembly_grp_dict2[seed])
+        restrict2gids = utils.get_gids(utils.get_bluepy_circuit_from_root_path(config2.root_path), config2.target)\
+            if restrict else None
+        similarities = get_assembly_similarities(assembly_grp1, assembly_grp_dict2[seed], restrict2gids)
         fig_name = os.path.join(config2.fig_path, "assembly_similarities_%s.png" % seed)
         plot_assembly_similarities(similarities, xlabel, ylabel, fig_name)
 
@@ -185,11 +196,12 @@ def analyze_corrs(config1_path, config2_path, xlabel=None, ylabel=None, sim_th=0
 
 
 if __name__ == "__main__":
-    config1_path = "../configs/v7_5seeds_np_before.yaml"
-    config2_path = "../configs/v7_5seeds_np_after.yaml"
-    analyze_corrs(config1_path, config2_path, ylabel="before", xlabel="after")
+    # config1_path = "../configs/v7_5seeds_np_before.yaml"
+    # config2_path = "../configs/v7_5seeds_np_after.yaml"
+    # analyze_corrs(config1_path, config2_path, ylabel="before", xlabel="after")
     # config_path = "../configs/v7_10seeds_np.yaml"
     # consensus_vs_average_assembly_similarity(config_path, frac_ths=[0.2, 0.4, 0.6, 0.8])
     # consensus_vs_average_assembly_composition(config_path, 7, 1)
-    assembly_similarities_from2configs("../configs/v7_10seeds_np.yaml", "../configs/v7_10seeds_np_L2-5_sparse.yaml")
+    assembly_similarities_from2configs("../configs/v7_10seeds_np.yaml",
+                                       "../configs/v7_10seeds_np_L2-5_sparse.yaml")
 
