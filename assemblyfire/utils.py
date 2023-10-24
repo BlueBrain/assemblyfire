@@ -225,7 +225,7 @@ def group_clusters_by_patterns(clusters, t_bins, stim_times, patterns):
             pattern_matrices[pattern][row_idx[pattern], t_idx] = clusters[idx]
         row_idx[pattern] += 1
     # find max length of sign. activity and cut all matrices there
-    max_tidx = np.max([np.sum(~np.all(np.isnan(pattern_matrix), axis=0))
+    max_tidx = np.max([np.nonzero(~np.all(np.isnan(pattern_matrix), axis=0))[0][-1]
                        for _, pattern_matrix in pattern_matrices.items()])
     pattern_matrices = {pattern_name: pattern_matrix[:, :max_tidx]
                         for pattern_name, pattern_matrix in pattern_matrices.items()}
