@@ -8,8 +8,8 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 from scipy.stats import binom
-from pyitlib import discrete_random_variable as drv
 
+import assemblyfire.discrete_random_variable as drv
 from conntility.connectivity import ConnectivityMatrix
 
 

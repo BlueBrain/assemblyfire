@@ -33,7 +33,6 @@ setup(
                       "scipy>=1.10.0",
                       "pandas>=1.5.3",
                       "scikit-learn",
-                      "pyitlib>=0.2.3",
                       "libsonata>=0.1.16",
                       "pyflagser>=0.4.5",
                       "pyflagsercount>=0.2.2",
