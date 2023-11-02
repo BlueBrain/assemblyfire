@@ -8,8 +8,8 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 from scipy.stats import binom
-from pyitlib import discrete_random_variable as drv
 
+import assemblyfire.discrete_random_variable as drv
 from conntility.connectivity import ConnectivityMatrix
 
 
@@ -146,7 +146,7 @@ def simplex_counts_consensus_instantiations(assembly_grp, conn_mat):
     return simplex_count, s_c_control
 
 
-def bin_gids_by_innervation(all_indegrees, gids, n_bins):
+def bin_gids_by_innervation(all_indegrees, gids, n_bins, incl_extrema=False):
     """Creates lookups of gids in optimal bins for each pre-synaptic group (in terms of in-degree)
     works with both dictionary and DataFrame (column-wise)"""
     binned_gids, bin_centers_dict, bin_idx_dict = {key: {} for key in list(all_indegrees.keys())}, {}, {}
@@ -166,6 +166,9 @@ def bin_gids_by_innervation(all_indegrees, gids, n_bins):
         bin_idx_dict[key] = bin_idx
         for i, center in enumerate(bin_centers):
             binned_gids[key][center] = gids[bin_idx == i+1]
+        if incl_extrema:
+            binned_gids[key][center] = np.concatenate(binned_gids[key][center], gids[bin_idx == i + 2]])
+            binned_gids[key][bin_centers[0]] = np.concatenate(binned_gids[key][bin_centers[0]], gids[bin_idx == 0])
     return binned_gids, bin_centers_dict, bin_idx_dict
 
 

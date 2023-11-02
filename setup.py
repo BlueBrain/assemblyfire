@@ -32,8 +32,7 @@ setup(
                       "numpy>=1.24.3",
                       "scipy>=1.10.1",
                       "pandas>=2.0.2",
-                      "scikit-learn",  # let `pyitlib` figure out the version...
-                      "pyitlib>=0.2.3",
+                      "scikit-learn",
                       "libsonata>=0.1.21",
                       "neurom>=3.2.2",
                       "morph-tool>=2.9.1",
