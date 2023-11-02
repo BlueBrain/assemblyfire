@@ -1,4 +1,4 @@
-root_path: "/gpfs/bbp.cscs.ch/data/scratch/proj83/simulations/two_region_wonder/output/stim_3set/Ca1p05/OUcv0p3/fracInVivo0p5/fibers0p0/inputRep40/inputRepDelay1000/seed512997"
+root_path: "/gpfs/bbp.cscs.ch/data/scratch/proj83/simulations/two_region_wonder/output/stim_4spot/Ca1p05/OUcv0p3/fracInVivo0p6/fibers0p0/inputRep40/inputRepDelay1000/seed512997"
 input_patterns_fname: "input/stim_series.txt"
 
 h5_out:
@@ -13,6 +13,6 @@ root_fig_path: "/gpfs/bbp.cscs.ch/project/proj96/home/ecker/figures/v7_assemblie
 preprocessing_protocol:
     target: "two_region_hex0_Exc"
     t_start: 1500
-    t_end: 121500
-    bin_size: 20
+    t_end: 161500
+    bin_size: 5
     threshold_rate: True
