@@ -5,6 +5,7 @@ last modified: András Ecker 09.2023
 
 import numpy as np
 import pandas as pd
+from scipy.spatial.distance import pdist, squareform
 # follow https://github.com/cajal/microns-nda-access to be able to run this!
 from caveclient import CAVEclient
 from microns_phase3 import nda
@@ -29,8 +30,9 @@ def get_data(matched_df, session_id, scan_id):
     for i, unit_id in enumerate(df["unit_id"].to_numpy()):
         unit_key = {"session": session_id, "scan_idx": scan_id, "unit_id": unit_id}
         spikes[i, :] = (nda.Activity & unit_key).fetch1("trace")
+    corrs = 1 - squareform(pdist(spikes, "correlation"))
     npzf_name = "MICrONS_session%i_scan%i.npz" % (session_id, scan_id)
-    np.savez(npzf_name, spikes=spikes, t=t, idx=df["id_ref"].to_numpy(),
+    np.savez(npzf_name, spikes=spikes, t=t, idx=df["id_ref"].to_numpy(), corrs=corrs,
              v_treadmill=v_treadmill, pattern_names=pattern_names, stim_times=stim_times)
 
 
