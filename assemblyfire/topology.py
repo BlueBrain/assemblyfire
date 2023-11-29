@@ -167,7 +167,7 @@ def bin_gids_by_innervation(all_indegrees, gids, n_bins, incl_extrema=False):
         for i, center in enumerate(bin_centers):
             binned_gids[key][center] = gids[bin_idx == i+1]
         if incl_extrema:
-            binned_gids[key][center] = np.concatenate(binned_gids[key][center], gids[bin_idx == i + 2]])
+            binned_gids[key][center] = np.concatenate(binned_gids[key][center], gids[bin_idx == i + 2])
             binned_gids[key][bin_centers[0]] = np.concatenate(binned_gids[key][bin_centers[0]], gids[bin_idx == 0])
     return binned_gids, bin_centers_dict, bin_idx_dict
 
