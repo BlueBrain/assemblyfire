@@ -27,12 +27,19 @@ def get_data(matched_df, session_id, scan_id):
     # `fetch` gets all extracted spikes in one go, but then idk. how to map them to `id_ref`...
     df = matched_df.loc[(matched_df["session"] == session_id) & (matched_df["scan_idx"] == scan_id)]
     spikes = np.zeros((len(df), len(t)), dtype=np.float32)
+    oracle_scores = np.full(len(df), np.nan)
     for i, unit_id in enumerate(df["unit_id"].to_numpy()):
         unit_key = {"session": session_id, "scan_idx": scan_id, "unit_id": unit_id}
         spikes[i, :] = (nda.Activity & unit_key).fetch1("trace")
+        try:
+            oracle_scores[i] = (nda.Oracle & unit_key).fetch1("pearson")
+        except:
+            continue
+    print("session: %i scan: %i: No oracle scores for %i/%i units" % (session_id, scan_id,
+                                                                      np.isnan(oracle_scores).sum(), len(df)))
     corrs = 1 - squareform(pdist(spikes, "correlation"))
     npzf_name = "MICrONS_session%i_scan%i.npz" % (session_id, scan_id)
-    np.savez(npzf_name, spikes=spikes, t=t, idx=df["id_ref"].to_numpy(), corrs=corrs,
+    np.savez(npzf_name, spikes=spikes, t=t, idx=df["id_ref"].to_numpy(), oracle_scores=oracle_scores, corrs=corrs,
              v_treadmill=v_treadmill, pattern_names=pattern_names, stim_times=stim_times)
 
 
