@@ -213,7 +213,7 @@ def group_clusters_by_patterns(clusters, t_bins, stim_times, patterns):
     # find max length of sign. activity and cut all matrices there
     max_tidx = np.max([np.nonzero(~np.all(np.isnan(pattern_matrix), axis=0))[0][-1]
                        for _, pattern_matrix in pattern_matrices.items()])
-    pattern_matrices = {pattern_name: pattern_matrix[:, :max_tidx]
+    pattern_matrices = {pattern_name: pattern_matrix[:, :max_tidx + 1]
                         for pattern_name, pattern_matrix in pattern_matrices.items()}
     # count nr. of clusters per patterns
     pattern_counts, n_clusters = {}, len(np.unique(clusters))
